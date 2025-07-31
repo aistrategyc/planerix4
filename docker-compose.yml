@@ -1,0 +1,41 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:14
+    env_file:
+      - .env.postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    env_file:
+      - ./apps/api/.env
+    depends_on:
+      - postgres
+    ports:
+      - "8000:8000"
+    stdin_open: true
+    tty: true
+
+  frontend:
+    build:
+      context: ./apps/web-enterprise
+      dockerfile: Dockerfile
+    env_file:
+      - ./apps/web-enterprise/.env.local
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./apps/web-enterprise:/app
+      - /app/node_modules
+
+volumes:
+  postgres_data:
