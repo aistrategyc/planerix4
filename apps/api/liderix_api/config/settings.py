@@ -3,6 +3,8 @@
 from __future__ import annotations
 import os
 import logging
+import secrets
+import re
 from typing import List, Optional
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -19,12 +21,13 @@ class Settings(BaseSettings):
 
     # ── БД ──────────────────────────────────────────────────────────────────────
     # 🎯 ВАЖНО: По умолчанию async URL для FastAPI, env.py автоматически преобразует в sync
-    LIDERIX_DB_URL: Optional[str] = "postgresql+asyncpg://manfromlamp:lashd87123kKJSDAH81@localhost:5432/liderixapp"
+    # 🔒 БЕЗОПАСНОСТЬ: Никогда не указывать пароли в коде! Только через переменные окружения
+    LIDERIX_DB_URL: Optional[str] = None  # ОБЯЗАТЕЛЬНО через .env файл
     POSTGRES_URL: Optional[str] = None  # для совместимости
     ITSTEP_DB_URL: Optional[str] = None  # клиентская БД
 
     # ── JWT / Security ─────────────────────────────────────────────────────────
-    SECRET_KEY: str = Field(..., min_length=32)
+    SECRET_KEY: str = Field(..., min_length=64, description="Минимум 64 символа для безопасности")
     JWT_ALGORITHM: str = "HS256"
     JWT_ISSUER: str = "liderix"
     JWT_AUDIENCE: str = "liderix-clients"
@@ -37,9 +40,10 @@ class Settings(BaseSettings):
     DEV_AUTO_VERIFY: bool = False
 
     # ── Cookies ─────────────────────────────────────────────────────────────────
-    COOKIE_DOMAIN: Optional[str] = None   # в проде: ".planerix.com"
-    COOKIE_SECURE: bool = False           # в проде: True (только HTTPS)
-    COOKIE_SAMESITE: str = "lax"          # в проде: "strict"
+    COOKIE_DOMAIN: Optional[str] = None
+    # 🔒 Автоматическое определение безопасных настроек cookies
+    COOKIE_SECURE: bool = Field(default_factory=lambda: os.getenv("ENVIRONMENT", "development") == "production")
+    COOKIE_SAMESITE: str = Field(default_factory=lambda: "strict" if os.getenv("ENVIRONMENT", "development") == "production" else "lax")
     
     # ── CORS ────────────────────────────────────────────────────────────────────
     CORS_ALLOW_ORIGINS: List[str] = Field(default_factory=lambda: [
@@ -49,8 +53,12 @@ class Settings(BaseSettings):
         "https://www.planerix.com"
     ])
     CORS_ALLOW_CREDENTIALS: bool = True
-    CORS_ALLOW_METHODS: List[str] = Field(default_factory=lambda: ["*"])
-    CORS_ALLOW_HEADERS: List[str] = Field(default_factory=lambda: ["*"])
+    # 🔒 Ограничиваем CORS методы и заголовки для безопасности
+    CORS_ALLOW_METHODS: List[str] = Field(default_factory=lambda: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+    CORS_ALLOW_HEADERS: List[str] = Field(default_factory=lambda: [
+        "Accept", "Accept-Language", "Content-Type", "Content-Language", 
+        "Authorization", "X-Requested-With", "X-CSRF-Token"
+    ])
 
     # ── Email / Frontend ────────────────────────────────────────────────────────
     RESEND_API_KEY: Optional[str] = None
@@ -82,6 +90,37 @@ class Settings(BaseSettings):
             except ValueError:
                 logger.warning("Invalid ACCESS_TOKEN_EXPIRE_MINUTES; ignoring.")
         return values
+
+    @field_validator("SECRET_KEY")
+    @classmethod
+    def _validate_secret_key(cls, v):
+        """Валидация SECRET_KEY на достаточную энтропию и длину"""
+        if len(v) < 64:
+            raise ValueError("SECRET_KEY должен быть минимум 64 символа для безопасности")
+        
+        # Проверка на разнообразие символов (базовая проверка энтропии)
+        if len(set(v)) < 16:
+            logger.warning("SECRET_KEY имеет низкое разнообразие символов. Рекомендуется использовать более случайный ключ.")
+        
+        # Предупреждение о слабых ключах
+        weak_patterns = [r'12345', r'qwerty', r'password', r'secret', r'(.)\1{5,}']
+        for pattern in weak_patterns:
+            if re.search(pattern, v, re.IGNORECASE):
+                raise ValueError(f"SECRET_KEY содержит слабый паттерн. Используйте криптографически стойкий случайный ключ.")
+        
+        return v
+    
+    @field_validator("LIDERIX_DB_URL")
+    @classmethod 
+    def _validate_db_url(cls, v):
+        """Проверка что URL БД не содержит пароль в открытом виде"""
+        if v and "://" in v and ":" in v.split("://")[1].split("@")[0]:
+            # Если URL содержит пароль, но мы в разработке - предупреждаем
+            if os.getenv("ENVIRONMENT", "development") == "development":
+                logger.warning("БД URL содержит пароль. В продакшене используйте переменные окружения.")
+            elif os.getenv("ENVIRONMENT") == "production":
+                raise ValueError("В продакшене БД URL не должен содержать пароль в открытом виде")
+        return v
 
     @field_validator("CORS_ALLOW_ORIGINS", mode="before")
     @classmethod

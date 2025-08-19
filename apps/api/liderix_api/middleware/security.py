@@ -45,21 +45,22 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.redis: Redis = Redis.from_url(settings.REDIS_URL)
 
-        # Rate limits на нормализованные пути
+        # 🔒 Усиленные лимиты для защиты от bruteforce атак
         self.rate_limits = {
-            "/auth/register": {"requests": 50, "window": 3600},
-            "/auth/login": {"requests": 100, "window": 900},
+            "/auth/register": {"requests": 5, "window": 3600},      # 5 регистраций в час
+            "/auth/login": {"requests": 20, "window": 900},         # 20 попыток входа за 15 минут  
             "/auth/resend-verification": {"requests": 3, "window": 3600},
-            "/auth/refresh": {"requests": 100, "window": 3600},
-            "/auth/verify": {"requests": 100, "window": 3600},
-            "/auth/logout": {"requests": 60, "window": 3600},
+            "/auth/refresh": {"requests": 50, "window": 3600},      # снижено с 100
+            "/auth/verify": {"requests": 10, "window": 3600},       # снижено с 100
+            "/auth/logout": {"requests": 30, "window": 3600},       # снижено с 60
+            "/auth/password-reset": {"requests": 3, "window": 3600}, # новый лимит
         }
 
-        # Пороги для подозрительных действий
+        # 🔒 Более строгие пороги для подозрительных действий
         self.suspicious_thresholds = {
-            "rapid_fire_per_minute": 50,
-            "failed_logins_per_hour": 20,
-            "registrations_per_hour": 10,
+            "rapid_fire_per_minute": 30,      # снижено с 50
+            "failed_logins_per_hour": 10,     # снижено с 20
+            "registrations_per_hour": 3,      # снижено с 10
         }
 
         # Макс. размер тела в байтах

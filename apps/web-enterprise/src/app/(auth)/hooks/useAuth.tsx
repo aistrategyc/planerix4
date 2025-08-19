@@ -9,28 +9,15 @@ import {
   type PropsWithChildren,
 } from 'react'
 import { useRouter } from 'next/navigation'
-import { AxiosError } from 'axios'
 import { api, setAccessToken, clearTokens } from '@/lib/api/config'
 import { CompanyAPI } from '@/lib/api/company'
-
-interface User {
-  id: string
-  email: string
-  full_name?: string | null
-  is_active?: boolean
-}
-
-interface LoginData {
-  email: string
-  password: string
-}
-
-interface RegisterData {
-  email: string
-  password: string
-  username: string
-  terms_accepted: boolean
-}
+import { parseAPIError, getErrorMessage } from '@/lib/utils/error-handler'
+import type { 
+  User, 
+  LoginRequest, 
+  RegisterRequest,
+  AuthTokens
+} from '@/types/api'
 
 interface AuthState {
   user: User | null
@@ -39,8 +26,8 @@ interface AuthState {
 }
 
 interface AuthContextType extends AuthState {
-  login: (data: LoginData) => Promise<void>
-  register: (data: RegisterData) => Promise<void>
+  login: (data: LoginRequest) => Promise<void>
+  register: (data: RegisterRequest) => Promise<void>
   logout: () => Promise<void>
   refreshToken: () => Promise<boolean>
   clearError: () => void
@@ -118,18 +105,25 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     }
   }, [getCurrentUser, refreshToken, setUser, setLoading])
 
-  const login = useCallback(async (payload: LoginData) => {
+  const login = useCallback(async (payload: LoginRequest) => {
     clearError()
     setLoading(true)
     try {
-      const { data } = await api.post('/auth/login', payload)
-      const token: string | undefined = data?.access_token
+      const { data } = await api.post<AuthTokens>('/auth/login', payload)
+      const token = data?.access_token
       if (!token) throw new Error('Access token not received from server')
 
       setAccessToken(token)
 
       const user = await getCurrentUser()
       if (!user) throw new Error('Failed to get user profile after login')
+
+      // ✅ КРИТИЧЕСКИ ВАЖНО: Проверяем верификацию email
+      if (!user.is_verified) {
+        setUser(user)
+        router.push(`/verify-email?email=${encodeURIComponent(user.email)}`)
+        return
+      }
 
       setUser(user)
 
@@ -142,11 +136,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       }
     } catch (err) {
       console.error('Login error:', err)
-      let message = 'Login failed. Please try again.'
-      if (err instanceof AxiosError) {
-        const detail = err.response?.data?.detail
-        message = typeof detail === 'string' ? detail : detail?.detail || detail?.title || message
-      }
+      const message = getErrorMessage(err)
       setError(message)
       throw new Error(message)
     } finally {
@@ -154,28 +144,16 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     }
   }, [clearError, setLoading, getCurrentUser, setUser, setError, router])
 
-  const register = useCallback(async (payload: RegisterData) => {
+  const register = useCallback(async (payload: RegisterRequest) => {
     clearError()
     setLoading(true)
     try {
-      // Если бэкенд слушает /register — замени путь
-      await api.post('/register', payload)
+      // ✅ Исправлен путь для соответствия backend роуту
+      await api.post('/auth/register', payload)
       router.push(`/verify-email?email=${encodeURIComponent(payload.email)}`)
     } catch (err) {
       console.error('Registration error:', err)
-      let message = 'Registration failed. Please try again.'
-      if (err instanceof AxiosError) {
-        const detail = err.response?.data?.detail
-        if (typeof detail === 'string') message = detail
-        else if (detail && typeof detail === 'object') {
-          if (Array.isArray(detail)) {
-            const msgs = detail.map((e: any) => e.msg || e.message).filter(Boolean)
-            message = msgs.length ? msgs.join(', ') : message
-          } else {
-            message = detail.detail || detail.title || message
-          }
-        }
-      }
+      const message = getErrorMessage(err)
       setError(message)
       throw new Error(message)
     } finally {

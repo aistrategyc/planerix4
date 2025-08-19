@@ -366,11 +366,11 @@ export default function OnboardingPage() {
               </div>
             </div>
 
-            {/* Индикатор загрузки */}
+            {/* ✅ Улучшенный индикатор загрузки */}
             {saving && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                Создаём организацию...
+              <div className="flex items-center gap-2 text-sm text-muted-foreground p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                <span>Создаём организацию...</span>
               </div>
             )}
 

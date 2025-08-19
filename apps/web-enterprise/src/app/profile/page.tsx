@@ -889,7 +889,10 @@ function ProfilePageContent() {
 
 export default function ProfilePage() {
   return (
-    <ProtectedRoute requireAuth={true}>
+    <ProtectedRoute 
+      requireAuth={true} 
+      requireVerified={true}
+    >
       <ProfilePageContent />
     </ProtectedRoute>
   )
