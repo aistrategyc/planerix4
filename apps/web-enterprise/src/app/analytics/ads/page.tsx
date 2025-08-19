@@ -68,7 +68,7 @@ interface UtmRow {
   conv_rate: number
   cpa: number | null
   cps: number | null
-  platform?: string
+  platform: string
 }
 
 interface AdsDailyData {

@@ -9,9 +9,12 @@ interface CalendarProps {
   mode?: "single" | "range"
   value?: Date | { from?: Date; to?: Date }
   onChange?: (value: Date | { from?: Date; to?: Date }) => void
+  numberOfMonths?: number // ✅ добавлено
+  className?: string
+  disabled?: (date: Date) => boolean
 }
 
-export function Calendar({ mode = "single", value, onChange }: CalendarProps) {
+export function Calendar({ mode = "single", value, onChange, numberOfMonths = 1, className, disabled }: CalendarProps) {
   const handleChange = (item: any) => {
     if (mode === "range") {
       const range = item.selection
@@ -30,21 +33,34 @@ export function Calendar({ mode = "single", value, onChange }: CalendarProps) {
   }
 
   return (
-    <div className="rounded-md border shadow-sm p-2 bg-white">
+    <div className={`rounded-md border shadow-sm p-2 bg-white ${className ?? ""}`}>
       <BaseCalendar
         showDateDisplay={false}
         editableDateInputs={true}
         onChange={handleChange}
         moveRangeOnFirstSelection={false}
-        months={1}
+        months={numberOfMonths}
         direction="horizontal"
         rangeColors={["#3b82f6"]}
+        minDate={new Date(2000, 0, 1)}
+        maxDate={new Date()}
+        disabledDates={
+          disabled
+            ? Array.from({ length: 365 * 20 }) // check up to 20 years back
+                .map((_, i) => {
+                  const d = new Date()
+                  d.setDate(d.getDate() - i)
+                  return disabled(d) ? d : undefined
+                })
+                .filter(Boolean)
+            : undefined
+        }
         {...(mode === "range"
           ? {
               ranges: [
                 {
                   ...getSelectedRange(),
-                  color: "#3b82f6", // ✅ ключевое исправление
+                  color: "#3b82f6",
                 },
               ],
             }

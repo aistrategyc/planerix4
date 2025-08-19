@@ -98,12 +98,11 @@ export function DateRangePicker({ value, onChange }: DateRangePickerProps) {
         </div>
         <Calendar
           mode="range"
-          selected={tempRange}
-          onSelect={handleSelect}
+          value={tempRange}
+          onChange={handleSelect as (value: Date | { from?: Date; to?: Date }) => void}
           numberOfMonths={2}
           className="rounded-md border"
           disabled={(date) => isAfter(date, yesterday)}
-          initialFocus
         />
       </PopoverContent>
     </Popover>

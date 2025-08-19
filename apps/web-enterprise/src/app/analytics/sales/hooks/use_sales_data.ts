@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 
 interface SalesDaily {
   date: string
@@ -10,6 +10,8 @@ interface SalesDaily {
 interface SalesWeekly {
   week_start: string
   total_revenue: number
+  total_first_sum: number
+  contract_count: number
 }
 
 interface ServiceRow {
@@ -55,34 +57,51 @@ export function useSalesData(dateRange?: { from?: Date; to?: Date }) {
   })
   const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => {
-    async function fetchData() {
-      setIsLoading(true)
+  const fetchData = useCallback(async () => {
+    setIsLoading(true)
+    const query = new URLSearchParams()
+    if (dateRange?.from) query.append("from", dateRange.from.toISOString())
+    if (dateRange?.to) query.append("to", dateRange.to.toISOString())
 
-      const query = new URLSearchParams()
-      if (dateRange?.from) query.append("from", dateRange.from.toISOString())
-      if (dateRange?.to) query.append("to", dateRange.to.toISOString())
+    try {
+      const res = await fetch(`/api/analytics/sales?${query.toString()}`)
+      const json = await res.json()
 
-      try {
-        const res = await fetch(`/api/analytics/sales?${query.toString()}`)
-        const json = await res.json()
-        setData(json)
-      } catch (error) {
-        console.error("Ошибка при загрузке sales data", error)
-        setData({
-          daily: [],
-          weekly: [],
-          byService: [],
-          byBranch: [],
-          byUtm: [],
-        })
-      } finally {
-        setIsLoading(false)
-      }
+      const mappedWeekly = (json.weekly ?? []).map((item: any) => ({
+        week_start: item.week_start,
+        total_revenue: item.total_revenue ?? 0,
+        total_first_sum: item.total_first_sum ?? 0,
+        contract_count: item.contract_count ?? 0,
+      }))
+
+      setData({
+        daily: json.daily ?? [],
+        weekly: mappedWeekly,
+        byService: json.byService ?? [],
+        byBranch: json.byBranch ?? [],
+        byUtm: json.byUtm ?? [],
+      })
+    } catch (error) {
+      console.error("Ошибка при загрузке sales data", error)
+      setData({
+        daily: [],
+        weekly: [],
+        byService: [],
+        byBranch: [],
+        byUtm: [],
+      })
+    } finally {
+      setIsLoading(false)
     }
-
-    fetchData()
   }, [dateRange?.from?.toISOString(), dateRange?.to?.toISOString()])
 
-  return { ...data, isLoading }
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  return {
+    ...data,
+    isLoading,
+    refetch: fetchData,
+  }
 }

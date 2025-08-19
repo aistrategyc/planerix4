@@ -2,7 +2,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } f
 
 interface Props {
   data: Array<{
-    date: string // Изменено с dt на date для соответствия AdsAnalyticsPage
+    date: string
     spend?: number | null
     clicks?: number | null
     conversions?: number | null
@@ -12,6 +12,13 @@ interface Props {
   }>
 }
 
+const legendLabelMap = {
+  spend: "Витрати",
+  clicks: "Кліки",
+  conversions: "Конверсії",
+  conv_rate: "CR",
+}
+
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
@@ -19,7 +26,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         <p className="font-semibold">{`Дата: ${label}`}</p>
         {payload.map((entry: any, index: number) => (
           <p key={index} style={{ color: entry.stroke }}>
-            {entry.name === "Витрати" && entry.value != null
+            {entry.name === "Витрати"
               ? `${entry.name}: ${entry.value.toLocaleString("uk-UA", { style: "currency", currency: "UAH" })}`
               : `${entry.name}: ${entry.value != null ? entry.value.toLocaleString("uk-UA") : "–"}`}
           </p>
@@ -46,69 +53,24 @@ export function AdsDailyChart({ data }: Props) {
       ) : (
         <ResponsiveContainer>
           <LineChart data={data} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
-            <XAxis
-              dataKey="date"
-              tick={{ fontSize: 12 }}
-              label={{ value: "Дата", position: "bottom", offset: 0 }}
-              aria-label="Вісь X: Дата"
-            />
+            <XAxis dataKey="date" tick={{ fontSize: 12 }} label={{ value: "Дата", position: "bottom", offset: 0 }} />
             <YAxis
+              yAxisId="left"
               tick={{ fontSize: 12 }}
-              tickFormatter={(value, name) =>
-                name === "spend"
-                  ? value.toLocaleString("uk-UA", { style: "currency", currency: "UAH", maximumFractionDigits: 0 })
-                  : name === "conv_rate"
-                  ? (value * 100).toFixed(1) + "%"
-                  : value.toLocaleString("uk-UA", { maximumFractionDigits: 0 })
-              }
-              aria-label="Вісь Y: Значення метрик"
-            />
-            <Tooltip content={<CustomTooltip />} />
-            <Legend formatter={(value) => (value === "spend" ? "Витрати" : value === "clicks" ? "Кліки" : value === "conversions" ? "Конверсії" : "CR")} />
-            <Line
-              type="monotone"
-              dataKey="spend"
-              stroke="#3b82f6"
-              name="Витрати"
-              strokeWidth={2}
-              dot={false}
-              aria-label="Лінія витрат"
-            />
-            <Line
-              type="monotone"
-              dataKey="clicks"
-              stroke="#22c55e"
-              name="Кліки"
-              strokeWidth={2}
-              dot={false}
-              aria-label="Лінія кліків"
-            />
-            <Line
-              type="monotone"
-              dataKey="conversions"
-              stroke="#f97316"
-              name="Конверсії"
-              strokeWidth={2}
-              dot={false}
-              aria-label="Лінія конверсій"
-            />
-            <Line
-              type="monotone"
-              dataKey="conv_rate"
-              stroke="#a855f7"
-              name="CR"
-              strokeWidth={2}
-              dot={false}
-              aria-label="Лінія коефіцієнта конверсії"
-              yAxisId="percentage"
+              tickFormatter={(value) => value.toLocaleString("uk-UA", { maximumFractionDigits: 0 })}
             />
             <YAxis
               yAxisId="percentage"
               orientation="right"
-              tickFormatter={(value) => (value * 100).toFixed(1) + "%"}
               tick={{ fontSize: 12 }}
-              aria-label="Вісь Y: Коефіцієнт конверсії"
+              tickFormatter={(value) => (value * 100).toFixed(1) + "%"}
             />
+            <Tooltip content={<CustomTooltip />} />
+            <Legend formatter={(value) => legendLabelMap[value as keyof typeof legendLabelMap] ?? value} />
+            <Line type="monotone" dataKey="spend" stroke="#3b82f6" name="Витрати" strokeWidth={2} dot={false} yAxisId="left" />
+            <Line type="monotone" dataKey="clicks" stroke="#22c55e" name="Кліки" strokeWidth={2} dot={false} yAxisId="left" />
+            <Line type="monotone" dataKey="conversions" stroke="#f97316" name="Конверсії" strokeWidth={2} dot={false} yAxisId="left" />
+            <Line type="monotone" dataKey="conv_rate" stroke="#a855f7" name="CR" strokeWidth={2} dot={false} yAxisId="percentage" />
           </LineChart>
         </ResponsiveContainer>
       )}

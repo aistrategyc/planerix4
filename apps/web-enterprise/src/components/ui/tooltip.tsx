@@ -80,10 +80,9 @@ const TooltipTrigger: React.FC<TooltipTriggerProps> = ({ asChild, children, clas
     <Component
       className={cn("inline-flex items-center", className)}
       tabIndex={0}
-      ref={(node: HTMLDivElement | HTMLButtonElement) => {
+      ref={(node: any) => {
         if (node) {
-          // TypeScript workaround for ref
-          (node as any).dataset.tooltipTrigger = true
+          node.dataset.tooltipTrigger = "true"
         }
       }}
     >
@@ -99,10 +98,9 @@ const TooltipContent: React.FC<TooltipContentProps> = ({ children, className }) 
         "absolute z-50 bg-gray-800 text-white text-sm p-2 rounded-md shadow-lg min-w-max top-full mt-2",
         className
       )}
-      ref={(node: HTMLDivElement) => {
+      ref={(node: any) => {
         if (node) {
-          // TypeScript workaround for ref
-          (node as any).dataset.tooltipContent = true
+          node.dataset.tooltipContent = "true"
         }
       }}
     >

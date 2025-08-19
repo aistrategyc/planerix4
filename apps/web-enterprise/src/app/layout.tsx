@@ -3,9 +3,10 @@ import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
 import { cn } from "@/lib/utils"
 import { Providers } from "./providers"
-import { Header } from "@/components/ui/header"
-import { Sidebar } from "@/components/ui/sidebar"
-import { ToastProvider } from "@/components/ui/use-toast" // Adjust path if necessary
+import { AuthProvider } from "@/app/(auth)/hooks/useAuth"
+import Header from "@/components/ui/header"
+import Sidebar from "@/components/ui/sidebar"
+import { ToastProvider } from "@/components/ui/use-toast"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,8 +21,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Liderix — Business Intelligence",
-  description: "AI-powered business analytics and management platform.",
+  title: "Planerix — Business OS",
+  description: "AI-powered operating system for modern business.",
 }
 
 export default function RootLayout({
@@ -33,25 +34,33 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body
         className={cn(
-          "min-h-screen bg-background text-foreground font-sans antialiased transition-colors duration-300",
+          "min-h-screen bg-white text-gray-900 font-sans antialiased transition-colors duration-300",
           geistSans.variable,
           geistMono.variable
         )}
       >
         <Providers>
-          <ToastProvider> {/* Added ToastProvider to provide context for useToast */}
-            <div className="relative flex flex-col min-h-screen">
-              <Header />
-              <div className="flex flex-1 overflow-hidden">
-                <Sidebar />
-                <main className="flex-1 overflow-y-auto px-6 py-6 md:px-10 md:py-8 bg-background/80 backdrop-blur-md">
-                  {children}
-                </main>
-              </div>
-            </div>
-          </ToastProvider>
+          <AuthProvider>
+            <ToastProvider>
+              <ConditionalLayout>{children}</ConditionalLayout>
+            </ToastProvider>
+          </AuthProvider>
         </Providers>
       </body>
     </html>
+  )
+}
+
+function ConditionalLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <Header />
+      <div className="relative flex min-h-screen">
+        <Sidebar />
+        <main className="flex-1 overflow-y-auto px-6 py-6 md:px-10 md:py-8 pt-20 bg-white/80 backdrop-blur-sm">
+          {children}
+        </main>
+      </div>
+    </>
   )
 }

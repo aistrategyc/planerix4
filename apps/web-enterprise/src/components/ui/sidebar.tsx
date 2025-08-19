@@ -1,9 +1,8 @@
-// components/ui/sidebar.tsx
-"use client"
+'use client';
 
-import { useRouter } from "next/navigation"
-import { useState } from "react"
-import { Button } from "./button"
+import { usePathname } from 'next/navigation';
+import Link from 'next/link';
+import { useState, useMemo } from 'react';
 import {
   Home,
   Target,
@@ -16,51 +15,139 @@ import {
   BrainCircuit,
   Settings,
   HelpCircle,
-} from "lucide-react"
+} from 'lucide-react';
 
-export function Sidebar() {
-  const router = useRouter()
-  const [isHovered, setIsHovered] = useState(false)
+type NavItem = {
+  href: string;
+  label: string;
+  icon: React.ElementType;
+  badge?: string;
+};
+
+const MAIN: NavItem[] = [
+  { href: '/dashboard', label: 'Dashboard', icon: Home },
+  { href: '/okr', label: 'OKR', icon: Target },
+  { href: '/tasks', label: 'Tasks', icon: ListChecks },
+  { href: '/crm', label: 'CRM', icon: BarChart },
+  { href: '/marketing', label: 'Marketing', icon: Megaphone, badge: 'New' },
+  { href: '/ads', label: 'Ads', icon: Megaphone },
+  { href: '/teams', label: 'Teams', icon: Users },
+  { href: '/analytics', label: 'Analytics', icon: PieChart },
+  { href: '/calendar', label: 'Calendar', icon: Calendar },
+  { href: '/ai', label: 'AI', icon: BrainCircuit },
+];
+
+const FOOTER: NavItem[] = [
+  { href: '/settings', label: 'Settings', icon: Settings },
+  { href: '/help', label: 'Help', icon: HelpCircle },
+];
+
+export default function Sidebar() {
+  const pathname = usePathname();
+  const [isHovered, setIsHovered] = useState(false);
+
+  // активность роутинга
+  const isActive = (href: string) =>
+    pathname === href || (href !== '/' && pathname?.startsWith(href + '/'));
+
+  // ширина и паддинги панелей
+  const wide = isHovered;
+  const asideWidth = wide ? 'w-64 px-3 md:px-4' : 'w-[56px] px-2';
+  const align = wide ? 'items-start' : 'items-center';
 
   return (
     <aside
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className={`fixed top-0 left-0 z-40 h-screen transition-all duration-300 border-r border-border bg-white/60 backdrop-blur-lg shadow-md flex flex-col overflow-hidden ${
-        isHovered ? "w-64 px-4 py-6" : "w-[56px] items-center py-4"
-      }`}
+      className={[
+        // сдвигаем ниже фиксированного хедера (~64px)
+        'fixed left-0 z-40 h-[calc(100vh-64px)] top-16',
+        'border-r border-gray-200 bg-white/80 backdrop-blur-md shadow-sm',
+        'transition-all duration-300 ease-out',
+        'flex flex-col overflow-hidden',
+        asideWidth,
+      ].join(' ')}
+      aria-label="Primary navigation"
     >
-      <nav className={`flex flex-col gap-1 ${isHovered ? "items-start" : "items-center"}`}>
-        <SidebarButton icon={<Home size={18} />} label="На главную" path="/" showLabel={isHovered} />
-        <SidebarButton icon={<Target size={18} />} label="Стратегия" path="/strategy" showLabel={isHovered} />
-        <SidebarButton icon={<ListChecks size={18} />} label="Задачи" path="/tasks" showLabel={isHovered} />
-        <SidebarButton icon={<BarChart size={18} />} label="CRM" path="/crm" showLabel={isHovered} />
-        <SidebarButton icon={<BarChart size={18} className="text-black bg-lime-300 rounded-sm p-[1px]" />} label="Маркетинг" path="/marketing" showLabel={isHovered} />
-        <SidebarButton icon={<Megaphone size={18} />} label="Реклама" path="/ads" showLabel={isHovered} />
-        <SidebarButton icon={<Users size={18} />} label="Команды" path="/teams" showLabel={isHovered} />
-        <SidebarButton icon={<PieChart size={18} />} label="Аналитика" path="/analytics" showLabel={isHovered} />
-        <SidebarButton icon={<Calendar size={18} />} label="Календарь" path="/calendar" showLabel={isHovered} />
-        <SidebarButton icon={<BrainCircuit size={18} />} label="AI" path="/ai" showLabel={isHovered} />
+      {/* Основная навигация */}
+      <nav className={`mt-3 flex flex-col gap-1 ${align} overflow-y-auto`}>
+        {MAIN.map((item) => (
+          <SidebarLink
+            key={item.href}
+            item={item}
+            active={isActive(item.href)}
+            expanded={wide}
+          />
+        ))}
       </nav>
 
-      <div className={`mt-auto pt-6 flex flex-col gap-1 ${isHovered ? "items-start" : "items-center"}`}>
-        <SidebarButton icon={<Settings size={18} />} label="Настройки" path="/settings" showLabel={isHovered} />
-        <SidebarButton icon={<HelpCircle size={18} />} label="Помощь" path="/help" showLabel={isHovered} />
+      {/* Нижний блок */}
+      <div className={`mt-auto pt-4 pb-3 border-t border-gray-100 ${align}`}>
+        {FOOTER.map((item) => (
+          <SidebarLink
+            key={item.href}
+            item={item}
+            active={isActive(item.href)}
+            expanded={wide}
+          />
+        ))}
       </div>
     </aside>
-  )
+  );
 }
 
-function SidebarButton({ icon, label, path, showLabel = true }: { icon: React.ReactNode, label: string, path: string, showLabel?: boolean }) {
-  const router = useRouter()
+function SidebarLink({
+  item,
+  active,
+  expanded,
+}: {
+  item: NavItem;
+  active: boolean;
+  expanded: boolean;
+}) {
+  const Icon = item.icon;
+
+  const className = useMemo(
+    () =>
+      [
+        'group relative w-full rounded-lg',
+        'transition-colors duration-200',
+        'flex items-center gap-3',
+        expanded ? 'px-3 py-2' : 'px-2 py-2 justify-center',
+        active
+          ? 'bg-blue-50 text-blue-700 border border-blue-100'
+          : 'text-gray-700 hover:bg-gray-100/70',
+      ].join(' '),
+    [expanded, active]
+  );
+
   return (
-    <Button
-      variant="ghost"
-      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 hover:bg-muted/30 hover:shadow-sm"
-      onClick={() => router.push(path)}
+    <Link
+      href={item.href}
+      className={className}
+      aria-current={active ? 'page' : undefined}
+      title={!expanded ? item.label : undefined} // тултип при свёрнутом
     >
-      {icon}
-      {showLabel && <span className="text-sm truncate">{label}</span>}
-    </Button>
-  )
+      <Icon
+        className={active ? 'text-blue-600' : 'text-gray-600 group-hover:text-gray-800'}
+        size={18}
+        aria-hidden="true"
+      />
+      {expanded && (
+        <span className="text-sm truncate">
+          {item.label}{' '}
+          {item.badge && (
+            <span className="ml-2 align-middle text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">
+              {item.badge}
+            </span>
+          )}
+        </span>
+      )}
+
+      {/* Акцентная полоса слева (в расширенном виде) */}
+      {expanded && active && (
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded bg-blue-600" />
+      )}
+    </Link>
+  );
 }

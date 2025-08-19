@@ -1,7 +1,11 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
-import axios from "axios"
+import { useState, useCallback, useRef, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { useProfile } from "@/app/profile/hooks/useProfile"
+import { useOrganization } from "@/app/profile/hooks/useOrganization"
+import { useTasks } from "@/app/tasks/hooks/useTasks"
+import ProtectedRoute from "@/components/auth/ProtectedRoute"
 
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -12,251 +16,296 @@ import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import { useToast } from "@/components/ui/use-toast"
 
-import { AlertTriangle, Award, Building2, Calendar, Camera, CheckSquare, Clock, Edit3, Globe, Linkedin, Mail, MapPin, Phone, Save, Star, Target, TrendingUp, Twitter, User, Users, X, Github } from "lucide-react"
+import {
+  AlertTriangle,
+  Award,
+  Building2,
+  Calendar,
+  Camera,
+  CheckSquare,
+  Clock,
+  Edit3,
+  Globe,
+  Linkedin,
+  Mail,
+  MapPin,
+  Phone,
+  Save,
+  Star,
+  Target,
+  TrendingUp,
+  Twitter,
+  User,
+  Users,
+  X,
+  Github,
+  Loader2,
+  Plus,
+  Shield,
+  Settings,
+  BarChart3,
+  FileText,
+  Activity
+} from "lucide-react"
 
-// API Base URL (замени на реальный URL твоего backend, например, http://localhost:8000/api)
-const API_BASE = "http://localhost:8000/api"  // <--- Замени здесь на реальный URL, чтобы избежать Network Error
-
-interface TeamMember {
-  id: string
-  username: string
-  role: string
-  position: string
-  email: string
-  status: "online" | "offline" | "away"
+interface PasswordChangeForm {
+  currentPassword: string
+  newPassword: string
+  confirmPassword: string
 }
 
-interface Metric {
-  id: string
-  name: string
-  value: number | string
-  change: number
-  icon: any
-  color: string
-}
-
-interface Goal {
-  id: string
-  title: string
-  progress: number
-  deadline: string
-  priority: "high" | "medium" | "low"
-}
-
-interface Achievement {
-  id: string
-  title: string
-  description: string
-  date: string
-  icon: any
-}
-
-interface Task {
-  id: string
-  title: string
-  assignedTo: TeamMember
-  progress: number
-  deadline: string
-  status: "pending" | "in-progress" | "completed"
-  priority: "high" | "medium" | "low"
-}
-
-interface Integration {
-  id: number
-  name: string
-  connected: boolean
-  token: string
-}
-
-export default function ProfilePage() {
+function ProfilePageContent() {
+  const { toast } = useToast()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  
+  // Hooks
+  const { profile, stats, loading: profileLoading, updating, updateProfile, uploadAvatar, changePassword } = useProfile()
+  const { organization: currentOrg, loading: orgLoading, updateOrganization, teamMembers, inviteUser } = useOrganization()
+  const { tasks, loading: tasksLoading } = useTasks(profile ? { assigned_to: profile.id } : undefined)
+  // State
   const [isEditing, setIsEditing] = useState(false)
-  const [name, setName] = useState("")
-  const [email, setEmail] = useState("")
-  const [phone, setPhone] = useState("")
-  const [address, setAddress] = useState("")
-  const [department, setDepartment] = useState("")
-  const [role, setRole] = useState("")
-  const [bio, setBio] = useState("")
-  const [skills, setSkills] = useState<string[]>([])
-  const [avatarUrl, setAvatarUrl] = useState("")
-  const [team, setTeam] = useState<TeamMember[]>([])
-  const [companyName, setCompanyName] = useState("")
-  const [companyAddress, setCompanyAddress] = useState("")
-  const [companyWebsite, setCompanyWebsite] = useState("")
-  const [companyDescription, setCompanyDescription] = useState("")
-  const [metrics, setMetrics] = useState<Metric[]>([])
-  const [goals, setGoals] = useState<Goal[]>([])
-  const [achievements, setAchievements] = useState<Achievement[]>([])
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [integrations, setIntegrations] = useState<Integration[]>([
-    { id: 1, name: "Facebook Ads", connected: false, token: "" },
-    { id: 2, name: "Google Ads", connected: false, token: "" },
-    { id: 3, name: "Google Analytics", connected: false, token: "" },
-  ])
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false)
   const [inviteEmail, setInviteEmail] = useState("")
-  const [inviteRole, setInviteRole] = useState("employee")
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [inviteRole, setInviteRole] = useState("member")
+  const [passwordForm, setPasswordForm] = useState<PasswordChangeForm>({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: ""
+  })
+
+  // Form data for editing
+  const [formData, setFormData] = useState({
+    username: profile?.username || "",
+    first_name: profile?.first_name || "",
+    last_name: profile?.last_name || "",
+    phone: profile?.phone || "",
+    bio: profile?.bio || "",
+    timezone: profile?.timezone || ""
+  })
+
+  const [orgFormData, setOrgFormData] = useState({
+    name: currentOrg?.name || "",
+    description: currentOrg?.description || "",
+    website: currentOrg?.website || ""
+  })
+
+  // Update form data when profile/org changes
+  useEffect(() => {
+    if (profile) {
+      setFormData({
+        username: profile.username || "",
+        first_name: profile.first_name || "",
+        last_name: profile.last_name || "",
+        phone: profile.phone || "",
+        bio: profile.bio || "",
+        timezone: profile.timezone || ""
+      })
+    }
+  }, [profile])
 
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true)
-      try {
-        // Fetch current user profile
-        const profileRes = await axios.get(`${API_BASE}/users/me`)
-        const userData = profileRes.data
-        setName(userData.username || "")
-        setEmail(userData.email || "")
-        setPhone(userData.phone || "")
-        setAddress(userData.address || "")
-        setDepartment(userData.department || "")
-        setRole(userData.role || "")
-        setBio(userData.bio || "")
-        setSkills(userData.skills || [])
-        setAvatarUrl(userData.avatarUrl || "https://api.dicebear.com/7.x/initials/svg?seed=" + (userData.username ? userData.username[0] : "U"))
+    if (currentOrg) {
+      setOrgFormData({
+        name: currentOrg.name || "",
+        description: currentOrg.description || "",
+        website: currentOrg.website || ""
+      })
+    }
+  }, [currentOrg])
 
-        // Fetch team
-        const teamRes = await axios.get(`${API_BASE}/clients/${userData.client_id}/team`)
-        setTeam(teamRes.data.map((member: any) => ({
-          ...member,
-          status: "offline" // Placeholder, can be fetched or real-time
-        })))
+  // Handlers
+  const handleSaveProfile = useCallback(async () => {
+    const success = await updateProfile(formData)
+    if (success) {
+      setIsEditing(false)
+    }
+  }, [formData, updateProfile])
 
-        // Fetch company
-        const companyRes = await axios.get(`${API_BASE}/clients/${userData.client_id}`)
-        const companyData = companyRes.data
-        setCompanyName(companyData.name || "")
-        setCompanyAddress(companyData.address || "")
-        setCompanyWebsite(companyData.website || "")
-        setCompanyDescription(companyData.description || "")
+  const handleSaveOrganization = useCallback(async () => {
+  if (!currentOrg) return
+  const success = await updateOrganization(orgFormData) // ← без id
+  if (success) setIsEditing(false)
+}, [currentOrg, orgFormData, updateOrganization])
 
-        // Fetch projects, tasks, okrs, kpis
-        const projectsRes = await axios.get(`${API_BASE}/clients/${userData.client_id}/projects`)
-        setGoals(projectsRes.data.map((proj: any) => ({
-          id: proj.id,
-          title: proj.name,
-          progress: 0, // Calculate based on tasks
-          deadline: proj.deadline || "2025-12-31",
-          priority: "medium"
-        })))
+  const handleAvatarUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
 
-        const tasksRes = await axios.get(`${API_BASE}/clients/${userData.client_id}/tasks`)
-        setTasks(tasksRes.data.map((task: any) => ({
-          ...task,
-          assignedTo: teamRes.data.find((m: any) => m.id === task.assignee_id) || { username: "Unknown", role: "" },
-          status: task.status || "pending",
-          priority: task.priority || "medium"
-        })))
-
-        const okrsRes = await axios.get(`${API_BASE}/clients/${userData.client_id}/okrs`)
-        setAchievements(okrsRes.data.map((okr: any) => ({
-          id: okr.id,
-          title: okr.objective,
-          description: okr.key_results,
-          date: okr.created_at,
-          icon: Award
-        })))
-
-        const kpisRes = await axios.get(`${API_BASE}/clients/${userData.client_id}/kpis`)
-        setMetrics(kpisRes.data.map((kpi: any) => ({
-          id: kpi.id,
-          name: kpi.name,
-          value: kpi.current_value,
-          change: ((kpi.current_value - kpi.target_value) / kpi.target_value) * 100,
-          icon: TrendingUp,
-          color: "text-green-600"
-        })))
-
-        // Integrations from company
-        const newIntegrations = [...integrations]
-        if (companyData.facebook_ads_token) newIntegrations[0] = { ...newIntegrations[0], connected: true, token: companyData.facebook_ads_token }
-        if (companyData.google_ads_client_id) newIntegrations[1] = { ...newIntegrations[1], connected: true, token: companyData.google_ads_client_id }
-        if (companyData.google_analytics_id) newIntegrations[2] = { ...newIntegrations[2], connected: true, token: companyData.google_analytics_id }
-        setIntegrations(newIntegrations)
-      } catch (err) {
-        setError("Error fetching data. Check if backend is running.")
-        console.error(err)
-      } finally {
-        setLoading(false)
-      }
+    // Validate file
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Invalid File',
+        description: 'Please select an image file',
+        variant: 'destructive',
+      })
+      return
     }
 
-    fetchData()
-  }, [])
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "online": return "bg-green-500"
-      case "away": return "bg-yellow-500"
-      case "offline": return "bg-gray-400"
-      default: return "bg-gray-400"
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      toast({
+        title: 'File Too Large',
+        description: 'Please select an image smaller than 5MB',
+        variant: 'destructive',
+      })
+      return
     }
-  }
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "high": return "bg-red-100 text-red-800"
-      case "medium": return "bg-yellow-100 text-yellow-800"
-      case "low": return "bg-green-100 text-green-800"
-      default: return "bg-gray-100 text-gray-800"
+    await uploadAvatar(file)
+  }, [uploadAvatar, toast])
+
+  const handlePasswordChange = useCallback(async () => {
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast({
+        title: 'Password Mismatch',
+        description: 'New passwords do not match',
+        variant: 'destructive',
+      })
+      return
     }
-  }
 
-  const getTaskStatusColor = (status: string) => {
-    switch (status) {
-      case "completed": return "bg-green-500"
-      case "in-progress": return "bg-blue-500"
-      case "pending": return "bg-yellow-500"
-      default: return "bg-gray-400"
+    if (passwordForm.newPassword.length < 8) {
+      toast({
+        title: 'Weak Password',
+        description: 'Password must be at least 8 characters long',
+        variant: 'destructive',
+      })
+      return
     }
+
+    const success = await changePassword(passwordForm.currentPassword, passwordForm.newPassword)
+    if (success) {
+      setIsPasswordDialogOpen(false)
+      setPasswordForm({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: ""
+      })
+    }
+  }, [passwordForm, changePassword, toast])
+
+  const handleInviteUser = useCallback(async () => {
+    if (!currentOrg || !inviteEmail.trim()) return
+
+    const success = await inviteUser(inviteEmail, inviteRole as 'member' | 'manager' | 'admin')
+    if (success) {
+      setInviteEmail("")
+      setInviteRole("member")
+    }
+  }, [currentOrg, inviteEmail, inviteRole, inviteUser])
+
+  const router = useRouter()
+
+  const handleVerifyEmail = useCallback(() => {
+    if (!profile?.email) return
+    router.push(`/verify-email?email=${encodeURIComponent(profile.email)}`)
+  }, [profile?.email, router])
+
+  // Helper functions
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase()
   }
 
-  const handleSave = useCallback(async () => {
-    setIsEditing(false)
-    // Update user profile
-    await axios.put(`${API_BASE}/users/me`, { username: name, email, phone, address, department, role, bio, skills })
-    // Update company
-    await axios.put(`${API_BASE}/clients/current`, { name: companyName, address: companyAddress, website: companyWebsite, description: companyDescription })
-  }, [name, email, phone, address, department, role, bio, skills, companyName, companyAddress, companyWebsite, companyDescription])
-
-  const handleConnectIntegration = async (id: number, token: string) => {
-    const int = integrations[id - 1]
-    const field = int.name.toLowerCase().replace(/ /g, '_') + '_token'
-    await axios.put(`${API_BASE}/clients/current/integrations`, { [field]: token })
-    setIntegrations(integrations.map(i => i.id === id ? { ...i, connected: true, token } : i))
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString()
   }
 
-  const handleInvite = async () => {
-    await axios.post(`${API_BASE}/clients/current/invite`, { email: inviteEmail, role: inviteRole })
-    setInviteEmail("")
-    setInviteRole("employee")
+  const getStatusColor = (isActive?: boolean, lastLogin?: string | null) => {
+  const active = !!isActive
+  if (!active) return "bg-gray-400"
+  if (!lastLogin) return "bg-yellow-500"
+
+  const lastLoginDate = new Date(lastLogin)
+  const now = new Date()
+  const diffHours = (now.getTime() - lastLoginDate.getTime()) / (1000 * 60 * 60)
+
+  if (diffHours < 1) return "bg-green-500"
+  if (diffHours < 24) return "bg-yellow-500"
+  return "bg-gray-400"
+}
+
+  const getStatusText = (isActive?: boolean, lastLogin?: string | null) => {
+  const active = !!isActive
+  if (!active) return "Inactive"
+  if (!lastLogin) return "Never logged in"
+
+  const lastLoginDate = new Date(lastLogin)
+  const now = new Date()
+  const diffHours = (now.getTime() - lastLoginDate.getTime()) / (1000 * 60 * 60)
+
+  if (diffHours < 1) return "Online"
+  if (diffHours < 24) return "Away"
+  return "Offline"
+}
+
+  // Loading state
+  if (profileLoading || orgLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="flex flex-col items-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading profile...</p>
+        </div>
+      </div>
+    )
   }
 
-  if (loading) return <div>Загрузка...</div>
-  if (error) return <div>{error}</div>
+  if (!profile) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-foreground mb-2">Profile Not Found</h2>
+          <p className="text-muted-foreground">Unable to load your profile information.</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">
+      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Профиль пользователя</h1>
-          <p className="text-gray-600 mt-1">Управляйте своей информацией, компанией, задачами и интеграциями</p>
+          <h1 className="text-3xl font-bold text-foreground">Profile</h1>
+          <p className="text-muted-foreground mt-1">
+            Manage your personal information, organization, and preferences
+          </p>
         </div>
         <div className="flex gap-2">
           {isEditing ? (
             <>
-              <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700">
-                <Save className="w-4 h-4 mr-2" /> Сохранить
+              <Button 
+                onClick={() => {
+                  handleSaveProfile()
+                  if (currentOrg) handleSaveOrganization()
+                }} 
+                disabled={updating}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                {updating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                Save Changes
               </Button>
-              <Button variant="outline" onClick={() => setIsEditing(false)}>
-                <X className="w-4 h-4 mr-2" /> Отмена
+              <Button variant="outline" onClick={() => setIsEditing(false)} disabled={updating}>
+                <X className="w-4 h-4 mr-2" />
+                Cancel
               </Button>
             </>
           ) : (
             <Button onClick={() => setIsEditing(true)} variant="outline">
-              <Edit3 className="w-4 h-4 mr-2" /> Редактировать
+              <Edit3 className="w-4 h-4 mr-2" />
+              Edit Profile
             </Button>
           )}
         </div>
@@ -264,167 +313,300 @@ export default function ProfilePage() {
 
       <Tabs defaultValue="profile" className="w-full">
         <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="profile">Профиль</TabsTrigger>
-          <TabsTrigger value="team">Команда</TabsTrigger>
-          <TabsTrigger value="company">Компания</TabsTrigger>
-          <TabsTrigger value="metrics">Метрики</TabsTrigger>
-          <TabsTrigger value="tasks">Задачи</TabsTrigger>
-          <TabsTrigger value="integrations">Интеграции</TabsTrigger>
+          <TabsTrigger value="profile" className="flex items-center gap-2">
+            <User className="w-4 h-4" />
+            Profile
+          </TabsTrigger>
+          <TabsTrigger value="organization" className="flex items-center gap-2">
+            <Building2 className="w-4 h-4" />
+            Organization
+          </TabsTrigger>
+          <TabsTrigger value="team" className="flex items-center gap-2">
+            <Users className="w-4 h-4" />
+            Team
+          </TabsTrigger>
+          <TabsTrigger value="tasks" className="flex items-center gap-2">
+            <CheckSquare className="w-4 h-4" />
+            My Tasks
+          </TabsTrigger>
+          <TabsTrigger value="stats" className="flex items-center gap-2">
+            <BarChart3 className="w-4 h-4" />
+            Statistics
+          </TabsTrigger>
+          <TabsTrigger value="security" className="flex items-center gap-2">
+            <Shield className="w-4 h-4" />
+            Security
+          </TabsTrigger>
         </TabsList>
 
+        {/* Profile Tab */}
         <TabsContent value="profile" className="space-y-6">
           <Card>
             <CardContent className="p-6">
               <div className="flex flex-col md:flex-row gap-6">
+                {/* Avatar Section */}
                 <div className="flex flex-col items-center space-y-4">
                   <div className="relative">
                     <Avatar className="w-32 h-32">
-                      <AvatarImage src={avatarUrl} />
-                      <AvatarFallback className="text-2xl">{name.split(" ").map(n => n[0]).join("")}</AvatarFallback>
+                      <AvatarImage src={profile.avatar_url} />
+                      <AvatarFallback className="text-2xl">
+                        {getInitials(profile.username || profile.email || "U")}
+                      </AvatarFallback>
                     </Avatar>
                     {isEditing && (
-                      <Button size="sm" className="absolute -bottom-2 -right-2 rounded-full w-8 h-8 p-0" variant="secondary">
+                      <Button 
+                        size="sm" 
+                        className="absolute -bottom-2 -right-2 rounded-full w-8 h-8 p-0" 
+                        variant="secondary"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={updating}
+                      >
                         <Camera className="w-4 h-4" />
                       </Button>
                     )}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarUpload}
+                      className="hidden"
+                    />
                   </div>
                   <div className="text-center">
-                    <h2 className="text-2xl font-bold">{name}</h2>
-                    <p className="text-gray-600">{role}</p>
-                    <p className="text-sm text-gray-500">{department}</p>
+                    <h2 className="text-2xl font-bold">{profile.username}</h2>
+                    <p className="text-muted-foreground">{profile.email}</p>
+                    <Badge variant={profile.is_verified ? "default" : "secondary"} className="mt-2">
+                      {profile.is_verified ? "Verified" : "Not Verified"}
+                    </Badge>
                   </div>
                 </div>
+
+                {/* Profile Form */}
                 <div className="flex-1 space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <Label className="flex items-center gap-2">
-                        <User className="w-4 h-4" /> Имя
-                      </Label>
-                      <Input value={name} onChange={(e) => setName(e.target.value)} disabled={!isEditing} className="mt-1" />
+                      <Label htmlFor="username">Username</Label>
+                      <Input
+                        id="username"
+                        value={formData.username}
+                        onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                        disabled={!isEditing}
+                      />
                     </div>
                     <div>
-                      <Label className="flex items-center gap-2">
-                        <Mail className="w-4 h-4" /> Email
-                      </Label>
-                      <Input value={email} onChange={(e) => setEmail(e.target.value)} disabled={!isEditing} className="mt-1" />
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        value={profile.email}
+                        disabled
+                        className="bg-muted"
+                      />
                     </div>
                     <div>
-                      <Label className="flex items-center gap-2">
-                        <Phone className="w-4 h-4" /> Телефон
-                      </Label>
-                      <Input value={phone} onChange={(e) => setPhone(e.target.value)} disabled={!isEditing} className="mt-1" />
+                      <Label htmlFor="firstName">First Name</Label>
+                      <Input
+                        id="firstName"
+                        value={formData.first_name}
+                        onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                        disabled={!isEditing}
+                      />
                     </div>
                     <div>
-                      <Label className="flex items-center gap-2">
-                        <Building2 className="w-4 h-4" /> Департамент
-                      </Label>
-                      <Input value={department} onChange={(e) => setDepartment(e.target.value)} disabled={!isEditing} className="mt-1" />
+                      <Label htmlFor="lastName">Last Name</Label>
+                      <Input
+                        id="lastName"
+                        value={formData.last_name}
+                        onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                        disabled={!isEditing}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="phone">Phone</Label>
+                      <Input
+                        id="phone"
+                        value={formData.phone}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        disabled={!isEditing}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="timezone">Timezone</Label>
+                      <Select
+                        value={formData.timezone}
+                        onValueChange={(value) => setFormData({ ...formData, timezone: value })}
+                        disabled={!isEditing}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select timezone" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="UTC">UTC</SelectItem>
+                          <SelectItem value="America/New_York">Eastern Time</SelectItem>
+                          <SelectItem value="America/Chicago">Central Time</SelectItem>
+                          <SelectItem value="America/Denver">Mountain Time</SelectItem>
+                          <SelectItem value="America/Los_Angeles">Pacific Time</SelectItem>
+                          <SelectItem value="Europe/London">London</SelectItem>
+                          <SelectItem value="Europe/Paris">Paris</SelectItem>
+                          <SelectItem value="Asia/Tokyo">Tokyo</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
+
                   <div>
-                    <Label className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4" /> Адрес
-                    </Label>
-                    <Input value={address} onChange={(e) => setAddress(e.target.value)} disabled={!isEditing} className="mt-1" />
-                  </div>
-                  <div>
-                    <Label>О себе</Label>
-                    <textarea
-                      value={bio}
-                      onChange={(e) => setBio(e.target.value)}
+                    <Label htmlFor="bio">Bio</Label>
+                    <Textarea
+                      id="bio"
+                      value={formData.bio}
+                      onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
                       disabled={!isEditing}
-                      className="mt-1 w-full p-2 border rounded-md resize-none h-20 disabled:bg-gray-50"
-                      placeholder="Расскажите о себе..."
+                      placeholder="Tell us about yourself..."
+                      rows={4}
                     />
                   </div>
-                  <div>
-                    <Label>Навыки</Label>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {skills.map((skill, index) => (
-                        <Badge key={index} variant="secondary">
-                          {skill}
-                        </Badge>
-                      ))}
+
+                  {/* Account Info */}
+                  <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        <span>Joined: {formatDate(profile.created_at)}</span>
+                      </div>
+                      {profile.last_login_at && (
+                        <div className="flex items-center gap-2">
+                          <Activity className="w-4 h-4" />
+                          <span>Last login: {formatDate(profile.last_login_at)}</span>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                  <div>
-                    <Label>Социальные сети</Label>
-                    <div className="flex gap-4 mt-2">
-                      <a href="https://linkedin.com/in/ivan" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors">
-                        <Linkedin className="w-5 h-5" />
-                        <span className="text-sm">LinkedIn</span>
-                      </a>
-                      <a href="https://twitter.com/ivan" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sky-500 hover:text-sky-700 transition-colors">
-                        <Twitter className="w-5 h-5" />
-                        <span className="text-sm">Twitter</span>
-                      </a>
-                      <a href="https://github.com/ivan" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-gray-700 hover:text-gray-900 transition-colors">
-                        <Github className="w-5 h-5" />
-                        <span className="text-sm">GitHub</span>
-                      </a>
-                      <a href="https://ivan.example.com" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-green-600 hover:text-green-800 transition-colors">
-                        <Globe className="w-5 h-5" />
-                        <span className="text-sm">Сайт</span>
-                      </a>
+                    <div className="space-y-2 text-sm">
+                      <div>Account Status: <Badge variant={profile.is_active ? "default" : "secondary"}>{profile.is_active ? "Active" : "Inactive"}</Badge></div>
+                      <div>User ID: <code className="text-xs">{profile.id}</code></div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Award className="w-5 h-5" /> Достижения
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {achievements.map((achievement) => {
-                  const Icon = achievement.icon
-                  return (
-                    <div key={achievement.id} className="flex items-start gap-3 p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                      <div className="flex-shrink-0 w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
-                        <Icon className="w-5 h-5 text-yellow-600" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-medium text-sm">{achievement.title}</h4>
-                        <p className="text-xs text-gray-600 mt-1">{achievement.description}</p>
-                        <p className="text-xs text-gray-500 mt-2">{achievement.date}</p>
-                      </div>
-                    </div>
-                  )
-                })}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
+        {/* Organization Tab */}
+        <TabsContent value="organization" className="space-y-6">
+          {currentOrg ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="w-5 h-5" />
+                  Organization Details
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="orgName">Organization Name</Label>
+                  <Input
+                    id="orgName"
+                    value={orgFormData.name}
+                    onChange={(e) => setOrgFormData({ ...orgFormData, name: e.target.value })}
+                    disabled={!isEditing}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="orgWebsite">Website</Label>
+                  <Input
+                    id="orgWebsite"
+                    value={orgFormData.website}
+                    onChange={(e) => setOrgFormData({ ...orgFormData, website: e.target.value })}
+                    disabled={!isEditing}
+                    placeholder="https://example.com"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="orgDescription">Description</Label>
+                  <Textarea
+                    id="orgDescription"
+                    value={orgFormData.description}
+                    onChange={(e) => setOrgFormData({ ...orgFormData, description: e.target.value })}
+                    disabled={!isEditing}
+                    placeholder="Tell us about your organization..."
+                    rows={4}
+                  />
+                </div>
+
+                {/* Organization Stats */}
+                <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4" />
+                      <span>Founded: {formatDate(currentOrg.created_at)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      <span>Team Members ({(teamMembers?.length ?? 0)})</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <div>Organization ID: <code className="text-xs">{currentOrg.id}</code></div>
+                    {currentOrg.website && (
+                      <div className="flex items-center gap-2">
+                        <Globe className="w-4 h-4" />
+                        <a 
+                          href={currentOrg.website} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline"
+                        >
+                          Visit Website
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-6 text-center">
+                <Building2 className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-medium mb-2">No Organization</h3>
+                <p className="text-muted-foreground mb-4">You're not part of any organization yet.</p>
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Organization
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* Team Tab */}
         <TabsContent value="team" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Users className="w-5 h-5" /> Команда и коллеги
+                <Users className="w-5 h-5" />
+                Team Members ({teamMembers?.length ?? 0})
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {team.map((member) => (
-                  <div key={member.id} className="flex flex-col items-center space-y-3 p-4 border rounded-lg hover:shadow-md transition-shadow">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {(teamMembers ?? []).map(member => (
+                  <div key={member.id} className="flex flex-col items-center space-y-3 p-4 border border-border rounded-lg hover:shadow-md transition-shadow">
                     <div className="relative">
                       <Avatar className="w-16 h-16">
-                        <AvatarImage src={member.avatarUrl} />
-                        <AvatarFallback>{member.username.split(" ").map(n => n[0]).join("")}</AvatarFallback>
+                        <AvatarImage src={member.avatar_url} />
+                        <AvatarFallback>{getInitials(member.username)}</AvatarFallback>
                       </Avatar>
-                      <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${getStatusColor(member.status)}`} />
+                      <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-background ${getStatusColor(member.is_active, member.last_login_at)}`} />
                     </div>
                     <div className="text-center">
                       <div className="font-medium text-sm">{member.username}</div>
-                      <div className="text-xs text-gray-600">{member.role}</div>
+                      <div className="text-xs text-muted-foreground">{member.email}</div>
                       <Badge variant="outline" className="mt-2 text-xs">
-                        {member.status === "online" ? "В сети" : member.status === "away" ? "Отошел" : "Не в сети"}
+                        {member.role}
                       </Badge>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {getStatusText(member.is_active, member.last_login_at)}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -432,218 +614,283 @@ export default function ProfilePage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="w-5 h-5" /> Приглашение сотрудников
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="invite-email">Email для приглашения</Label>
-                  <Input id="invite-email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="email@example.com" />
-                </div>
-                <div>
-                  <Label htmlFor="invite-role">Роль</Label>
-                  <select id="invite-role" value={inviteRole} onChange={(e) => setInviteRole(e.target.value)} className="w-full p-2 border rounded-md">
-                    <option value="employee">Сотрудник</option>
-                    <option value="teamlead">Тимлид</option>
-                  </select>
-                </div>
-                <Button onClick={handleInvite} className="w-full">
-                  <Mail className="w-4 h-4 mr-2" /> Отправить приглашение
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="company" className="space-y-6">
-          <Card>
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                <div>
-                  <Label className="flex items-center gap-2">
-                    <Building2 className="w-4 h-4" /> Название компании
-                  </Label>
-                  <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} disabled={!isEditing} className="mt-1" />
-                </div>
-                <div>
-                  <Label className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4" /> Адрес компании
-                  </Label>
-                  <Input value={companyAddress} onChange={(e) => setCompanyAddress(e.target.value)} disabled={!isEditing} className="mt-1" />
-                </div>
-                <div>
-                  <Label className="flex items-center gap-2">
-                    <Globe className="w-4 h-4" /> Веб-сайт
-                  </Label>
-                  <Input value={companyWebsite} onChange={(e) => setCompanyWebsite(e.target.value)} disabled={!isEditing} className="mt-1" />
-                </div>
-                <div>
-                  <Label>Описание компании</Label>
-                  <textarea
-                    value={companyDescription}
-                    onChange={(e) => setCompanyDescription(e.target.value)}
-                    disabled={!isEditing}
-                    className="mt-1 w-full p-2 border rounded-md resize-none h-20 disabled:bg-gray-50"
-                    placeholder="Расскажите о компании..."
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Target className="w-5 h-5" /> Цели компании
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {goals.map((goal) => (
-                <div key={goal.id} className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 flex-1">
-                      <h4 className="font-medium">{goal.title}</h4>
-                      <Badge className={getPriorityColor(goal.priority)}>
-                        {goal.priority === "high" ? "Высокий" : goal.priority === "medium" ? "Средний" : "Низкий"}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Calendar className="w-4 h-4" />
-                      {goal.deadline}
-                    </div>
+          {/* Invite User Card */}
+          {currentOrg && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Mail className="w-5 h-5" />
+                  Invite Team Member
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="inviteEmail">Email Address</Label>
+                    <Input
+                      id="inviteEmail"
+                      type="email"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      placeholder="colleague@example.com"
+                    />
                   </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Прогресс</span>
-                      <span className="font-medium">{goal.progress}%</span>
-                    </div>
-                    <Progress value={goal.progress} className="h-2" />
+                  <div>
+                    <Label htmlFor="inviteRole">Role</Label>
+                    <Select value={inviteRole} onValueChange={setInviteRole}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="member">Employee</SelectItem>
+                        <SelectItem value="manager">Manager</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
+                  <Button 
+                    onClick={handleInviteUser} 
+                    className="w-full"
+                    disabled={!inviteEmail.trim()}
+                  >
+                    <Mail className="w-4 h-4 mr-2" />
+                    Send Invitation
+                  </Button>
                 </div>
-              ))}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
-        <TabsContent value="metrics" className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {metrics.map((metric) => {
-              const Icon = metric.icon
-              return (
-                <Card key={metric.id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-full bg-gray-100">
-                          <Icon className={`w-5 h-5 ${metric.color}`} />
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-600">{metric.name}</p>
-                          <p className="text-2xl font-bold">{metric.value}</p>
-                        </div>
-                      </div>
-                      <div className={`text-sm font-medium ${metric.change > 0 ? "text-green-600" : "text-red-600"}`}>
-                        {metric.change > 0 ? "+" : ""}{metric.change}%
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
-        </TabsContent>
-
+        {/* My Tasks Tab */}
         <TabsContent value="tasks" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <CheckSquare className="w-5 h-5" /> Задачи
+                <CheckSquare className="w-5 h-5" />
+                My Tasks ({tasks.length})
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
-              {tasks.map((task) => (
-                <div key={task.id} className="space-y-3 p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="w-10 h-10">
-                        <AvatarImage src={task.assignedTo.avatarUrl} />
-                        <AvatarFallback>{task.assignedTo.username.split(" ").map(n => n[0]).join("")}</AvatarFallback>
-                      </Avatar>
-                      <div>
+            <CardContent>
+              {tasksLoading ? (
+                <div className="text-center py-8">
+                  <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
+                  <p className="text-muted-foreground">Loading tasks...</p>
+                </div>
+              ) : tasks.length > 0 ? (
+                <div className="space-y-4">
+                  {tasks.slice(0, 10).map((task) => (
+                    <div key={task.id} className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors">
+                      <div className="flex-1">
                         <h4 className="font-medium">{task.title}</h4>
-                        <p className="text-sm text-gray-600">{task.assignedTo.username} ({task.assignedTo.role})</p>
+                        {task.description && (
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                            {task.description}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-2 mt-2">
+                          <Badge variant="outline" className="text-xs">
+                            {task.status.replace('_', ' ').toUpperCase()}
+                          </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {task.priority.toUpperCase()}
+                          </Badge>
+                          {task.due_date && (
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Clock className="w-3 h-3" />
+                              {formatDate(task.due_date)}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge className={getPriorityColor(task.priority)}>
-                        {task.priority === "high" ? "Высокий" : task.priority === "medium" ? "Средний" : "Низкий"}
-                      </Badge>
-                      <div className={`w-3 h-3 rounded-full ${getTaskStatusColor(task.status)}`} />
+                  ))}
+                  {tasks.length > 10 && (
+                    <div className="text-center pt-4">
+                      <Button variant="outline" size="sm">
+                        View All Tasks ({tasks.length})
+                      </Button>
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Прогресс</span>
-                      <span className="font-medium">{task.progress}%</span>
-                    </div>
-                    <Progress value={task.progress} className="h-2" />
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Clock className="w-4 h-4" />
-                      {task.deadline}
-                      {new Date(task.deadline) < new Date() && task.status !== "completed" && (
-                        <AlertTriangle className="w-4 h-4 text-red-600" />
-                      )}
-                    </div>
-                  </div>
+                  )}
                 </div>
-              ))}
+              ) : (
+                <div className="text-center py-8">
+                  <CheckSquare className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-lg font-medium mb-2">No Tasks Assigned</h3>
+                  <p className="text-muted-foreground">You don't have any tasks assigned to you yet.</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="integrations" className="space-y-6">
+        {/* Statistics Tab */}
+        <TabsContent value="stats" className="space-y-6">
+          {stats ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Tasks</p>
+                      <p className="text-2xl font-bold">{stats.total_tasks}</p>
+                    </div>
+                    <CheckSquare className="w-8 h-8 text-primary" />
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Completed</p>
+                      <p className="text-2xl font-bold">{stats.completed_tasks}</p>
+                    </div>
+                    <CheckSquare className="w-8 h-8 text-green-600" />
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Active Projects</p>
+                      <p className="text-2xl font-bold">{stats.active_projects}</p>
+                    </div>
+                    <Target className="w-8 h-8 text-blue-600" />
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Completion Rate</p>
+                      <p className="text-2xl font-bold">{stats.completion_rate}%</p>
+                    </div>
+                    <TrendingUp className="w-8 h-8 text-purple-600" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="p-6 text-center">
+                <BarChart3 className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-medium mb-2">No Statistics Available</h3>
+                <p className="text-muted-foreground">Start working on tasks to see your statistics.</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* Security Tab */}
+        <TabsContent value="security" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Интеграции</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="w-5 h-5" />
+                Password & Security
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {integrations.map((int) => (
-                  <div key={int.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Globe className="w-5 h-5" />
-                      <span>{int.name}</span>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 border border-border rounded-lg">
+                <div>
+                  <h4 className="font-medium">Password</h4>
+                  <p className="text-sm text-muted-foreground">Last changed: Never</p>
+                </div>
+                <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline">Change Password</Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Change Password</DialogTitle>
+                      <DialogDescription>
+                        Enter your current password and choose a new secure password.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="currentPassword">Current Password</Label>
+                        <Input
+                          id="currentPassword"
+                          type="password"
+                          value={passwordForm.currentPassword}
+                          onChange={(e) => setPasswordForm({...passwordForm, currentPassword: e.target.value})}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="newPassword">New Password</Label>
+                        <Input
+                          id="newPassword"
+                          type="password"
+                          value={passwordForm.newPassword}
+                          onChange={(e) => setPasswordForm({...passwordForm, newPassword: e.target.value})}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                        <Input
+                          id="confirmPassword"
+                          type="password"
+                          value={passwordForm.confirmPassword}
+                          onChange={(e) => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
+                        />
+                      </div>
                     </div>
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button variant={int.connected ? "secondary" : "default"}>
-                          {int.connected ? "Подключено" : "Подключить"}
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Подключить {int.name}</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4">
-                          <Label>API Token</Label>
-                          <Input placeholder="Введите токен" onChange={(e) => handleConnectIntegration(int.id, e.target.value)} />
-                          <Button onClick={() => handleConnectIntegration(int.id, 'token')} className="w-full">
-                            Подключить
-                          </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-                ))}
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setIsPasswordDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button onClick={handlePasswordChange}>
+                        Change Password
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              <div className="flex items-center justify-between p-4 border border-border rounded-lg">
+                <div>
+                  <h4 className="font-medium">Two Factor Authentication</h4>
+                  <p className="text-sm text-muted-foreground">Add extra security to your account</p>
+                </div>
+                <Button variant="outline" disabled>
+                  <Settings className="w-4 h-4 mr-2" />
+                  Configure
+                </Button>
+              </div>
+
+              <div className="flex items-center justify-between p-4 border border-border rounded-lg">
+                <div>
+                  <h4 className="font-medium">Account Verification</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Status: {profile.is_verified ? "Verified" : "Not Verified"}
+                  </p>
+                </div>
+                {!profile.is_verified && (
+                  <Button variant="outline" onClick={handleVerifyEmail}>
+                    <Mail className="w-4 h-4 mr-2" />
+                    Verify Email
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
     </div>
+  )
+}
+
+export default function ProfilePage() {
+  return (
+    <ProtectedRoute requireAuth={true}>
+      <ProfilePageContent />
+    </ProtectedRoute>
   )
 }

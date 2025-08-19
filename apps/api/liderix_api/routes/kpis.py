@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 
 from liderix_api.models.kpi import KPI
 from liderix_api.schemas.kpis import KPICreate, KPIUpdate, KPIRead
@@ -10,10 +10,10 @@ from liderix_api.db import get_async_session
 from liderix_api.services.auth import get_current_user
 from liderix_api.models.users import User
 
-router = APIRouter(prefix="/kpis", tags=["KPIs"])
+router = APIRouter(prefix="", tags=["KPIs"])
 
 # 🔹 Получить все KPI пользователя
-@router.get("/", response_model=list[KPIRead])
+@router.get("/kpis", response_model=list[KPIRead])
 async def get_kpis(
     session: AsyncSession = Depends(get_async_session),
     current_user: User = Depends(get_current_user)
@@ -24,7 +24,7 @@ async def get_kpis(
     return result.scalars().all()
 
 # 🔹 Получить один KPI
-@router.get("/{kpi_id}", response_model=KPIRead)
+@router.get("/kpis/{kpi_id}", response_model=KPIRead)
 async def get_kpi(
     kpi_id: UUID,
     session: AsyncSession = Depends(get_async_session),
@@ -36,7 +36,7 @@ async def get_kpi(
     return kpi
 
 # 🔹 Создать KPI
-@router.post("/", response_model=KPIRead)
+@router.post("/kpis", response_model=KPIRead)
 async def create_kpi(
     data: KPICreate,
     session: AsyncSession = Depends(get_async_session),
@@ -45,7 +45,7 @@ async def create_kpi(
     new_kpi = KPI(
         **data.dict(),
         user_id=current_user.id,
-        created_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc)
     )
     session.add(new_kpi)
     await session.commit()
@@ -53,7 +53,7 @@ async def create_kpi(
     return new_kpi
 
 # 🔹 Обновить KPI
-@router.put("/{kpi_id}", response_model=KPIRead)
+@router.put("/kpis/{kpi_id}", response_model=KPIRead)
 async def update_kpi(
     kpi_id: UUID,
     data: KPIUpdate,
@@ -72,7 +72,7 @@ async def update_kpi(
     return kpi
 
 # 🔹 Удалить KPI
-@router.delete("/{kpi_id}")
+@router.delete("/kpis/{kpi_id}")
 async def delete_kpi(
     kpi_id: UUID,
     session: AsyncSession = Depends(get_async_session),

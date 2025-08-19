@@ -13,6 +13,7 @@ interface DailyStat {
 interface CampaignStat {
   campaign_id: string
   campaign_name?: string
+  platform?: string    
   spend: number
   clicks: number
   conversions: number
@@ -54,6 +55,7 @@ interface UtmStat {
   conv_rate: number
   cpa: number | null
   cps: number | null
+  platform: string
 }
 
 interface UseAdsDataResult {

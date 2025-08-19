@@ -1,7 +1,18 @@
-// app/(auth)/layout.tsx
+"use client"
 
-import AuthLayout from "@/components/layouts/authlayout"
+import { AuthProvider } from "@/app/(auth)/hooks/useAuth"
 
-export default function AuthRootLayout({ children }: { children: React.ReactNode }) {
-  return <AuthLayout>{children}</AuthLayout>
+export default function AuthLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <AuthProvider>
+      <div className="min-h-screen bg-background">
+        {/* Auth pages don't need Header/Sidebar */}
+        {children}
+      </div>
+    </AuthProvider>
+  )
 }

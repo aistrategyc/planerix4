@@ -17,23 +17,28 @@ export default function AIChatPage() {
   const [loading, setLoading] = useState(false);
   const chatRef = useRef<HTMLDivElement>(null);
 
-  const webhook = process.env.NEXT_PUBLIC_AI_AGENT_WEBHOOK_URL;
-  if (!webhook) {
-    throw new Error("NEXT_PUBLIC_AI_AGENT_WEBHOOK_URL is not defined");
-  }
+  // Webhook URL берём из NEXT_PUBLIC_*
+  const webhook = process.env.NEXT_PUBLIC_AI_AGENT_WEBHOOK_URL ?? "";
 
   const sendMessage = useCallback(async () => {
     const text = input.trim();
     if (!text) return;
 
-    // Добавляем сообщение пользователя
     setMessages((prev) => [...prev, { role: "user", text }]);
     setInput("");
     setLoading(true);
 
     try {
-      const { data } = await axios.post<{ answer?: string }>(webhook, { query: text });
-      const answer = data.answer ?? "🤖 Ответ отсутствует или недоступен.";
+      if (!webhook) {
+        throw new Error("Webhook URL not configured");
+      }
+
+      const { data } = await axios.post(webhook, { query: text });
+      const answer =
+        data?.answer ??
+        data?.data?.answer ??
+        "🤖 Ответ отсутствует или недоступен.";
+
       setMessages((prev) => [...prev, { role: "bot", text: answer }]);
     } catch (e) {
       setMessages((prev) => [
@@ -45,12 +50,26 @@ export default function AIChatPage() {
     }
   }, [input, webhook]);
 
-  // Автоскролл при новых сообщениях
+  // Автоскролл вниз при добавлении сообщений
   useEffect(() => {
     const el = chatRef.current;
-    if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-  }, [messages, loading]);
+    if (el) {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    }
+  }, [messages]);
+
+  // Если переменная окружения не настроена
+  if (!webhook) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[80vh] text-center p-6">
+        <h1 className="text-2xl font-bold mb-4">⚠️ Чат недоступен</h1>
+        <p className="text-muted-foreground max-w-md">
+          Не найден <code className="font-mono">NEXT_PUBLIC_AI_AGENT_WEBHOOK_URL</code>.
+          Добавь его в <code>.env.local</code>, чтобы подключить AI-агента.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col max-w-4xl mx-auto p-6 min-h-[calc(100vh-80px)]">
@@ -67,7 +86,9 @@ export default function AIChatPage() {
           >
             <div
               className={`max-w-[80%] px-4 py-2 rounded-xl text-sm shadow-sm ${
-                msg.role === "user" ? "bg-primary text-white" : "bg-white border"
+                msg.role === "user"
+                  ? "bg-primary text-white"
+                  : "bg-white border font-mono"
               }`}
             >
               {msg.text}
@@ -90,8 +111,17 @@ export default function AIChatPage() {
           placeholder="Задай вопрос, например: «Сколько было заявок за неделю?»"
           className="flex-1"
         />
-        <Button onClick={sendMessage} disabled={loading || !input.trim()} className="gap-2">
-          {loading ? <Loader2 size={18} className="animate-spin" /> : <SendHorizontal size={18} />}
+        <Button
+          onClick={sendMessage}
+          disabled={loading || !input.trim()}
+          className="gap-2"
+          aria-label="Отправить сообщение"
+        >
+          {loading ? (
+            <Loader2 size={18} className="animate-spin" />
+          ) : (
+            <SendHorizontal size={18} />
+          )}
           <span className="hidden sm:inline">Отправить</span>
         </Button>
       </div>

@@ -1,7 +1,9 @@
+"use client"
+
 import { useState } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ArrowUpDownIcon } from "@heroicons/react/24/outline"
+import { ArrowsUpDownIcon } from "@heroicons/react/24/outline"
 
 interface AdGroup {
   ad_group_id: string
@@ -48,31 +50,31 @@ export function AdsByAdGroupTable({ data, isLoading }: AdsByAdGroupTableProps) {
           <TableRow>
             <TableHead className="min-w-[150px] cursor-pointer" onClick={() => handleSort("ad_group_name")}>
               Група оголошень
-              {sortField === "ad_group_name" && <ArrowUpDownIcon className="inline h-4 w-4 ml-1" />}
+              {sortField === "ad_group_name" && <ArrowsUpDownIcon className="inline h-4 w-4 ml-1" />}
             </TableHead>
             <TableHead className="text-right cursor-pointer" onClick={() => handleSort("spend")}>
               Витрати
-              {sortField === "spend" && <ArrowUpDownIcon className="inline h-4 w-4 ml-1" />}
+              {sortField === "spend" && <ArrowsUpDownIcon className="inline h-4 w-4 ml-1" />}
             </TableHead>
             <TableHead className="text-right cursor-pointer" onClick={() => handleSort("clicks")}>
               Кліки
-              {sortField === "clicks" && <ArrowUpDownIcon className="inline h-4 w-4 ml-1" />}
+              {sortField === "clicks" && <ArrowsUpDownIcon className="inline h-4 w-4 ml-1" />}
             </TableHead>
             <TableHead className="text-right cursor-pointer" onClick={() => handleSort("ctr")}>
               CTR
-              {sortField === "ctr" && <ArrowUpDownIcon className="inline h-4 w-4 ml-1" />}
+              {sortField === "ctr" && <ArrowsUpDownIcon className="inline h-4 w-4 ml-1" />}
             </TableHead>
             <TableHead className="text-right cursor-pointer" onClick={() => handleSort("cpc")}>
               CPC
-              {sortField === "cpc" && <ArrowUpDownIcon className="inline h-4 w-4 ml-1" />}
+              {sortField === "cpc" && <ArrowsUpDownIcon className="inline h-4 w-4 ml-1" />}
             </TableHead>
             <TableHead className="text-right cursor-pointer" onClick={() => handleSort("cpa")}>
               CPA
-              {sortField === "cpa" && <ArrowUpDownIcon className="inline h-4 w-4 ml-1" />}
+              {sortField === "cpa" && <ArrowsUpDownIcon className="inline h-4 w-4 ml-1" />}
             </TableHead>
             <TableHead className="text-right cursor-pointer" onClick={() => handleSort("conversions")}>
               Конверсії
-              {sortField === "conversions" && <ArrowUpDownIcon className="inline h-4 w-4 ml-1" />}
+              {sortField === "conversions" && <ArrowsUpDownIcon className="inline h-4 w-4 ml-1" />}
             </TableHead>
           </TableRow>
         </TableHeader>
@@ -100,15 +102,21 @@ export function AdsByAdGroupTable({ data, isLoading }: AdsByAdGroupTableProps) {
                 <TableCell className="text-right">
                   {g.spend != null ? g.spend.toLocaleString("uk-UA", { style: "currency", currency: "UAH" }) : "–"}
                 </TableCell>
-                <TableCell className="text-right">{g.clicks != null ? g.clicks.toLocaleString("uk-UA") : "–"}</TableCell>
-                <TableCell className="text-right">{g.ctr != null ? (g.ctr * 100).toFixed(2) + "%" : "–"}</TableCell>
+                <TableCell className="text-right">
+                  {g.clicks != null ? g.clicks.toLocaleString("uk-UA") : "–"}
+                </TableCell>
+                <TableCell className="text-right">
+                  {g.ctr != null ? (g.ctr * 100).toFixed(2) + "%" : "–"}
+                </TableCell>
                 <TableCell className="text-right">
                   {g.cpc != null ? g.cpc.toLocaleString("uk-UA", { style: "currency", currency: "UAH" }) : "–"}
                 </TableCell>
                 <TableCell className="text-right">
                   {g.cpa != null ? g.cpa.toLocaleString("uk-UA", { style: "currency", currency: "UAH" }) : "–"}
                 </TableCell>
-                <TableCell className="text-right">{g.conversions != null ? g.conversions.toLocaleString("uk-UA") : "–"}</TableCell>
+                <TableCell className="text-right">
+                  {g.conversions != null ? g.conversions.toLocaleString("uk-UA") : "–"}
+                </TableCell>
               </TableRow>
             ))
           )}

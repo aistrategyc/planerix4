@@ -1,11 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
+    "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -16,29 +12,20 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",
-    "types": [
-      "react"
-    ],
     "incremental": true,
-    // Абсолютные импорты из папки src
+
+    // ✅ Абсолютные импорты из папки src
     "baseUrl": "src",
     "paths": {
-      "@/*": [
-        "*"
-      ],
-      "@/types/*": [
-        "types/*"
-      ],
-      "@/lib/*": [
-        "lib/*"
-      ],
-      "@/components/*": [
-        "components/*"
-      ],
-      "@/app/*": [
-        "app/*"
-      ]
+      "@/*": ["*"]
     },
+
+    // ✅ Используем typeRoots вместо types, чтобы поддерживать кастомные определения
+    "typeRoots": [
+      "types",
+      "node_modules/@types"
+    ],
+
     "plugins": [
       {
         "name": "next"
@@ -49,9 +36,8 @@
     "next-env.d.ts",
     "src/**/*.ts",
     "src/**/*.tsx",
+    "types/**/*.d.ts",
     ".next/types/**/*.ts"
   ],
-  "exclude": [
-    "node_modules"
-  ]
+  "exclude": ["node_modules"]
 }

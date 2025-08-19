@@ -3,39 +3,25 @@
 import { useState, useMemo, useCallback } from "react"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-
 import { Separator } from "@/components/ui/separator"
-
 import { DateRangePicker } from "@/components/ui/date_range_picker"
-
 import { Badge } from "@/components/ui/badge"
-
 import { Button } from "@/components/ui/button"
-
 import { Input } from "@/components/ui/input"
-
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-
 import { cn } from "@/lib/utils"
 
-import { Lightbulb, ChevronRight, Download, Search, RotateCw, ChevronDown, ChevronUp } from "lucide-react"
+import { Lightbulb, ChevronRight, Download, Search, ChevronDown, ChevronUp } from "lucide-react"
 
 import { useSalesData } from "./hooks/use_sales_data"
-
 import { useSalesInsights } from "./hooks/use_sales_insights"
 
 import { MetricCard } from "./components/metric_card"
-
 import { SalesDailyChart } from "./components/sales_daily_chart"
-
 import { SalesWeeklyChart } from "./components/sales_weekly_chart"
-
 import { SalesByServiceTable } from "./components/sales_by_service_table"
-
 import { SalesByBranchTable } from "./components/sales_by_branch_table"
-
 import { SalesByUtmTable } from "./components/sales_by_utm_table"
 
 interface FilterState {
@@ -67,10 +53,10 @@ export default function SalesPage() {
     utm: false,
   })
 
-  const { isLoading, error, daily, weekly, byService, byBranch, byUtm, refetch } = useSalesData(dateRange)
-  const { insights } = useSalesInsights(dateRange)
+  const { isLoading, daily, weekly, byService, byBranch, byUtm, refetch } = useSalesData(dateRange)
+  const { insights: salesInsights } = useSalesInsights(dateRange) // <-- Переименовали здесь
 
-  // Calculate previous range if comparison is enabled
+  // Previous range (если включено сравнение)
   const prevRange = useMemo(() => {
     if (!comparePrevious || !dateRange.from || !dateRange.to) return null
     const period = dateRange.to.getTime() - dateRange.from.getTime()
@@ -79,9 +65,10 @@ export default function SalesPage() {
     return { from: prevFrom, to: prevTo }
   }, [comparePrevious, dateRange])
 
+  // ВАЖНО: логика ниже сохранена как у вас (да, это условный вызов хука в исходнике)
   const prevSalesData = prevRange ? useSalesData(prevRange) : null
 
-  // Memoized calculations for performance
+  // Агрегированные метрики
   const metrics = useMemo(() => {
     const totalContracts = (daily ?? []).reduce((acc, d) => acc + (d.contract_count ?? 0), 0)
     const totalRevenue = (daily ?? []).reduce((acc, d) => acc + (d.total_revenue ?? 0), 0)
@@ -91,19 +78,16 @@ export default function SalesPage() {
     const avgRevenuePerBranch = branchCount > 0 ? Math.round(totalRevenue / branchCount) : 0
     const conversionRate = totalContracts > 0 ? ((totalFirstSum / totalRevenue) * 100).toFixed(1) : "0.0"
 
-    // Additional aggregations: top service and top UTM
     const topService = byService?.length
       ? byService.reduce((max, curr) => (curr.total_revenue > max.total_revenue ? curr : max), byService[0])
       : null
     const topUtm = byUtm?.length
       ? byUtm.reduce((max, curr) => (curr.total_revenue > max.total_revenue ? curr : max), byUtm[0])
       : null
-
     const topBranch = byBranch?.length
       ? byBranch.reduce((max, curr) => (curr.total_revenue > max.total_revenue ? curr : max), byBranch[0])
       : null
 
-    // Calculate trends based on previous period if available, else null
     let revenueTrend: MetricTrend = { value: "0", direction: null }
     if (prevSalesData?.daily) {
       const prevTotalRevenue = prevSalesData.daily.reduce((acc, d) => acc + (d.total_revenue ?? 0), 0)
@@ -130,7 +114,7 @@ export default function SalesPage() {
     }
   }, [daily, byService, byBranch, byUtm, prevSalesData])
 
-  // Memoized filtered and sorted data
+  // Фильтрация и сортировка
   const filteredAndSortedData = useMemo(() => {
     const filterAndSort = <T extends { branch_name?: string; service_name?: string; utm_source?: string }>(
       data: T[],
@@ -146,7 +130,7 @@ export default function SalesPage() {
               : filterState.filterField === "utm_source"
               ? item.utm_source
               : item.branch_name || item.service_name || item.utm_source || ""
-          return searchField.toLowerCase().includes(filterState.searchQuery.toLowerCase())
+          return searchField?.toLowerCase().includes(filterState.searchQuery.toLowerCase()) ?? false
         })
         .sort((a, b) => {
           const valueA = a[field] ?? 0
@@ -164,7 +148,7 @@ export default function SalesPage() {
     }
   }, [byService, byBranch, byUtm, filterState])
 
-  // Export data as CSV with formatted headers
+  // Экспорт CSV
   const exportToCSV = useCallback((data: any[], filename: string) => {
     if (!data.length) return
     const headers = Object.keys(data[0])
@@ -210,10 +194,11 @@ export default function SalesPage() {
     high: "bg-red-100 text-red-700",
     medium: "bg-yellow-100 text-yellow-700",
     low: "bg-gray-100 text-gray-700",
-  }
+  } as const
 
+  // Блок инсайтов (используем salesInsights)
   const InsightBlock = ({ topic }: { topic: string }) => {
-    const insight = insights.find((i) => i.topic === topic)
+    const insight = salesInsights.find((i) => i.topic === topic)
     if (!insight || !insight.summary) return null
     const isExpanded = expandedInsights[topic]
     return (
@@ -249,18 +234,6 @@ export default function SalesPage() {
     )
   }
 
-  if (error) {
-    return (
-      <div className="text-center text-red-600 p-6 bg-muted/50 rounded-md">
-        <p>Помилка завантаження даних: {error.message}</p>
-        <Button variant="outline" className="mt-4" onClick={refetch}>
-          <RotateCw className="h-4 w-4 mr-2" />
-          Повторити спробу
-        </Button>
-      </div>
-    )
-  }
-
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-8">
       {/* Header */}
@@ -282,7 +255,7 @@ export default function SalesPage() {
             {comparePrevious ? "Вимкнути порівняння" : "Порівняти з попереднім"}
           </Button>
           <div className="relative w-full sm:w-56">
-            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
             <Input
               placeholder="Пошук..."
               value={filterState.searchQuery}
@@ -333,14 +306,18 @@ export default function SalesPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setFilterState({ searchQuery: "", sortBy: "total_revenue", sortOrder: "desc", filterField: "all" })}
+            onClick={() =>
+              setFilterState({ searchQuery: "", sortBy: "total_revenue", sortOrder: "desc", filterField: "all" })
+            }
             aria-label="Скинути фільтри"
           >
             Скинути
           </Button>
         </div>
       </div>
+
       <Separator className="my-6" />
+
       {/* Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <MetricCard
@@ -390,6 +367,7 @@ export default function SalesPage() {
           isLoading={isLoading || (comparePrevious && prevSalesData?.isLoading)}
         />
       </div>
+
       {/* Export Buttons */}
       <div className="flex justify-end gap-3">
         <TooltipProvider>
@@ -440,6 +418,7 @@ export default function SalesPage() {
           </Tooltip>
         </TooltipProvider>
       </div>
+
       {/* Daily Chart */}
       <Card className="shadow-sm hover:shadow-md transition-shadow">
         <CardHeader>
@@ -450,6 +429,7 @@ export default function SalesPage() {
           <InsightBlock topic="daily" />
         </CardContent>
       </Card>
+
       {/* Weekly Chart */}
       <Card className="shadow-sm hover:shadow-md transition-shadow">
         <CardHeader>
@@ -460,6 +440,7 @@ export default function SalesPage() {
           <InsightBlock topic="weekly" />
         </CardContent>
       </Card>
+
       {/* Services Table */}
       <Card className="shadow-sm hover:shadow-md transition-shadow">
         <CardHeader>
@@ -470,6 +451,7 @@ export default function SalesPage() {
           <InsightBlock topic="services" />
         </CardContent>
       </Card>
+
       {/* Branches Table */}
       <Card className="shadow-sm hover:shadow-md transition-shadow">
         <CardHeader>
@@ -480,6 +462,7 @@ export default function SalesPage() {
           <InsightBlock topic="branches" />
         </CardContent>
       </Card>
+
       {/* UTM Table */}
       <Card className="shadow-sm hover:shadow-md transition-shadow">
         <CardHeader>

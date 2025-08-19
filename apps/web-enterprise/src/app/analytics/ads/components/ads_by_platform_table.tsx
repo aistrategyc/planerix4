@@ -1,7 +1,9 @@
+"use client"
+
 import { useState } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ArrowUpDownIcon } from "@heroicons/react/24/outline"
+import { ArrowsUpDownIcon } from "@heroicons/react/24/outline"
 
 interface PlatformRow {
   platform: string
@@ -37,7 +39,7 @@ export function AdsByPlatformTable({ data, isLoading }: AdsByPlatformTableProps)
     const aValue = a[sortField] ?? 0
     const bValue = b[sortField] ?? 0
     if (aValue === bValue) return 0
-    return sortDirection === "asc" ? (aValue < bValue ? -1 : 1) : aValue > bValue ? -1 : 1
+    return sortDirection === "asc" ? (aValue < bValue ? -1 : 1) : (aValue > bValue ? -1 : 1)
   })
 
   return (
@@ -47,35 +49,35 @@ export function AdsByPlatformTable({ data, isLoading }: AdsByPlatformTableProps)
           <TableRow>
             <TableHead className="min-w-[100px] cursor-pointer" onClick={() => handleSort("platform")}>
               Платформа
-              {sortField === "platform" && <ArrowUpDownIcon className="inline h-4 w-4 ml-1" />}
+              {sortField === "platform" && <ArrowsUpDownIcon className="inline h-4 w-4 ml-1" />}
             </TableHead>
             <TableHead className="text-right cursor-pointer" onClick={() => handleSort("spend")}>
               Витрати
-              {sortField === "spend" && <ArrowUpDownIcon className="inline h-4 w-4 ml-1" />}
+              {sortField === "spend" && <ArrowsUpDownIcon className="inline h-4 w-4 ml-1" />}
             </TableHead>
             <TableHead className="text-right cursor-pointer" onClick={() => handleSort("impressions")}>
               Покази
-              {sortField === "impressions" && <ArrowUpDownIcon className="inline h-4 w-4 ml-1" />}
+              {sortField === "impressions" && <ArrowsUpDownIcon className="inline h-4 w-4 ml-1" />}
             </TableHead>
             <TableHead className="text-right cursor-pointer" onClick={() => handleSort("clicks")}>
               Кліки
-              {sortField === "clicks" && <ArrowUpDownIcon className="inline h-4 w-4 ml-1" />}
+              {sortField === "clicks" && <ArrowsUpDownIcon className="inline h-4 w-4 ml-1" />}
             </TableHead>
             <TableHead className="text-right cursor-pointer" onClick={() => handleSort("conversions")}>
               Конверсії
-              {sortField === "conversions" && <ArrowUpDownIcon className="inline h-4 w-4 ml-1" />}
+              {sortField === "conversions" && <ArrowsUpDownIcon className="inline h-4 w-4 ml-1" />}
             </TableHead>
             <TableHead className="text-right cursor-pointer" onClick={() => handleSort("ctr")}>
               CTR
-              {sortField === "ctr" && <ArrowUpDownIcon className="inline h-4 w-4 ml-1" />}
+              {sortField === "ctr" && <ArrowsUpDownIcon className="inline h-4 w-4 ml-1" />}
             </TableHead>
             <TableHead className="text-right cursor-pointer" onClick={() => handleSort("cpc")}>
               CPC
-              {sortField === "cpc" && <ArrowUpDownIcon className="inline h-4 w-4 ml-1" />}
+              {sortField === "cpc" && <ArrowsUpDownIcon className="inline h-4 w-4 ml-1" />}
             </TableHead>
             <TableHead className="text-right cursor-pointer" onClick={() => handleSort("cpa")}>
               CPA
-              {sortField === "cpa" && <ArrowUpDownIcon className="inline h-4 w-4 ml-1" />}
+              {sortField === "cpa" && <ArrowsUpDownIcon className="inline h-4 w-4 ml-1" />}
             </TableHead>
           </TableRow>
         </TableHeader>

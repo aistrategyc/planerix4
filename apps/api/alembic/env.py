@@ -1,57 +1,118 @@
-from logging.config import fileConfig
-from sqlalchemy import engine_from_config, pool
-from alembic import context
+from __future__ import annotations
 
 import os
 import sys
 import importlib
 import pkgutil
+from logging.config import fileConfig
 
-# Добавляем путь к корню проекта (где находится папка liderix_api)
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from alembic import context
+from sqlalchemy import create_engine, pool
+from sqlalchemy.engine import Connection
 
-# Импортируем Base
-from liderix_api.db import Base
+# --- Подготовка sys.path, чтобы импортировать приложение ---
+HERE = os.path.abspath(os.path.dirname(__file__))
+APPS_API_DIR = os.path.abspath(os.path.join(HERE, ".."))
+if APPS_API_DIR not in sys.path:
+    sys.path.append(APPS_API_DIR)
 
-# Импортируем и инициализируем все модели
-from liderix_api import models
-for _, module_name, _ in pkgutil.iter_modules(models.__path__):
-    importlib.import_module(f"liderix_api.models.{module_name}")
-
+# --- Alembic config & logging ---
 config = context.config
-
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
+# --- Импорт настроек и моделей ---
+from liderix_api.config.settings import settings
+
+# Безопасный импорт Base
+try:
+    from liderix_api.models.base import Base
+except ImportError:
+    from liderix_api.db import Base
+
+# --- Импорт всех подмодулей в models ---
+import liderix_api.models as models_pkg
+for finder, name, ispkg in pkgutil.walk_packages(models_pkg.__path__, models_pkg.__name__ + "."):
+    try:
+        importlib.import_module(name)
+    except ImportError as e:
+        print(f"Warning: Could not import {name}: {e}")
+
 target_metadata = Base.metadata
 
-def run_migrations_offline():
-    url = config.get_main_option("sqlalchemy.url")
+# --- DB URL ---
+def get_database_url() -> str:
+    """Получает URL базы данных и преобразует для синхронного Alembic"""
+    url = os.getenv("ALEMBIC_DATABASE_URL", settings.LIDERIX_DB_URL)
+    if not url:
+        raise ValueError("Database URL not found in settings or environment")
+    
+    # Преобразуем async URL в sync для Alembic
+    if "+asyncpg" in url:
+        url = url.replace("postgresql+asyncpg://", "postgresql://")
+    elif "+psycopg" in url:
+        url = url.replace("postgresql+psycopg://", "postgresql://")
+    
+    return url
+
+# --- Схема для хранения alembic_version ---
+def get_version_table_schema():
+    """Возвращает схему для таблицы alembic_version"""
+    schema = os.getenv("ALEMBIC_VERSION_SCHEMA", "public")
+    return schema if schema else None
+
+# --- Автогенерация: фильтрация объектов ---
+def include_object(object, name, type_, reflected, compare_to):
+    """Фильтрация объектов для автогенерации миграций"""
+    return True
+
+# --- Offline миграции (только SQL скрипт) ---
+def run_migrations_offline() -> None:
+    """Run migrations in 'offline' mode."""
+    url = get_database_url()
     context.configure(
         url=url,
         target_metadata=target_metadata,
         literal_binds=True,
-        include_schemas=True,
-        version_table_schema="core",
         dialect_opts={"paramstyle": "named"},
+        include_object=include_object,
+        compare_type=True,
+        compare_server_default=True,
+        render_as_batch=False,
+        version_table="alembic_version",
+        version_table_schema=get_version_table_schema(),
     )
+
     with context.begin_transaction():
         context.run_migrations()
 
-def run_migrations_online():
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section),
-        prefix="sqlalchemy.",
+# --- Online миграции (с реальным подключением к БД) ---
+def run_migrations_online() -> None:
+    """Run migrations in 'online' mode."""
+    connectable = create_engine(
+        get_database_url(),
         poolclass=pool.NullPool,
+        future=True,
+        echo=False,  # Отключаем логирование SQL запросов
     )
+
     with connectable.connect() as connection:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
-            include_schemas=True,
-            version_table_schema="core"
+            include_object=include_object,
+            compare_type=True,
+            compare_server_default=True,
+            render_as_batch=False,
+            version_table="alembic_version",
+            version_table_schema=get_version_table_schema(),
         )
+
         with context.begin_transaction():
             context.run_migrations()
 
-run_migrations_online()
+# --- Entrypoint ---
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    run_migrations_online()
