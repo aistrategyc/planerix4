@@ -68,12 +68,18 @@ export default function LeadForm({ type, className, onSuccess, defaultPlan }: Pr
     }
     try {
       setStatus('loading');
-      const res = await fetch('/api/lead', {
+      const res = await fetch('/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...values,
           source: typeof window !== 'undefined' ? window.location.pathname : 'unknown',
+          referrer: typeof window !== 'undefined' ? document.referrer : undefined,
+          utm_source: typeof window !== 'undefined' ? new URL(window.location.href).searchParams.get('utm_source') : undefined,
+          utm_medium: typeof window !== 'undefined' ? new URL(window.location.href).searchParams.get('utm_medium') : undefined,
+          utm_campaign: typeof window !== 'undefined' ? new URL(window.location.href).searchParams.get('utm_campaign') : undefined,
+          utm_term: typeof window !== 'undefined' ? new URL(window.location.href).searchParams.get('utm_term') : undefined,
+          utm_content: typeof window !== 'undefined' ? new URL(window.location.href).searchParams.get('utm_content') : undefined,
         }),
       });
       if (!res.ok) {

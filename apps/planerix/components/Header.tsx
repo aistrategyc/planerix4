@@ -15,7 +15,7 @@ const NAV = [
 ];
 
 const APP_ORIGIN =
-  process.env.NEXT_PUBLIC_APP_ORIGIN || 'http://localhost:3002'; // fallback для дев-режима
+  process.env.NEXT_PUBLIC_APP_ORIGIN || 'https://app.planerix.com';
 
 export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false);

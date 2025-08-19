@@ -45,7 +45,7 @@ services:
       redis:
         condition: service_healthy
     ports:
-      - "8000:8000"
+      - "8001:8001"
     stdin_open: true
     tty: true
     healthcheck:
@@ -55,7 +55,7 @@ services:
           python - <<'PY'
           import sys, urllib.request
           try:
-              r = urllib.request.urlopen('http://localhost:8000/openapi.json', timeout=3)
+              r = urllib.request.urlopen('http://localhost:8001/api/health', timeout=3)
               sys.exit(0 if r.getcode() < 400 else 1)
           except Exception:
               sys.exit(1)

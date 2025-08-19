@@ -22,11 +22,7 @@ RUN pip install --no-cache-dir "poetry==$POETRY_VERSION" \
 COPY . /app
 
 # 4) Открываем порт
-EXPOSE 8000
+EXPOSE 8001
 
 # 5) Стартуем приложение напрямую с uvicorn
-CMD ["uvicorn", "liderix_api.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"]
-
-COPY . /app
-EXPOSE 8000
-CMD ["bash", "entrypoint.sh"]
+CMD ["uvicorn", "liderix_api.main:app", "--host", "0.0.0.0", "--port", "8001", "--log-level", "info"]

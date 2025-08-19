@@ -60,7 +60,7 @@ export default function PricingPage() {
         'Core integrations',
       ],
       ctaText: 'Start for free',
-      ctaHref: '/web-enterprise/register?plan=starter',
+      ctaHref: 'https://app.planerix.com/register?plan=starter',
       footnote: 'No credit card required',
     },
     {
@@ -76,7 +76,7 @@ export default function PricingPage() {
         'API access',
       ],
       ctaText: 'Start 14-day trial',
-      ctaHref: '/web-enterprise/register?plan=team',
+      ctaHref: 'https://app.planerix.com/register?plan=team',
       footnote: 'Cancel anytime',
     },
     {

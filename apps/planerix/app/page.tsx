@@ -9,10 +9,10 @@ import {
   Phone,
   Mail,
   MapPin,
-  Facebook,
-  Twitter,
-  Linkedin,
-  Youtube,
+  Globe,
+  MessageCircle,
+  Users2,
+  PlayCircle,
   Target,
   Brain,
   Users,
@@ -418,10 +418,10 @@ export default function LandingPage() {
               <div className="mt-8">
                 <p className="font-medium mb-4">Follow us</p>
                 <div className="flex space-x-4">
-                  <a href="#" className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-blue-100 transition-colors"><Facebook className="w-5 h-5 text-gray-600" /></a>
-                  <a href="#" className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-blue-100 transition-colors"><Twitter className="w-5 h-5 text-gray-600" /></a>
-                  <a href="#" className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-blue-100 transition-colors"><Linkedin className="w-5 h-5 text-gray-600" /></a>
-                  <a href="#" className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-blue-100 transition-colors"><Youtube className="w-5 h-5 text-gray-600" /></a>
+                  <a href="#" className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-blue-100 transition-colors"><Globe className="w-5 h-5 text-gray-600" /></a>
+                  <a href="#" className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-blue-100 transition-colors"><MessageCircle className="w-5 h-5 text-gray-600" /></a>
+                  <a href="#" className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-blue-100 transition-colors"><Users2 className="w-5 h-5 text-gray-600" /></a>
+                  <a href="#" className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-blue-100 transition-colors"><PlayCircle className="w-5 h-5 text-gray-600" /></a>
                 </div>
               </div>
             </div>

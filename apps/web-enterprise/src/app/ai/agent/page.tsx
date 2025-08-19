@@ -58,10 +58,7 @@ export default function AIChatPage() {
   const [loading, setLoading] = useState(false);
   const chatRef = useRef<HTMLDivElement>(null);
 
-  const webhook = process.env.NEXT_PUBLIC_AI_AGENT_WEBHOOK_URL;
-  if (!webhook) {
-    throw new Error("NEXT_PUBLIC_AI_AGENT_WEBHOOK_URL is not defined");
-  }
+  const webhook = process.env.NEXT_PUBLIC_AI_AGENT_WEBHOOK_URL || "https://api.liderix.com/ai/webhook";
 
   const sendMessage = useCallback(async () => {
     const text = input.trim();

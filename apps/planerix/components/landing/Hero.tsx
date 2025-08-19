@@ -10,10 +10,10 @@ export default function Hero() {
         Операционная система для бизнеса: стратегия, аналитика, команды и AI.
       </p>
       <div className="flex justify-center gap-4">
-        <Link href="https://app.liderix.com/login">
+        <Link href="https://app.planerix.com/login">
           <Button size="lg">Войти</Button>
         </Link>
-        <Link href="https://app.liderix.com/register">
+        <Link href="https://app.planerix.com/register">
           <Button size="lg" variant="outline">Регистрация</Button>
         </Link>
       </div>

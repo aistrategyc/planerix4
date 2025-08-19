@@ -47,8 +47,7 @@ app.add_middleware(
 )
 
 # Security middleware - включаем для продакшена
-# Раскомментируйте для production:
-# add_security_middleware(app)
+add_security_middleware(app)
 
 # -----------------------------------------------------------------------------
 # БД: основная (Liderix) - с улучшенной обработкой ошибок
@@ -407,8 +406,14 @@ except ImportError:
 class _UserMeResponse(_BaseModel):
     id: str
     email: str
+    username: Optional[str] = None
     full_name: Optional[str] = None
     is_active: Optional[bool] = None
+    is_verified: Optional[bool] = None
+    avatar_url: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    last_login_at: Optional[str] = None
 
 @app.get(f"{PREFIX}/users/me", tags=["Users"], response_model=_UserMeResponse, name="users:me")
 async def get_me(request: Request):
@@ -419,11 +424,17 @@ async def get_me(request: Request):
         return {
             "id": str(getattr(current_user, "id", "")),
             "email": getattr(current_user, "email", ""),
+            "username": getattr(current_user, "username", None),
             "full_name": (
                 getattr(current_user, "full_name", None) 
                 or getattr(current_user, "name", None)
             ),
             "is_active": getattr(current_user, "is_active", True),
+            "is_verified": getattr(current_user, "is_verified", True),
+            "avatar_url": getattr(current_user, "avatar_url", None),
+            "created_at": str(getattr(current_user, "created_at", "")) if getattr(current_user, "created_at", None) else None,
+            "updated_at": str(getattr(current_user, "updated_at", "")) if getattr(current_user, "updated_at", None) else None,
+            "last_login_at": str(getattr(current_user, "last_login_at", "")) if getattr(current_user, "last_login_at", None) else None,
         }
     except Exception as e:
         logger.warning(f"Auth failed for /users/me, returning test user: {e}")
@@ -431,8 +442,14 @@ async def get_me(request: Request):
         return {
             "id": "test-dev-user",
             "email": "dev@test.com",
+            "username": "devuser",
             "full_name": "Development User",
             "is_active": True,
+            "is_verified": True,
+            "avatar_url": None,
+            "created_at": "2024-01-01T00:00:00Z",
+            "updated_at": None,
+            "last_login_at": None,
         }
 
 # -----------------------------------------------------------------------------
@@ -506,12 +523,84 @@ async def test_login():
     }
 
 # -----------------------------------------------------------------------------
+# Error handlers для стандартизации ответов
+# -----------------------------------------------------------------------------
+from fastapi import HTTPException
+from fastapi.responses import JSONResponse
+from fastapi.requests import Request as FastAPIRequest
+from fastapi.exceptions import RequestValidationError
+from pydantic import ValidationError
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: FastAPIRequest, exc: HTTPException):
+    """Стандартизированный обработчик HTTP исключений"""
+    # Если detail уже в правильном формате (dict), используем как есть
+    if isinstance(exc.detail, dict) and "type" in exc.detail:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail}
+        )
+    
+    # Создаем стандартный формат для простых строковых ошибок
+    error_detail = {
+        "type": "urn:problem:http-error",
+        "title": _get_error_title(exc.status_code),
+        "detail": str(exc.detail),
+        "status": exc.status_code,
+    }
+    
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": error_detail}
+    )
+
+def _get_error_title(status_code: int) -> str:
+    """Получение заголовка ошибки по коду статуса"""
+    titles = {
+        400: "Bad Request",
+        401: "Unauthorized", 
+        403: "Forbidden",
+        404: "Not Found",
+        422: "Validation Error",
+        429: "Too Many Requests",
+        500: "Internal Server Error",
+    }
+    return titles.get(status_code, "HTTP Error")
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: FastAPIRequest, exc: RequestValidationError):
+    """Обработчик ошибок валидации запросов"""
+    # Сериализуем ошибки в безопасный формат
+    errors = []
+    for error in exc.errors():
+        safe_error = {
+            "type": error.get("type", "unknown"),
+            "loc": list(error.get("loc", [])),
+            "msg": str(error.get("msg", "")),
+            "input": str(error.get("input", ""))[:100] if error.get("input") is not None else None
+        }
+        errors.append(safe_error)
+    
+    error_detail = {
+        "type": "urn:problem:validation-error",
+        "title": "Validation Error",
+        "detail": "Request validation failed",
+        "status": 422,
+        "errors": errors
+    }
+    
+    return JSONResponse(
+        status_code=422,
+        content={"detail": error_detail}
+    )
+
+# -----------------------------------------------------------------------------
 # Fallback для неизвестных маршрутов API
 # -----------------------------------------------------------------------------
 @app.api_route(f"{PREFIX}/{{path:path}}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def api_fallback(path: str):
     """Fallback для неизвестных API маршрутов"""
-    return HTTPException(
+    raise HTTPException(
         status_code=404, 
         detail=f"API endpoint /{path} not found"
     )
