@@ -1,11 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { EmptyState } from "@/components/ui/empty-state";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import { useAuth } from "@/app/(auth)/hooks/useAuth";
+import { useCompany, useCompanyTeam, useDepartments } from "@/app/company/hooks/useCompany";
 import { 
   BarChart3, 
   Target, 
@@ -34,7 +39,16 @@ import {
 } from "lucide-react";
 
 export default function DashboardHome() {
+  const router = useRouter();
+  const { user } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [showExampleData, setShowExampleData] = useState(true);
+
+  // company data
+  const { company, stats, loading: companyLoading } = useCompany();
+  const orgId = company?.id;
+  const { teamMembers, loading: teamLoading } = useCompanyTeam(orgId);
+  const { departments, loading: deptsLoading } = useDepartments(orgId);
 
   // Обновление времени каждую минуту
   useEffect(() => {
@@ -44,49 +58,57 @@ export default function DashboardHome() {
     return () => clearInterval(timer);
   }, []);
 
-  // Данные пользователя
-  const user = {
-    name: "Иван Иванов",
-    role: "Руководитель отдела маркетинга",
-    avatar: "https://api.dicebear.com/7.x/initials/svg?seed=ИИ",
-    department: "Маркетинг"
-  };
+  // Define interface for dashboard metrics
+  interface DashboardMetric {
+    title: string;
+    value: string;
+    change: number;
+    icon: React.ComponentType<any>;
+    color: string;
+    bgColor: string;
+    isExample?: boolean;
+  }
 
-  // Основные метрики
-  const mainMetrics = [
-    {
-      title: "Выручка",
-      value: "$2.4M",
-      change: 12.5,
-      icon: DollarSign,
-      color: "text-green-600",
-      bgColor: "bg-green-50"
-    },
-    {
-      title: "Проекты",
-      value: "24",
-      change: 8.2,
-      icon: FileText,
-      color: "text-blue-600",
-      bgColor: "bg-blue-50"
-    },
-    {
-      title: "Команда",
-      value: "48",
-      change: -2.1,
-      icon: Users,
-      color: "text-purple-600",
-      bgColor: "bg-purple-50"
-    },
-    {
-      title: "Конверсия",
-      value: "18.4%",
-      change: 5.7,
-      icon: TrendingUp,
-      color: "text-orange-600",
-      bgColor: "bg-orange-50"
+  const displayName = useMemo(() => {
+    if (user?.full_name?.trim()) return user.full_name.split(" ")[0];
+    if (user?.email) return user.email.split("@")[0];
+    return "Коллега";
+  }, [user]);
+
+  // Проверяем есть ли реальные данные
+  const hasRealData = useMemo(() => {
+    const hasStats = stats && (stats.total_projects > 0 || stats.total_tasks > 0);
+    const hasTeam = teamMembers && teamMembers.length > 0;
+    const hasDepartments = departments && departments.length > 0;
+    return hasStats || hasTeam || hasDepartments;
+  }, [stats, teamMembers, departments]);
+
+  const busy = companyLoading || teamLoading || deptsLoading;
+
+  const mainMetrics = useMemo((): DashboardMetric[] => {
+    if (hasRealData && stats) {
+      // Реальные данные из API
+      const projectsCount = Number(stats.total_projects ?? 0);
+      const tasksCount = Number(stats.total_tasks ?? 0);
+      const teamCount = Number(teamMembers?.length ?? 0);
+      const deptCount = Number(departments?.length ?? 0);
+
+      return [
+        { title: "Проекты", value: String(projectsCount), change: 0, icon: FileText, color: "text-indigo-600", bgColor: "bg-indigo-50" },
+        { title: "Задачи", value: String(tasksCount), change: 0, icon: Activity, color: "text-blue-600", bgColor: "bg-blue-50" },
+        { title: "Команда", value: String(teamCount), change: 0, icon: Users, color: "text-sky-600", bgColor: "bg-sky-50" },
+        { title: "Отделы", value: String(deptCount), change: 0, icon: Users, color: "text-cyan-600", bgColor: "bg-cyan-50" },
+      ];
+    } else {
+      // Примеры данных
+      return [
+        { title: "Выручка", value: "$2.4M", change: 12.5, icon: DollarSign, color: "text-green-600", bgColor: "bg-green-50", isExample: true },
+        { title: "Проекты", value: "24", change: 8.2, icon: FileText, color: "text-blue-600", bgColor: "bg-blue-50", isExample: true },
+        { title: "Команда", value: "15", change: 5.4, icon: Users, color: "text-purple-600", bgColor: "bg-purple-50", isExample: true },
+        { title: "Клиенты", value: "89", change: 15.7, icon: UserPlus, color: "text-orange-600", bgColor: "bg-orange-50", isExample: true },
+      ];
     }
-  ];
+  }, [hasRealData, stats, teamMembers, departments]);
 
   // Активные цели
   const activeGoals = [
@@ -229,10 +251,10 @@ export default function DashboardHome() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
-            {getTimeGreeting()}, {user.name.split(' ')[0]}! 👋
+            {getTimeGreeting()}, {displayName}! 👋
           </h1>
           <p className="text-gray-600">
-            Вот что происходит в вашем {user.department.toLowerCase()} отделе сегодня
+            Вот что происходит в вашей организации сегодня
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -250,28 +272,79 @@ export default function DashboardHome() {
         </div>
       </div>
 
+      {/* Empty State для новых пользователей */}
+      {!hasRealData && (
+        <Card className="mb-6 border-dashed border-2 border-blue-200 bg-blue-50/50">
+          <CardContent className="p-6">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Target className="w-8 h-8 text-blue-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Добро пожаловать в Liderix!
+              </h3>
+              <p className="text-gray-600 mb-4 max-w-md mx-auto">
+                Вы видите примеры данных. Создайте свою первую цель или проект, чтобы начать работу.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Button 
+                  className="bg-blue-600 hover:bg-blue-700"
+                  onClick={() => router.push('/okrs')}
+                >
+                  <Target className="w-4 h-4 mr-2" />
+                  Создать цель
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => router.push('/projects')}
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  Создать проект
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => router.push('/company/team')}
+                >
+                  <Users className="w-4 h-4 mr-2" />
+                  Пригласить команду
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Основные метрики */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {mainMetrics.map((metric, index) => {
           const Icon = metric.icon;
           return (
-            <Card key={index} className="hover:shadow-md transition-shadow">
+            <Card key={index} className="hover:shadow-md transition-shadow relative">
               <CardContent className="p-6">
+                {metric.isExample && (
+                  <div className="absolute top-2 right-2">
+                    <Badge variant="secondary" className="text-xs bg-yellow-100 text-yellow-700">
+                      Пример
+                    </Badge>
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-gray-600">{metric.title}</p>
                     <div className="flex items-center gap-2">
                       <p className="text-2xl font-bold">{metric.value}</p>
-                      <div className={`flex items-center text-xs ${
-                        metric.change > 0 ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {metric.change > 0 ? (
-                          <TrendingUp className="w-3 h-3 mr-1" />
-                        ) : (
-                          <TrendingDown className="w-3 h-3 mr-1" />
-                        )}
-                        {Math.abs(metric.change)}%
-                      </div>
+                      {metric.change !== 0 && (
+                        <div className={`flex items-center text-xs ${
+                          metric.change > 0 ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {metric.change > 0 ? (
+                            <TrendingUp className="w-3 h-3 mr-1" />
+                          ) : (
+                            <TrendingDown className="w-3 h-3 mr-1" />
+                          )}
+                          {Math.abs(metric.change)}%
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className={`${metric.bgColor} p-3 rounded-lg`}>
@@ -305,38 +378,88 @@ export default function DashboardHome() {
               </Button>
             </CardHeader>
             <CardContent className="space-y-4">
-              {activeGoals.map((goal) => (
-                <div key={goal.id} className="p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <h4 className="font-medium text-sm mb-1">{goal.title}</h4>
-                      <div className="flex items-center gap-2">
-                        <Badge className={getPriorityColor(goal.priority)} variant="outline">
-                          {goal.priority === 'high' ? 'Высокий' : 
-                           goal.priority === 'medium' ? 'Средний' : 'Низкий'}
-                        </Badge>
-                        <span className="text-xs text-gray-500">
-                          До {new Date(goal.deadline).toLocaleDateString('ru-RU')}
-                        </span>
+              {hasRealData ? (
+                // Реальные данные целей (пока показываем примеры, так как у нас нет реальных OKR в API)
+                activeGoals.map((goal) => (
+                  <div key={goal.id} className="p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-sm mb-1">{goal.title}</h4>
+                        <div className="flex items-center gap-2">
+                          <Badge className={getPriorityColor(goal.priority)} variant="outline">
+                            {goal.priority === 'high' ? 'Высокий' : 
+                             goal.priority === 'medium' ? 'Средний' : 'Низкий'}
+                          </Badge>
+                          <span className="text-xs text-gray-500">
+                            До {new Date(goal.deadline).toLocaleDateString('ru-RU')}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex -space-x-2">
+                        {goal.team.map((member, idx) => (
+                          <Avatar key={idx} className="w-6 h-6 border-2 border-white">
+                            <AvatarFallback className="text-xs">{member}</AvatarFallback>
+                          </Avatar>
+                        ))}
                       </div>
                     </div>
-                    <div className="flex -space-x-2">
-                      {goal.team.map((member, idx) => (
-                        <Avatar key={idx} className="w-6 h-6 border-2 border-white">
-                          <AvatarFallback className="text-xs">{member}</AvatarFallback>
-                        </Avatar>
-                      ))}
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Прогресс</span>
+                        <span className="font-medium">{goal.progress}%</span>
+                      </div>
+                      <Progress value={goal.progress} className="h-2" />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Прогресс</span>
-                      <span className="font-medium">{goal.progress}%</span>
-                    </div>
-                    <Progress value={goal.progress} className="h-2" />
+                ))
+              ) : (
+                // Empty state для целей
+                <div className="text-center py-8">
+                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Target className="w-6 h-6 text-blue-600" />
                   </div>
+                  <h4 className="font-medium text-gray-900 mb-2">Нет активных целей</h4>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Создайте свою первую OKR цель, чтобы начать отслеживать прогресс
+                  </p>
+                  <Button 
+                    size="sm" 
+                    onClick={() => router.push('/okrs')}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Создать первую цель
+                  </Button>
                 </div>
-              ))}
+              )}
+              
+              {/* Показываем примеры, если нет реальных данных */}
+              {!hasRealData && (
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-medium text-gray-700">Примеры целей:</span>
+                    <Badge variant="secondary" className="text-xs bg-yellow-100 text-yellow-700">
+                      Примеры
+                    </Badge>
+                  </div>
+                  {activeGoals.slice(0, 2).map((goal) => (
+                    <div key={`example-${goal.id}`} className="p-3 border border-dashed rounded-lg mb-3 opacity-70">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1">
+                          <h4 className="font-medium text-sm mb-1">{goal.title}</h4>
+                          <div className="flex items-center gap-2">
+                            <Badge className={getPriorityColor(goal.priority)} variant="outline">
+                              {goal.priority === 'high' ? 'Высокий' : 
+                               goal.priority === 'medium' ? 'Средний' : 'Низкий'}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                      <Progress value={goal.progress} className="h-1.5" />
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 

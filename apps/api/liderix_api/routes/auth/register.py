@@ -49,7 +49,7 @@ async def send_verification_email_async(email: str, username: str, token: str) -
     """Отправка письма подтверждения (с безопасным фолбэком, чтобы не падать при ошибках)."""
     import logging
     logger = logging.getLogger(__name__)
-    link = f"{settings.FRONTEND_URL}/verify?token={token}&email={email}"
+    link = f"{settings.FRONTEND_URL}/verify-email?token={token}&email={email}"
 
     if not _RESEND_AVAILABLE or not settings.RESEND_API_KEY:
         logger.warning("Resend is not available or API key is missing; skipping email to %s", email)

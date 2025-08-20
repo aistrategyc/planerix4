@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useEffect, useMemo } from 'react'
-import { resendVerification } from '@/lib/api/auth'
+import { resendVerification, verifyEmailByToken } from '@/lib/api/auth'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Mail, Loader2, AlertCircle, CheckCircle2, ExternalLink } from 'lucide-react'
@@ -17,20 +17,44 @@ function getMailboxUrl(email?: string | null) {
   return `https://${domain}`
 }
 
-type VerifyEmailClientProps = { email: string }
+type VerifyEmailClientProps = { email: string; token?: string }
 
-export default function VerifyEmailClient({ email }: VerifyEmailClientProps) {
+export default function VerifyEmailClient({ email, token }: VerifyEmailClientProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [secondsLeft, setSecondsLeft] = useState(0)
+  const [verified, setVerified] = useState(false)
+  const [verifying, setVerifying] = useState(false)
 
   const mailboxUrl = useMemo(() => getMailboxUrl(email), [email])
 
   useEffect(() => {
     if (!email) setError('Не указан email для подтверждения.')
   }, [email])
+
+  // Автоматическая верификация если есть token
+  useEffect(() => {
+    if (token && email && !verified && !verifying) {
+      const handleAutoVerify = async () => {
+        setVerifying(true)
+        setError(null)
+        try {
+          await verifyEmailByToken(token)
+          setVerified(true)
+          setTimeout(() => {
+            router.push('/login?verified=1')
+          }, 2000)
+        } catch (err: any) {
+          setError(err?.message || 'Не удалось подтвердить email')
+        } finally {
+          setVerifying(false)
+        }
+      }
+      handleAutoVerify()
+    }
+  }, [token, email, verified, verifying, router])
 
   useEffect(() => {
     if (secondsLeft <= 0) return
@@ -60,10 +84,17 @@ export default function VerifyEmailClient({ email }: VerifyEmailClientProps) {
           <Mail className="w-10 h-10 text-primary mb-2" />
         </div>
 
-        <h1 className="text-2xl font-bold">Проверьте вашу почту</h1>
+        <h1 className="text-2xl font-bold">
+          {verifying ? 'Проверяем email...' : verified ? 'Email подтвержден!' : 'Проверьте вашу почту'}
+        </h1>
         <p className="text-muted-foreground">
-          Мы отправили письмо с подтверждением на{' '}
-          <span className="font-semibold">{email || 'указанный email'}</span>.
+          {verified ? 
+            'Ваш email успешно подтвержден. Перенаправляем на страницу входа...' :
+            verifying ?
+              'Подтверждаем ваш email адрес...' :
+              <>Мы отправили письмо с подтверждением на{' '}
+              <span className="font-semibold">{email || 'указанный email'}</span>.</>
+          }
         </p>
 
         {error && (
@@ -73,11 +104,25 @@ export default function VerifyEmailClient({ email }: VerifyEmailClientProps) {
           </Alert>
         )}
 
-        {sent && !error && (
+        {verified && !error && (
+          <Alert variant="default">
+            <CheckCircle2 className="w-4 h-4 text-green-600" />
+            <AlertDescription>Email успешно подтвержден! Перенаправляем...</AlertDescription>
+          </Alert>
+        )}
+
+        {sent && !error && !verified && (
           <Alert variant="default">
             <CheckCircle2 className="w-4 h-4 text-green-600" />
             <AlertDescription>Письмо отправлено повторно!</AlertDescription>
           </Alert>
+        )}
+
+        {verifying && (
+          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Подтверждаем email...
+          </div>
         )}
 
         <div className="space-y-3">

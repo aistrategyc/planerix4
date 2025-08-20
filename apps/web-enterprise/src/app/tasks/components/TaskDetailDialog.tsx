@@ -48,9 +48,9 @@ export function TaskDetailDialog({
         title: task.title,
         description: task.description,
         priority: task.priority,
-        type: task.type,
+        task_type: task.task_type,
         status: task.status,
-        assigned_to: task.assigned_to,
+        assignee_id: task.assignee_id,
         project_id: task.project_id,
         due_date: task.due_date,
         estimated_hours: task.estimated_hours,
@@ -79,7 +79,7 @@ export function TaskDetailDialog({
     const map = {
       todo: "bg-gray-100 text-gray-800",
       in_progress: "bg-blue-100 text-blue-800",
-      in_review: "bg-yellow-100 text-yellow-800",
+      review: "bg-yellow-100 text-yellow-800",
       done: "bg-green-100 text-green-800",
       cancelled: "bg-red-100 text-red-800",
     }
@@ -181,9 +181,9 @@ export function TaskDetailDialog({
               <div className="grid gap-2">
                 <Label>Type</Label>
                 <Select
-                  value={editedTask.type || task.type}
+                  value={editedTask.task_type || task.type}
                   onValueChange={(value) =>
-                    setEditedTask({ ...editedTask, type: value as TaskType })
+                    setEditedTask({ ...editedTask, task_type: value as TaskType })
                   }
                 >
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -203,9 +203,9 @@ export function TaskDetailDialog({
               <div className="grid gap-2">
                 <Label>Assignee</Label>
                 <Select
-                  value={editedTask.assigned_to ?? task.assigned_to ?? ""}
+                  value={editedTask.assignee_id ?? task.assignee_id ?? ""}
                   onValueChange={(value) =>
-                    setEditedTask({ ...editedTask, assigned_to: value || undefined })
+                    setEditedTask({ ...editedTask, assignee_id: value || undefined })
                   }
                 >
                   <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
@@ -294,7 +294,7 @@ export function TaskDetailDialog({
               </div>
               <div className="space-y-2">
                 <div>Task ID: {task.id}</div>
-                <div>Created by: {task.created_by}</div>
+                <div>Created by: {task.creator_id}</div>
               </div>
             </div>
           </TabsContent>

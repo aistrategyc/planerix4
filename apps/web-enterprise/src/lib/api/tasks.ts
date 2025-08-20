@@ -1,5 +1,5 @@
 // src/lib/api/tasks.ts
-import api from '@/lib/api/axios'
+import { api } from '@/lib/api/config'
 
 // ------------ Types ------------
 export interface Task {
@@ -8,10 +8,13 @@ export interface Task {
   description?: string
   status: TaskStatus
   priority: TaskPriority
-  type: TaskType
+  task_type: TaskType  // Backend field
+  type: TaskType       // Computed field (always equals task_type)
   project_id?: string
-  assigned_to?: string
-  created_by: string
+  assignee_id?: string
+  assigned_to?: string // Frontend compatibility alias for assignee_id  
+  creator_id?: string
+  created_by?: string  // Frontend compatibility alias for creator_id
   created_at: string
   updated_at: string
   due_date?: string
@@ -19,13 +22,20 @@ export interface Task {
   actual_hours?: number
 }
 
+// ✅ Соответствует backend schemas/tasks.py
 export enum TaskStatus {
   TODO = "todo",
   IN_PROGRESS = "in_progress",
-  IN_REVIEW = "in_review",
+  REVIEW = "review",
   DONE = "done",
   CANCELLED = "cancelled",
 }
+
+// Backwards compatibility alias
+export const TaskStatusLegacy = {
+  ...TaskStatus,
+  IN_REVIEW: TaskStatus.REVIEW,
+} as const
 
 export enum TaskPriority {
   LOW = "low",
@@ -34,37 +44,55 @@ export enum TaskPriority {
   URGENT = "urgent",
 }
 
+// ✅ Соответствует backend schemas/tasks.py
 export enum TaskType {
-  FEATURE = "feature",
+  TASK = "task",
   BUG = "bug",
+  FEATURE = "feature",
   IMPROVEMENT = "improvement",
+  RESEARCH = "research",
   DOCUMENTATION = "documentation",
   TESTING = "testing",
 }
 
+// ✅ Соответствует backend TaskCreate
 export interface TaskCreate {
   title: string
   description?: string
-  status?: TaskStatus
   priority?: TaskPriority
-  type?: TaskType
-  project_id?: string
-  assigned_to?: string
+  task_type: TaskType     // Required field, maps to backend
+  assignee_id?: string
+  assigned_to?: string    // Frontend compatibility alias
   due_date?: string
+  start_date?: string
   estimated_hours?: number
+  story_points?: number
+  tags?: string[]
+  custom_fields?: Record<string, any>
+  project_id?: string
+  parent_task_id?: string
+  status?: TaskStatus
 }
 
+// ✅ Соответствует backend TaskUpdate
 export interface TaskUpdate {
   title?: string
   description?: string
   status?: TaskStatus
   priority?: TaskPriority
-  type?: TaskType
-  project_id?: string
-  assigned_to?: string
+  task_type?: TaskType    // Backend field
+  assignee_id?: string
+  assigned_to?: string    // Frontend compatibility alias
   due_date?: string
+  start_date?: string
+  completed_at?: string
   estimated_hours?: number
   actual_hours?: number
+  story_points?: number
+  progress_percentage?: number
+  tags?: string[]
+  custom_fields?: Record<string, any>
+  project_id?: string
 }
 
 export interface TaskFilters {
@@ -72,10 +100,11 @@ export interface TaskFilters {
   per_page?: number
   status?: TaskStatus
   priority?: TaskPriority
-  type?: TaskType
+  task_type?: TaskType
   project_id?: string
-  assigned_to?: string
-  created_by?: string
+  assignee_id?: string
+  assigned_to?: string    // Frontend compatibility alias
+  creator_id?: string
   search?: string
 }
 
@@ -105,27 +134,29 @@ export class TasksAPI {
 
   const { data } = await api.get(url)
 
-  // 🔧 Нормализуем ответ в массив
+  // 🔧 Нормализуем ответ в массив и типы
   const items = Array.isArray(data)
     ? data
     : data?.items ?? data?.results ?? data?.tasks ?? []
 
-  return items as Task[]
+  return (items as Task[]).map(normalizeTask)
 }
 
   static async getTask(taskId: string): Promise<Task> {
     const { data } = await api.get(`tasks/${taskId}`)
-    return data
+    return normalizeTask(data)
   }
 
   static async createTask(taskData: TaskCreate): Promise<Task> {
-    const { data } = await api.post('tasks/', taskData)
-    return data
+    const apiData = prepareTaskForAPI(taskData)
+    const { data } = await api.post('tasks/', apiData)
+    return normalizeTask(data)
   }
 
   static async updateTask(taskId: string, taskData: TaskUpdate): Promise<Task> {
-    const { data } = await api.patch(`tasks/${taskId}`, taskData)
-    return data
+    const apiData = prepareTaskForAPI(taskData)
+    const { data } = await api.patch(`tasks/${taskId}`, apiData)
+    return normalizeTask(data)
   }
 
   static async deleteTask(taskId: string): Promise<void> {
@@ -134,14 +165,14 @@ export class TasksAPI {
 
   static async updateTaskStatus(taskId: string, status: TaskStatus): Promise<Task> {
     const { data } = await api.patch(`tasks/${taskId}/status`, { status })
-    return data
+    return normalizeTask(data)
   }
 
-  static async updateTaskAssignment(taskId: string, assignedTo: string): Promise<Task> {
+  static async updateTaskAssignment(taskId: string, assigneeId: string): Promise<Task> {
     const { data } = await api.patch(`tasks/${taskId}/assignment`, {
-      assigned_to: assignedTo,
+      assignee_id: assigneeId,
     })
-    return data
+    return normalizeTask(data)
   }
 
   static async getTaskComments(taskId: string) {
@@ -181,18 +212,33 @@ export class UsersAPI {
   }
 }
 
-// ------------ Projects API (для выбора проекта) ------------
-export interface Project {
-  id: string
-  name: string
-  description?: string
-  status: string
+// Helper function to normalize Task objects
+export const normalizeTask = (task: any): Task => ({
+  ...task,
+  type: task.task_type || task.type,  // Ensure type equals task_type
+  task_type: task.task_type || task.type,
+  assigned_to: task.assigned_to || task.assignee_id,  // Normalize assignee
+  created_by: task.created_by || task.creator_id,     // Normalize creator
+})
+
+// Helper function to prepare Task data for API calls
+export const prepareTaskForAPI = (task: TaskCreate | TaskUpdate) => {
+  const apiTask = { ...task }
+  
+  // Remove frontend-only fields
+  delete (apiTask as any).type
+  delete (apiTask as any).assigned_to  
+  delete (apiTask as any).created_by
+  
+  // Map frontend fields to backend fields
+  if ('assigned_to' in task && task.assigned_to) {
+    apiTask.assignee_id = task.assigned_to
+  }
+  
+  return apiTask
 }
 
-export class ProjectsAPI {
-  static async getProjects(): Promise<Project[]> {
-    // ❗ было 'projects/projects/' — исправлено
-    const { data } = await api.get('projects/')
-    return data
-  }
-}
+// ------------ Projects API (для выбора проекта) ------------
+// Импортируем из отдельного файла projects.ts
+export type { Project } from './projects'
+export { ProjectsAPI } from './projects'

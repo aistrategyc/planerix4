@@ -41,9 +41,15 @@ import {
 } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-interface NewTaskForm extends TaskCreate {
+interface NewTaskForm {
+  title: string
+  description?: string
+  priority: TaskPriority
+  task_type: TaskType
   project_id: string
   assigned_to: string
+  due_date?: string
+  estimated_hours?: number
 }
 
 // Column configuration mapping API statuses to UI
@@ -58,7 +64,7 @@ const columnsConfig = {
     icon: <PlayCircle className="w-4 h-4" />,
     color: "bg-blue-100"
   },
-  [TaskStatus.IN_REVIEW]: { 
+  [TaskStatus.REVIEW]: { 
     name: "In Review", 
     icon: <Eye className="w-4 h-4" />,
     color: "bg-yellow-100"
@@ -80,11 +86,13 @@ function TasksPageContent() {
   const {
     tasks,
     loading: tasksLoading,
-    createTask,
-    updateTask,
-    updateTaskStatus,
-    deleteTask,
-    updateFilters
+    actions: {
+      createTask,
+      updateTask,
+      updateTaskStatus,
+      deleteTask,
+      updateFilters
+    }
   } = useTasks()
   const { users, loading: usersLoading } = useUsers()
   const { projects, loading: projectsLoading } = useProjects()
@@ -122,7 +130,7 @@ function TasksPageContent() {
     title: "",
     description: "",
     priority: TaskPriority.MEDIUM,
-    type: TaskType.FEATURE,
+    task_type: TaskType.FEATURE,
     project_id: "",
     assigned_to: "",
     due_date: "",
@@ -196,7 +204,7 @@ function TasksPageContent() {
         title: "",
         description: "",
         priority: TaskPriority.MEDIUM,
-        type: TaskType.FEATURE,
+        task_type: TaskType.FEATURE,
         project_id: "",
         assigned_to: "",
         due_date: "",
@@ -403,8 +411,8 @@ function TasksPageContent() {
                   <div className="grid gap-2">
                     <Label htmlFor="type">Type</Label>
                     <Select
-                      value={newTask.type}
-                      onValueChange={(value) => setNewTask({ ...newTask, type: value as TaskType })}
+                      value={newTask.task_type}
+                      onValueChange={(value) => setNewTask({ ...newTask, task_type: value as TaskType })}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -571,7 +579,7 @@ function TasksPageContent() {
                                   {task.priority.toUpperCase()}
                                 </Badge>
                                 <Badge className={getTypeColor(task.type)} variant="outline">
-                                  {task.type.replace('_', ' ').toUpperCase()}
+                                  {task.type?.replace('_', ' ').toUpperCase()}
                                 </Badge>
                               </div>
 
@@ -716,7 +724,7 @@ function TaskDetailDialog({
         title: task.title,
         description: task.description,
         priority: task.priority,
-        type: task.type,
+        task_type: task.type,
         status: task.status,
         assigned_to: task.assigned_to,
         project_id: task.project_id,
@@ -747,7 +755,7 @@ function TaskDetailDialog({
     const map: Record<TaskStatus, string> = {
       [TaskStatus.TODO]: "bg-gray-100 text-gray-800",
       [TaskStatus.IN_PROGRESS]: "bg-blue-100 text-blue-800",
-      [TaskStatus.IN_REVIEW]: "bg-yellow-100 text-yellow-800",
+      [TaskStatus.REVIEW]: "bg-yellow-100 text-yellow-800",
       [TaskStatus.DONE]: "bg-green-100 text-green-800",
       [TaskStatus.CANCELLED]: "bg-red-100 text-red-800",
     }
@@ -841,8 +849,8 @@ function TaskDetailDialog({
               <div className="grid gap-2">
                 <Label>Type</Label>
                 <Select
-                  value={(editedTask.type as TaskType) || undefined}
-                  onValueChange={(value) => setEditedTask({ ...editedTask, type: value as TaskType })}
+                  value={(editedTask.task_type as TaskType) || undefined}
+                  onValueChange={(value) => setEditedTask({ ...editedTask, task_type: value as TaskType })}
                 >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>

@@ -6,8 +6,11 @@ export default async function VerifyEmailPage(props: any) {
   const resolved: Record<string, any> =
     sp && typeof sp.then === 'function' ? await sp : (sp ?? {})
 
-  const raw = resolved?.email
-  const email = Array.isArray(raw) ? (raw[0] ?? '') : (raw ?? '')
+  const rawEmail = resolved?.email
+  const email = Array.isArray(rawEmail) ? (rawEmail[0] ?? '') : (rawEmail ?? '')
+  
+  const rawToken = resolved?.token
+  const token = Array.isArray(rawToken) ? (rawToken[0] ?? '') : (rawToken ?? '')
 
-  return <VerifyEmailClient email={email} />
+  return <VerifyEmailClient email={email} token={token} />
 }

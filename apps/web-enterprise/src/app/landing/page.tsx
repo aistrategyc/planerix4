@@ -193,12 +193,12 @@ export default function LandingPage() {
             </div>
             
             <div className="flex items-center space-x-4">
-              <button className="hidden md:block text-gray-600 hover:text-gray-900 transition-colors">
+              <a href="/login" className="hidden md:block text-gray-600 hover:text-gray-900 transition-colors">
                 Вход
-              </button>
-              <button className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-6 py-2 rounded-lg hover:shadow-lg transition-all duration-300 transform hover:scale-105">
+              </a>
+              <a href="/register" className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-6 py-2 rounded-lg hover:shadow-lg transition-all duration-300 transform hover:scale-105">
                 Начать бесплатно
-              </button>
+              </a>
               <button 
                 className="md:hidden text-gray-600"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -234,10 +234,10 @@ export default function LandingPage() {
               </p>
               
               <div className="flex flex-col sm:flex-row gap-4">
-                <button className="group relative px-8 py-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-medium overflow-hidden transition-all duration-300 transform hover:scale-105 hover:shadow-xl">
+                <a href="/register" className="group relative px-8 py-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-medium overflow-hidden transition-all duration-300 transform hover:scale-105 hover:shadow-xl inline-block text-center">
                   <span className="relative z-10">Попробовать 14 дней бесплатно</span>
                   <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity"></div>
-                </button>
+                </a>
                 <button className="flex items-center justify-center px-8 py-4 border-2 border-gray-300 rounded-lg font-medium hover:border-gray-400 transition-colors">
                   <Play className="w-5 h-5 mr-2" />
                   Смотреть демо
@@ -465,13 +465,13 @@ export default function LandingPage() {
                   <span className="text-5xl font-bold">₽{plan.price}</span>
                   <span className="text-gray-600">/месяц</span>
                 </div>
-                <button className={`w-full py-3 rounded-lg font-medium transition-all duration-300 ${
+                <a href={plan.name === 'Базовый' || plan.name === 'Команда' ? '/register' : '#contact'} className={`w-full py-3 rounded-lg font-medium transition-all duration-300 ${
                   plan.popular
                     ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:shadow-lg transform hover:scale-105'
                     : 'border-2 border-gray-300 hover:border-gray-400'
-                } mb-8`}>
+                } mb-8 inline-block text-center`}>
                   {plan.cta}
-                </button>
+                </a>
                 <ul className="space-y-4">
                   {plan.features.map((feature, i) => (
                     <li key={i} className="flex items-start">
@@ -570,9 +570,9 @@ export default function LandingPage() {
             Присоединяйтесь к тысячам компаний, которые уже управляют бизнесом эффективнее с LIDERIX
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="px-8 py-4 bg-white text-indigo-600 rounded-lg font-bold hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+            <a href="/register" className="px-8 py-4 bg-white text-indigo-600 rounded-lg font-bold hover:shadow-xl transition-all duration-300 transform hover:scale-105 inline-block text-center">
               Начать бесплатно
-            </button>
+            </a>
             <button className="px-8 py-4 border-2 border-white text-white rounded-lg font-bold hover:bg-white hover:text-indigo-600 transition-all duration-300">
               Заказать демо
             </button>
@@ -776,10 +776,10 @@ export default function LandingPage() {
                 <a href="#testimonials" className="block text-gray-600 hover:text-gray-900 transition-colors">Отзывы</a>
                 <a href="#contact" className="block text-gray-600 hover:text-gray-900 transition-colors">Контакты</a>
                 <hr className="my-4" />
-                <button className="block text-gray-600 hover:text-gray-900 transition-colors">Вход</button>
-                <button className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-6 py-2 rounded-lg hover:shadow-lg transition-all duration-300">
+                <a href="/login" className="block text-gray-600 hover:text-gray-900 transition-colors">Вход</a>
+                <a href="/register" className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-6 py-2 rounded-lg hover:shadow-lg transition-all duration-300 inline-block text-center">
                   Начать бесплатно
-                </button>
+                </a>
               </div>
             </div>
           </div>

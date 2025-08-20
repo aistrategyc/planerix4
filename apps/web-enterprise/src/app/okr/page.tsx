@@ -1,741 +1,347 @@
 "use client"
 
-import { useState, useCallback, useMemo } from "react"
-import ProtectedRoute from "@/components/auth/ProtectedRoute"
-
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog"
-import { Textarea } from "@/components/ui/textarea"
-import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useToast } from "@/components/ui/use-toast"
-
-import {
-  Plus,
-  Target,
-  TrendingUp,
-  TrendingDown,
-  AlertCircle,
-  CheckCircle2,
-  Calendar,
-  Users,
-  BarChart3,
-  Search,
-  Filter,
-  Eye,
-  Edit3,
-  Trash2,
-  Award,
-  Zap,
-  Clock
-} from "lucide-react"
-
-interface Objective {
-  id: string
-  title: string
-  description?: string
-  progress: number
-  status: 'draft' | 'active' | 'completed' | 'at_risk' | 'cancelled'
-  priority: 'low' | 'medium' | 'high' | 'critical'
-  owner: string
-  team?: string
-  startDate: string
-  endDate: string
-  keyResults: KeyResult[]
-  created_at: string
-  updated_at: string
-}
-
-interface KeyResult {
-  id: string
-  title: string
-  description?: string
-  progress: number
-  target: number
-  current: number
-  unit: string
-  status: 'not_started' | 'on_track' | 'at_risk' | 'completed'
-  owner?: string
-}
-
-// Mock data for demonstration
-const mockObjectives: Objective[] = [
-  {
-    id: "1",
-    title: "Increase Monthly Revenue by 25%",
-    description: "Drive revenue growth through improved sales processes and customer acquisition",
-    progress: 68,
-    status: 'active',
-    priority: 'high',
-    owner: "John Smith",
-    team: "Sales",
-    startDate: "2024-01-01",
-    endDate: "2024-12-31",
-    created_at: "2024-01-01T00:00:00Z",
-    updated_at: "2024-01-15T10:30:00Z",
-    keyResults: [
-      {
-        id: "kr1",
-        title: "Achieve $2.5M in monthly revenue",
-        progress: 70,
-        target: 2500000,
-        current: 1750000,
-        unit: "$",
-        status: 'on_track'
-      },
-      {
-        id: "kr2", 
-        title: "Increase customer acquisition by 40%",
-        progress: 65,
-        target: 140,
-        current: 91,
-        unit: "customers",
-        status: 'on_track'
-      }
-    ]
-  },
-  {
-    id: "2",
-    title: "Improve Product Quality & User Experience",
-    description: "Enhance product reliability and user satisfaction metrics",
-    progress: 45,
-    status: 'at_risk',
-    priority: 'critical',
-    owner: "Sarah Johnson",
-    team: "Product",
-    startDate: "2024-02-01", 
-    endDate: "2024-06-30",
-    created_at: "2024-02-01T00:00:00Z",
-    updated_at: "2024-02-10T14:20:00Z",
-    keyResults: [
-      {
-        id: "kr3",
-        title: "Reduce bug reports by 50%",
-        progress: 30,
-        target: 50,
-        current: 15,
-        unit: "%",
-        status: 'at_risk'
-      },
-      {
-        id: "kr4",
-        title: "Increase user satisfaction score to 4.5/5",
-        progress: 60,
-        target: 4.5,
-        current: 4.2,
-        unit: "★",
-        status: 'on_track'
-      }
-    ]
-  }
-]
+import { useState } from 'react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Progress } from '@/components/ui/progress'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { PlusCircle, Target, TrendingUp, Users, Calendar, Search, Filter, AlertCircle, MoreHorizontal } from 'lucide-react'
+import { format } from 'date-fns'
+import { ErrorBoundary } from '@/components/error-boundary'
+import { useOKRs, useOKRStats } from './hooks/useOKRs'
+import { OKRStatus, OKRTimeframe, type OKR } from '@/lib/api/okrs'
+import { Skeleton } from '@/components/ui/skeleton'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import ProtectedRoute from '@/components/auth/ProtectedRoute'
 
 export default function OKRPage() {
   return (
     <ProtectedRoute>
-      <OKRPageContent />
+      <ErrorBoundary>
+        <OKRPageContent />
+      </ErrorBoundary>
     </ProtectedRoute>
   )
 }
 
 function OKRPageContent() {
-  const { toast } = useToast()
-  
-  const [objectives, setObjectives] = useState<Objective[]>(mockObjectives)
   const [searchQuery, setSearchQuery] = useState("")
-  const [filterStatus, setFilterStatus] = useState<string>("all")
-  const [filterPriority, setFilterPriority] = useState<string>("all")
-  const [selectedObjective, setSelectedObjective] = useState<Objective | null>(null)
-  const [showCreateDialog, setShowCreateDialog] = useState(false)
-  const [showDetailDialog, setShowDetailDialog] = useState(false)
-
-  const [newObjective, setNewObjective] = useState({
-    title: "",
-    description: "",
-    priority: "medium" as const,
-    owner: "",
-    team: "",
-    startDate: "",
-    endDate: ""
+  const [statusFilter, setStatusFilter] = useState<OKRStatus | 'all'>('all')
+  const [timeframeFilter, setTimeframeFilter] = useState<OKRTimeframe | 'all'>('all')
+  
+  // Use real API hooks
+  const { okrs, loading, error, actions } = useOKRs()
+  const { stats, loading: statsLoading } = useOKRStats()
+  
+  // Filter OKRs based on search and filters
+  const filteredOKRs = okrs.filter(okr => {
+    const matchesSearch = !searchQuery || 
+      okr.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      okr.description?.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesStatus = statusFilter === 'all' || okr.status === statusFilter
+    const matchesTimeframe = timeframeFilter === 'all' || okr.timeframe === timeframeFilter
+    return matchesSearch && matchesStatus && matchesTimeframe
   })
 
-  const filteredObjectives = useMemo(() => {
-    return objectives.filter(obj => {
-      const matchesSearch = obj.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          obj.description?.toLowerCase().includes(searchQuery.toLowerCase())
-      const matchesStatus = filterStatus === "all" || obj.status === filterStatus
-      const matchesPriority = filterPriority === "all" || obj.priority === filterPriority
-      
-      return matchesSearch && matchesStatus && matchesPriority
-    })
-  }, [objectives, searchQuery, filterStatus, filterPriority])
-
-  const getStatusColor = (status: Objective['status']) => {
-    switch (status) {
-      case 'draft': return 'bg-gray-100 text-gray-800'
-      case 'active': return 'bg-blue-100 text-blue-800'
-      case 'completed': return 'bg-green-100 text-green-800'
-      case 'at_risk': return 'bg-red-100 text-red-800'
-      case 'cancelled': return 'bg-gray-100 text-gray-600'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
-
-  const getPriorityColor = (priority: Objective['priority']) => {
-    switch (priority) {
-      case 'critical': return 'bg-red-500 text-white'
-      case 'high': return 'bg-orange-500 text-white'
-      case 'medium': return 'bg-yellow-500 text-white'
-      case 'low': return 'bg-green-500 text-white'
-      default: return 'bg-gray-500 text-white'
-    }
-  }
-
-  const getKRStatusColor = (status: KeyResult['status']) => {
-    switch (status) {
-      case 'not_started': return 'bg-gray-100 text-gray-800'
-      case 'on_track': return 'bg-green-100 text-green-800'
-      case 'at_risk': return 'bg-red-100 text-red-800'
-      case 'completed': return 'bg-blue-100 text-blue-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
-
-  const handleCreateObjective = useCallback(() => {
-    if (!newObjective.title.trim()) {
-      toast({ title: "Error", description: "Objective title is required", variant: "destructive" })
-      return
-    }
-
-    const newObj: Objective = {
-      id: Date.now().toString(),
-      title: newObjective.title.trim(),
-      description: newObjective.description?.trim() || undefined,
-      progress: 0,
-      status: 'draft',
-      priority: newObjective.priority,
-      owner: newObjective.owner.trim() || "Unassigned",
-      team: newObjective.team?.trim() || undefined,
-      startDate: newObjective.startDate,
-      endDate: newObjective.endDate,
-      keyResults: [],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }
-
-    setObjectives(prev => [...prev, newObj])
-    setNewObjective({
-      title: "",
-      description: "",
-      priority: "medium",
-      owner: "",
-      team: "",
-      startDate: "",
-      endDate: ""
-    })
-    setShowCreateDialog(false)
-    
-    toast({ title: "Success", description: "Objective created successfully" })
-  }, [newObjective, toast])
-
-  const stats = useMemo(() => {
-    const total = objectives.length
-    const active = objectives.filter(obj => obj.status === 'active').length
-    const completed = objectives.filter(obj => obj.status === 'completed').length
-    const atRisk = objectives.filter(obj => obj.status === 'at_risk').length
-    const avgProgress = total > 0 ? objectives.reduce((sum, obj) => sum + obj.progress, 0) / total : 0
-
-    return { total, active, completed, atRisk, avgProgress }
-  }, [objectives])
-
-  return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-        <div className="flex items-center gap-2">
-          <Target className="w-6 h-6 text-blue-600" />
-          <h1 className="text-3xl font-bold">OKRs</h1>
-          <Badge variant="outline" className="ml-2">
-            Objectives & Key Results
-          </Badge>
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="space-y-8 p-8">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-80" />
+          </div>
+          <Skeleton className="h-10 w-32" />
         </div>
         
-        <div className="flex flex-wrap gap-2">
-          <div className="relative">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search objectives..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 w-64"
-            />
-          </div>
-
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="draft">Draft</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="at_risk">At Risk</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={filterPriority} onValueChange={setFilterPriority}>
-            <SelectTrigger className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Priority</SelectItem>
-              <SelectItem value="critical">Critical</SelectItem>
-              <SelectItem value="high">High</SelectItem>
-              <SelectItem value="medium">Medium</SelectItem>
-              <SelectItem value="low">Low</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                New Objective
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
-              <DialogHeader>
-                <DialogTitle>Create New Objective</DialogTitle>
-                <DialogDescription>Define a new strategic objective with measurable key results</DialogDescription>
-              </DialogHeader>
-              
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="title">Objective Title *</Label>
-                  <Input
-                    id="title"
-                    value={newObjective.title}
-                    onChange={(e) => setNewObjective({ ...newObjective, title: e.target.value })}
-                    placeholder="e.g., Increase customer satisfaction by 20%"
-                  />
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={newObjective.description}
-                    onChange={(e) => setNewObjective({ ...newObjective, description: e.target.value })}
-                    placeholder="Brief description of the objective..."
-                    rows={3}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="priority">Priority</Label>
-                    <Select
-                      value={newObjective.priority}
-                      onValueChange={(value: any) => setNewObjective({ ...newObjective, priority: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="low">Low</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
-                        <SelectItem value="critical">Critical</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="owner">Owner</Label>
-                    <Input
-                      id="owner"
-                      value={newObjective.owner}
-                      onChange={(e) => setNewObjective({ ...newObjective, owner: e.target.value })}
-                      placeholder="Objective owner"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="team">Team</Label>
-                    <Input
-                      id="team"
-                      value={newObjective.team}
-                      onChange={(e) => setNewObjective({ ...newObjective, team: e.target.value })}
-                      placeholder="Team or department"
-                    />
-                  </div>
-                  <div></div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="startDate">Start Date</Label>
-                    <Input
-                      id="startDate"
-                      type="date"
-                      value={newObjective.startDate}
-                      onChange={(e) => setNewObjective({ ...newObjective, startDate: e.target.value })}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="endDate">End Date</Label>
-                    <Input
-                      id="endDate"
-                      type="date"
-                      value={newObjective.endDate}
-                      onChange={(e) => setNewObjective({ ...newObjective, endDate: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleCreateObjective}>
-                  Create Objective
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-8 w-16" />
+              </CardHeader>
+            </Card>
+          ))}
         </div>
+        
+        <div className="space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-6 w-64" />
+                <Skeleton className="h-4 w-full" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-4 w-full mb-2" />
+                <Skeleton className="h-2 w-full" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    )
+  }
+  
+  // Show error state
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px] p-8">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+              <AlertCircle className="h-6 w-6 text-red-600" />
+            </div>
+            <CardTitle>Failed to load OKRs</CardTitle>
+            <CardDescription>{error}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={actions.refetch} className="w-full">
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-8 p-8">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold tracking-tight">Objectives & Key Results</h1>
+          <p className="text-lg text-muted-foreground">
+            Track and manage your objectives and measurable outcomes
+          </p>
+        </div>
+        <Button>
+          <PlusCircle className="mr-2 h-4 w-4" />
+          Create OKR
+        </Button>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Target className="w-4 h-4 text-blue-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Total OKRs</p>
-                <p className="text-2xl font-bold">{stats.total}</p>
-              </div>
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total OKRs</CardTitle>
+            <Target className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{statsLoading ? '...' : stats?.total_okrs || 0}</div>
+            <p className="text-xs text-muted-foreground">
+              Total objectives
+            </p>
           </CardContent>
         </Card>
-
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-green-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Active</p>
-                <p className="text-2xl font-bold">{stats.active}</p>
-              </div>
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{statsLoading ? '...' : stats?.active_okrs || 0}</div>
+            <p className="text-xs text-muted-foreground">
+              Currently in progress
+            </p>
           </CardContent>
         </Card>
-
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Award className="w-4 h-4 text-blue-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Completed</p>
-                <p className="text-2xl font-bold">{stats.completed}</p>
-              </div>
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Completed</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{statsLoading ? '...' : stats?.completed_okrs || 0}</div>
+            <p className="text-xs text-muted-foreground">
+              Successfully achieved
+            </p>
           </CardContent>
         </Card>
-
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-red-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">At Risk</p>
-                <p className="text-2xl font-bold">{stats.atRisk}</p>
-              </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
+            <Target className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {statsLoading ? '...' : `${stats?.completion_rate || 0}%`}
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-purple-600" />
-              <div>
-                <p className="text-sm text-muted-foreground">Avg Progress</p>
-                <p className="text-2xl font-bold">{Math.round(stats.avgProgress)}%</p>
-              </div>
-            </div>
+            <p className="text-xs text-muted-foreground">
+              Overall completion rate
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Objectives Grid */}
-      <div className="grid gap-4">
-        {filteredObjectives.map((objective) => (
-          <Card 
-            key={objective.id}
-            className="cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => {
-              setSelectedObjective(objective)
-              setShowDetailDialog(true)
-            }}
-          >
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                {/* Header */}
-                <div className="flex justify-between items-start">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3 className="text-lg font-semibold truncate">{objective.title}</h3>
-                      <Badge className={getPriorityColor(objective.priority)} variant="secondary">
-                        {objective.priority.toUpperCase()}
-                      </Badge>
-                      <Badge className={getStatusColor(objective.status)} variant="outline">
-                        {objective.status.replace('_', ' ').toUpperCase()}
-                      </Badge>
-                    </div>
-                    {objective.description && (
-                      <p className="text-sm text-muted-foreground line-clamp-2">
-                        {objective.description}
-                      </p>
-                    )}
-                  </div>
-                  
-                  <div className="text-right min-w-0 ml-4">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {objective.progress}%
-                    </div>
-                    <Progress value={objective.progress} className="w-20" />
-                  </div>
-                </div>
+      {/* Filters and Search */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+          <Input
+            placeholder="Search OKRs..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <div className="flex gap-2">
+          <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as OKRStatus | 'all')}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value={OKRStatus.DRAFT}>Draft</SelectItem>
+              <SelectItem value={OKRStatus.ACTIVE}>Active</SelectItem>
+              <SelectItem value={OKRStatus.DONE}>Completed</SelectItem>
+              <SelectItem value={OKRStatus.CANCELED}>Canceled</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={timeframeFilter} onValueChange={(value) => setTimeframeFilter(value as OKRTimeframe | 'all')}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Timeframe" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Timeframes</SelectItem>
+              <SelectItem value={OKRTimeframe.Q}>Quarterly</SelectItem>
+              <SelectItem value={OKRTimeframe.H1}>H1</SelectItem>
+              <SelectItem value={OKRTimeframe.H2}>H2</SelectItem>
+              <SelectItem value={OKRTimeframe.Y}>Yearly</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
-                {/* Meta info */}
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Users className="w-4 h-4" />
-                    {objective.owner}
-                  </div>
-                  {objective.team && (
-                    <div className="flex items-center gap-1">
-                      <Target className="w-4 h-4" />
-                      {objective.team}
-                    </div>
-                  )}
-                  <div className="flex items-center gap-1">
-                    <Calendar className="w-4 h-4" />
-                    {new Date(objective.startDate).toLocaleDateString()} - {new Date(objective.endDate).toLocaleDateString()}
-                  </div>
-                </div>
-
-                {/* Key Results Summary */}
-                {objective.keyResults.length > 0 && (
-                  <div className="border-t pt-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-sm font-medium">Key Results</h4>
-                      <Badge variant="outline" className="text-xs">
-                        {objective.keyResults.length} KRs
-                      </Badge>
-                    </div>
-                    <div className="space-y-1">
-                      {objective.keyResults.slice(0, 2).map((kr) => (
-                        <div key={kr.id} className="flex items-center justify-between text-sm">
-                          <span className="flex-1 truncate">{kr.title}</span>
-                          <div className="flex items-center gap-2">
-                            <Badge className={getKRStatusColor(kr.status)} variant="outline">
-                              {kr.status.replace('_', ' ').toUpperCase()}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground min-w-0">
-                              {kr.progress}%
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                      {objective.keyResults.length > 2 && (
-                        <div className="text-xs text-muted-foreground">
-                          +{objective.keyResults.length - 2} more key results
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-
-        {filteredObjectives.length === 0 && (
+      {/* OKR List */}
+      <div className="space-y-4">
+        {filteredOKRs.length === 0 ? (
           <Card>
-            <CardContent className="p-12 text-center">
-              <Target className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">No objectives found</h3>
-              <p className="text-muted-foreground mb-4">
-                {searchQuery || filterStatus !== "all" || filterPriority !== "all"
-                  ? "Try adjusting your filters or search terms"
-                  : "Get started by creating your first objective"}
+            <CardContent className="flex flex-col items-center justify-center py-16">
+              <Target className="h-12 w-12 text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No OKRs found</h3>
+              <p className="text-gray-500 text-center max-w-md">
+                {searchQuery || statusFilter !== "all" || timeframeFilter !== "all"
+                  ? "Try adjusting your search or filters to find what you're looking for."
+                  : "Get started by creating your first OKR to track objectives and key results."}
               </p>
-              <Button onClick={() => setShowCreateDialog(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Create Objective
+              <Button className="mt-4">
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Create OKR
               </Button>
             </CardContent>
           </Card>
+        ) : (
+          filteredOKRs.map((okr) => (
+            <OKRCard key={okr.id} okr={okr} onUpdate={actions.updateOKR} onDelete={actions.deleteOKR} />
+          ))
         )}
       </div>
-
-      {/* Objective Detail Dialog */}
-      <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
-        <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
-          {selectedObjective && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <Target className="w-5 h-5" />
-                  {selectedObjective.title}
-                  <Badge className={getPriorityColor(selectedObjective.priority)} variant="secondary">
-                    {selectedObjective.priority.toUpperCase()}
-                  </Badge>
-                </DialogTitle>
-                <DialogDescription>
-                  {selectedObjective.status.replace('_', ' ').toUpperCase()} • {selectedObjective.progress}% Complete
-                </DialogDescription>
-              </DialogHeader>
-
-              <Tabs defaultValue="overview" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="overview">Overview</TabsTrigger>
-                  <TabsTrigger value="key-results">Key Results ({selectedObjective.keyResults.length})</TabsTrigger>
-                  <TabsTrigger value="activity">Activity</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="overview" className="space-y-4">
-                  <div className="grid gap-4">
-                    {selectedObjective.description && (
-                      <div>
-                        <Label>Description</Label>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {selectedObjective.description}
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label>Owner</Label>
-                        <p className="text-sm">{selectedObjective.owner}</p>
-                      </div>
-                      {selectedObjective.team && (
-                        <div>
-                          <Label>Team</Label>
-                          <p className="text-sm">{selectedObjective.team}</p>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label>Start Date</Label>
-                        <p className="text-sm">{new Date(selectedObjective.startDate).toLocaleDateString()}</p>
-                      </div>
-                      <div>
-                        <Label>End Date</Label>
-                        <p className="text-sm">{new Date(selectedObjective.endDate).toLocaleDateString()}</p>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label>Overall Progress</Label>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Progress value={selectedObjective.progress} className="flex-1" />
-                        <span className="text-sm font-medium">{selectedObjective.progress}%</span>
-                      </div>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="key-results" className="space-y-4">
-                  {selectedObjective.keyResults.length > 0 ? (
-                    <div className="space-y-4">
-                      {selectedObjective.keyResults.map((kr) => (
-                        <Card key={kr.id}>
-                          <CardContent className="p-4">
-                            <div className="space-y-3">
-                              <div className="flex justify-between items-start">
-                                <div className="flex-1">
-                                  <h4 className="font-medium">{kr.title}</h4>
-                                  {kr.description && (
-                                    <p className="text-sm text-muted-foreground mt-1">
-                                      {kr.description}
-                                    </p>
-                                  )}
-                                </div>
-                                <Badge className={getKRStatusColor(kr.status)} variant="outline">
-                                  {kr.status.replace('_', ' ').toUpperCase()}
-                                </Badge>
-                              </div>
-
-                              <div className="flex items-center justify-between text-sm">
-                                <span>Progress: {kr.current.toLocaleString()}{kr.unit} / {kr.target.toLocaleString()}{kr.unit}</span>
-                                <span className="font-medium">{kr.progress}%</span>
-                              </div>
-
-                              <Progress value={kr.progress} />
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <Target className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                      <h3 className="text-lg font-medium mb-2">No Key Results</h3>
-                      <p className="text-muted-foreground mb-4">
-                        Add measurable key results to track progress on this objective.
-                      </p>
-                      <Button size="sm">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Key Result
-                      </Button>
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="activity" className="space-y-4">
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Clock className="w-12 h-12 mx-auto mb-4" />
-                    <p>Activity tracking coming soon...</p>
-                  </div>
-                </TabsContent>
-              </Tabs>
-
-              <div className="flex justify-between pt-4 border-t">
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline">
-                    <Edit3 className="w-4 h-4 mr-2" />
-                    Edit
-                  </Button>
-                  <Button size="sm" variant="outline">
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete
-                  </Button>
-                </div>
-                <Button size="sm" onClick={() => setShowDetailDialog(false)}>
-                  Close
-                </Button>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
+  )
+}
+
+// OKR Card Component
+function OKRCard({ 
+  okr, 
+  onUpdate, 
+  onDelete 
+}: { 
+  okr: OKR
+  onUpdate: (id: string, updates: any) => Promise<OKR | null>
+  onDelete: (id: string) => Promise<boolean>
+}) {
+  const getStatusColor = (status: OKRStatus) => {
+    switch (status) {
+      case OKRStatus.ACTIVE:
+        return "bg-blue-100 text-blue-800"
+      case OKRStatus.DONE:
+        return "bg-green-100 text-green-800"
+      case OKRStatus.CANCELED:
+        return "bg-red-100 text-red-800"
+      case OKRStatus.DRAFT:
+        return "bg-gray-100 text-gray-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  const getTimeframeLabel = (timeframe: OKRTimeframe) => {
+    switch (timeframe) {
+      case OKRTimeframe.Q:
+        return "Quarterly"
+      case OKRTimeframe.H1:
+        return "H1"
+      case OKRTimeframe.H2:
+        return "H2"
+      case OKRTimeframe.Y:
+        return "Yearly"
+      default:
+        return timeframe
+    }
+  }
+
+  return (
+    <Card className="hover:shadow-md transition-shadow">
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between">
+          <div className="space-y-1 flex-1">
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-lg">{okr.title}</CardTitle>
+              <Badge className={getStatusColor(okr.status)}>
+                {okr.status}
+              </Badge>
+            </div>
+            {okr.description && (
+              <CardDescription className="text-sm">
+                {okr.description}
+              </CardDescription>
+            )}
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem>Edit</DropdownMenuItem>
+              <DropdownMenuItem 
+                className="text-red-600"
+                onClick={() => onDelete(okr.id)}
+              >
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-4">
+              <Badge variant="outline" className="text-xs">
+                {getTimeframeLabel(okr.timeframe)}
+              </Badge>
+              <div className="flex items-center text-muted-foreground">
+                <Calendar className="mr-1 h-3 w-3" />
+                {format(new Date(okr.created_at), 'MMM dd, yyyy')}
+              </div>
+            </div>
+          </div>
+          
+          {okr.updated_at && (
+            <div className="text-xs text-muted-foreground">
+              Last updated: {format(new Date(okr.updated_at), 'MMM dd, yyyy HH:mm')}
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   )
 }

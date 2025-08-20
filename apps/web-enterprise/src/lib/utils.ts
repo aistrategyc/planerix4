@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { stripHtmlTags, sanitizeHtml as sanitize, escapeHtml as escape } from './sanitize-fallback'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -267,12 +268,26 @@ export function toCamelCase(string: string): string {
 }
 
 /**
- * Remove HTML tags from string
+ * Remove HTML tags from string safely (XSS protection)
+ * Uses fallback sanitization for reliability
  */
 export function stripHtml(html: string): string {
-  const tmp = document.createElement("div")
-  tmp.innerHTML = html
-  return tmp.textContent || tmp.innerText || ""
+  return stripHtmlTags(html)
+}
+
+/**
+ * Sanitize HTML content to prevent XSS attacks
+ * Uses fallback sanitization for reliability
+ */
+export function sanitizeHtml(html: string): string {
+  return sanitize(html)
+}
+
+/**
+ * Escape HTML entities to prevent XSS
+ */
+export function escapeHtml(text: string): string {
+  return escape(text)
 }
 
 /**

@@ -307,33 +307,27 @@ def _get_jwt_secret_and_opts():
 async def _get_current_user_from_bearer(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
 ):
-    """Fallback аутентификация через JWT токен"""
+    """
+    Безопасная аутентификация через JWT токен
+    Удален fallback для production безопасности
+    """
     if not credentials:
-        # Для /users/me можем вернуть анонимного пользователя в dev режиме
-        class _AnonymousUser:
-            def __init__(self):
-                self.id = "anonymous"
-                self.email = "anonymous@example.com"
-                self.full_name = "Anonymous User"
-                self.is_active = True
-                
-        logger.warning("No authorization header provided, returning anonymous user")
-        return _AnonymousUser()
+        logger.error("No authorization header provided")
+        raise HTTPException(
+            status_code=401, 
+            detail="Authorization header required",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
 
     token = credentials.credentials
     secret, alg, aud, iss = _get_jwt_secret_and_opts()
 
     if not secret:
         logger.error("JWT secret is not configured")
-        # В dev режиме возвращаем тестового пользователя
-        class _TestUser:
-            def __init__(self):
-                self.id = "test-user"
-                self.email = "test@example.com" 
-                self.full_name = "Test User"
-                self.is_active = True
-        
-        return _TestUser()
+        raise HTTPException(
+            status_code=500, 
+            detail="Server configuration error"
+        )
 
     try:
         options = {"verify_aud": False if not aud else True}

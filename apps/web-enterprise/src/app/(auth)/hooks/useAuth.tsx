@@ -149,7 +149,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     setLoading(true)
     try {
       // ✅ Исправлен путь для соответствия backend роуту
-      await api.post('/auth/register', payload)
+      await api.post('/register', payload)
       router.push(`/verify-email?email=${encodeURIComponent(payload.email)}`)
     } catch (err) {
       console.error('Registration error:', err)

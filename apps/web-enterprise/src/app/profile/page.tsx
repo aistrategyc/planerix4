@@ -74,7 +74,7 @@ function ProfilePageContent() {
   // Hooks
   const { profile, stats, loading: profileLoading, updating, updateProfile, uploadAvatar, changePassword } = useProfile()
   const { organization: currentOrg, loading: orgLoading, updateOrganization, teamMembers, inviteUser } = useOrganization()
-  const { tasks, loading: tasksLoading } = useTasks(profile ? { assigned_to: profile.id } : undefined)
+  const { tasks, loading: tasksLoading } = useTasks(profile ? { assignee: profile.id } : undefined)
   // State
   const [isEditing, setIsEditing] = useState(false)
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false)

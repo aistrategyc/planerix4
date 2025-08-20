@@ -1,5 +1,5 @@
 // lib/api/company.ts
-import api from '@/lib/api/axios'
+import { api } from '@/lib/api/config'
 import type { Department, Membership, TeamMember } from '@/types/profile'
 export type { Department, Membership, TeamMember } from '@/types/profile'
 export interface Client {
@@ -32,6 +32,7 @@ export interface Company extends Client {
 export interface CompanyStats {
   total_employees: number
   total_projects: number
+  total_tasks: number      // Add missing total_tasks field
   total_clients: number
   monthly_revenue?: number
   completion_rate: number
@@ -50,23 +51,23 @@ export interface CompanySettings {
 export class CompanyAPI {
   // Clients
   static async getClients(): Promise<Client[]> {
-    const { data } = await api.get('clients/clients/')
+    const { data } = await api.get('clients/')
     return data
   }
   static async getClient(clientId: string): Promise<Client> {
-    const { data } = await api.get(`clients/clients/${clientId}`)
+    const { data } = await api.get(`clients/${clientId}`)
     return data
   }
   static async createClient(clientData: ClientCreate): Promise<Client> {
-    const { data } = await api.post('clients/clients/', clientData)
+    const { data } = await api.post('clients/', clientData)
     return data
   }
   static async updateClient(clientId: string, updates: ClientUpdate): Promise<Client> {
-    const { data } = await api.put(`clients/clients/${clientId}`, updates)
+    const { data } = await api.put(`clients/${clientId}`, updates)
     return data
   }
   static async deleteClient(clientId: string): Promise<void> {
-    await api.delete(`clients/clients/${clientId}`)
+    await api.delete(`clients/${clientId}`)
   }
 
   // Company (Organization)
@@ -102,7 +103,7 @@ export class CompanyAPI {
       const orgsResp = await api.get('orgs/') // ⬅️ слэш
       const orgs = orgsResp.data?.items ?? orgsResp.data ?? []
       if (!Array.isArray(orgs) || orgs.length === 0) {
-        return { total_employees: 0, total_projects: 0, total_clients: 0, completion_rate: 0, active_projects: 0 }
+        return { total_employees: 0, total_projects: 0, total_tasks: 0, total_clients: 0, completion_rate: 0, active_projects: 0 }
       }
       const orgId = orgs[0].id
 
@@ -119,7 +120,7 @@ export class CompanyAPI {
 
       let clients: any[] = []
       try {
-        const clientsResponse = await api.get('clients/clients/')
+        const clientsResponse = await api.get('clients/')
         clients = clientsResponse.data?.items ?? clientsResponse.data ?? []
       } catch (e) {
         console.warn('Clients API not available:', e)
@@ -128,13 +129,14 @@ export class CompanyAPI {
       return {
         total_employees: memberships.length || 0,
         total_projects: projects.length || 0,
+        total_tasks: projects.reduce((acc: number, p: any) => acc + (p.tasks_count || 0), 0) || 0,
         total_clients: clients.length || 0,
         completion_rate: 85,
         active_projects: projects.filter((p: any) => p.status === 'active').length || 0,
       }
     } catch (error) {
       console.error('Failed to fetch company stats:', error)
-      return { total_employees: 0, total_projects: 0, total_clients: 0, completion_rate: 0, active_projects: 0 }
+      return { total_employees: 0, total_projects: 0, total_tasks: 0, total_clients: 0, completion_rate: 0, active_projects: 0 }
     }
   }
 

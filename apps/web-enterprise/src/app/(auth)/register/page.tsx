@@ -21,6 +21,8 @@ const registerSchema = z.object({
     .string()
     .min(8, { message: "Минимум 8 символов" })
     .regex(/[A-Z]/, { message: "Пароль должен содержать заглавную букву" })
+    .regex(/[a-z]/, { message: "Пароль должен содержать строчную букву" })
+    .regex(/[0-9]/, { message: "Пароль должен содержать цифру" })
     .regex(/[!@#$%^&*(),.?":{}|<>]/, { message: "Пароль должен содержать спецсимвол" }),
   username: z.string().min(3, { message: "Введите имя пользователя" }),
   terms_accepted: z.boolean().refine((val) => val === true, {
@@ -159,7 +161,7 @@ export default function RegisterPage() {
                   <p className="text-sm text-destructive">{errors.password.message}</p>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  Пароль должен содержать минимум 8 символов, заглавную букву и специальный символ (!@#$%^&* и т.д.)
+                  Пароль должен содержать минимум 8 символов, заглавную и строчную буквы, цифру и специальный символ (!@#$%^&* и т.д.)
                 </p>
               </div>
 
