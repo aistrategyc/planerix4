@@ -1,30 +1,69 @@
+// apps/web-enterprise/src/lib/api/analytics.ts
+// Unified analytics API client using standardized axios instance
 
-export async function fetchAnalytics<T>(endpoint: string): Promise<T> {
-  const token = localStorage.getItem("token")
+import { api } from "./config"
 
-  if (!token) {
-    throw new Error("Отсутствует токен авторизации")
+export interface AnalyticsData {
+  [key: string]: any
+}
+
+export class AnalyticsAPI {
+  /**
+   * Универсальный метод для получения аналитики
+   */
+  static async fetchAnalytics<T = AnalyticsData>(endpoint: string): Promise<T> {
+    try {
+      const response = await api.get(endpoint)
+      return response.data
+    } catch (error: any) {
+      console.error("Analytics fetch error:", error)
+      throw new Error(error.response?.data?.message || error.message || "Failed to fetch analytics")
+    }
   }
 
-  const url = `${process.env.NEXT_PUBLIC_API_URL}${endpoint}`
+  /**
+   * Получить аналитику продаж
+   */
+  static async getSalesAnalytics(): Promise<any> {
+    return this.fetchAnalytics("/analytics/sales")
+  }
 
-  try {
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    })
+  /**
+   * Получить аналитику задач
+   */
+  static async getTasksAnalytics(): Promise<any> {
+    return this.fetchAnalytics("/analytics/tasks")
+  }
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`Ошибка ${response.status}: ${errorText}`)
-    }
+  /**
+   * Получить аналитику проектов
+   */
+  static async getProjectsAnalytics(): Promise<any> {
+    return this.fetchAnalytics("/analytics/projects")
+  }
 
-    return await response.json()
-  } catch (error: any) {
-    console.error("Ошибка запроса к API:", error)
-    throw new Error(error?.message || "Ошибка запроса")
+  /**
+   * Получить общую аналитику организации
+   */
+  static async getOrganizationAnalytics(orgId: string): Promise<any> {
+    return this.fetchAnalytics(`/orgs/${orgId}/analytics`)
+  }
+
+  /**
+   * Получить аналитику членства в организации
+   */
+  static async getMembershipStats(orgId: string): Promise<any> {
+    return this.fetchAnalytics(`/orgs/${orgId}/memberships/stats`)
+  }
+
+  /**
+   * Получить AI инсайты по продажам
+   */
+  static async getSalesInsights(): Promise<any> {
+    return this.fetchAnalytics("/insights/sales")
   }
 }
+
+// Backward compatibility
+export const fetchAnalytics = AnalyticsAPI.fetchAnalytics
+export default AnalyticsAPI

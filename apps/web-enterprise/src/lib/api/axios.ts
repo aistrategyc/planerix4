@@ -2,7 +2,7 @@
 import axios, { AxiosError, AxiosRequestConfig } from "axios";
 
 const BASE_URL =
-  (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api").replace(
+  (process.env.NEXT_PUBLIC_API_URL || "https://api.planerix.com/api").replace(
     /\/+$/,
     ""
   );

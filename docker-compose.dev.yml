@@ -70,6 +70,8 @@ services:
       context: ./apps/web-enterprise
       dockerfile: Dockerfile
       args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_API_PREFIX: ${NEXT_PUBLIC_API_PREFIX}
         NEXT_PUBLIC_AI_AGENT_WEBHOOK_URL: ${NEXT_PUBLIC_AI_AGENT_WEBHOOK_URL}
     restart: unless-stopped
     env_file:
@@ -91,6 +93,8 @@ services:
       context: ./apps/planerix
       dockerfile: Dockerfile
       args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_API_PREFIX: ${NEXT_PUBLIC_API_PREFIX}
         RESEND_API_KEY: ${RESEND_API_KEY}
         RESEND_FROM: ${RESEND_FROM}
         CONTACT_TO: ${CONTACT_TO}

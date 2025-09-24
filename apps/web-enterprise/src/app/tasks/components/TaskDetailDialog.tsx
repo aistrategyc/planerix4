@@ -48,9 +48,9 @@ export function TaskDetailDialog({
         title: task.title,
         description: task.description,
         priority: task.priority,
-        type: task.type,
+        task_type: task.type,
         status: task.status,
-        assigned_to: task.assigned_to,
+        assignee_id: task.assignee_id,
         project_id: task.project_id,
         due_date: task.due_date,
         estimated_hours: task.estimated_hours,
@@ -183,7 +183,7 @@ export function TaskDetailDialog({
                 <Select
                   value={editedTask.type || task.type}
                   onValueChange={(value) =>
-                    setEditedTask({ ...editedTask, type: value as TaskType })
+                    setEditedTask({ ...editedTask, task_type: value as TaskType })
                   }
                 >
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -203,9 +203,9 @@ export function TaskDetailDialog({
               <div className="grid gap-2">
                 <Label>Assignee</Label>
                 <Select
-                  value={editedTask.assigned_to ?? task.assigned_to ?? ""}
+                  value={editedTask.assignee_id ?? task.assignee_id ?? ""}
                   onValueChange={(value) =>
-                    setEditedTask({ ...editedTask, assigned_to: value || undefined })
+                    setEditedTask({ ...editedTask, assignee_id: value || undefined })
                   }
                 >
                   <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>

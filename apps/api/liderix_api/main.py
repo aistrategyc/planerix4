@@ -23,19 +23,41 @@ app = FastAPI(
     version=settings.PROJECT_VERSION,
     docs_url="/docs",
     redoc_url="/redoc",
+    openapi_url="/api/openapi.json"
 )
 
 # -----------------------------------------------------------------------------
-# CORS — strict, production-ready
+# CORS — production-ready with environment configuration
 # -----------------------------------------------------------------------------
-ALLOWED_ORIGINS = [
+# Default localhost origins for development
+DEFAULT_ORIGINS = [
     "http://localhost:3000",
-    "http://localhost:3001",
+    "http://localhost:3001", 
     "http://localhost:3002",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:3001",
     "http://127.0.0.1:3002",
 ]
+
+# Use environment CORS_ALLOW_ORIGINS if available, otherwise fallback to defaults
+ALLOWED_ORIGINS = getattr(settings, 'CORS_ALLOW_ORIGINS', DEFAULT_ORIGINS)
+
+# If CORS_ALLOW_ORIGINS is a string, parse it appropriately
+if isinstance(ALLOWED_ORIGINS, str):
+    if ALLOWED_ORIGINS.strip() == "*":
+        ALLOWED_ORIGINS = ["*"]
+    else:
+        try:
+            import json
+            ALLOWED_ORIGINS = json.loads(ALLOWED_ORIGINS)
+        except (json.JSONDecodeError, TypeError):
+            # Try comma-separated format
+            ALLOWED_ORIGINS = [s.strip() for s in ALLOWED_ORIGINS.split(",") if s.strip()]
+            if not ALLOWED_ORIGINS:
+                logger.warning(f"Failed to parse CORS_ALLOW_ORIGINS: {ALLOWED_ORIGINS}, using defaults")
+                ALLOWED_ORIGINS = DEFAULT_ORIGINS
+
+logger.info(f"CORS allowed origins: {ALLOWED_ORIGINS}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -288,80 +310,8 @@ app.include_router(auth_router.router, prefix=PREFIX, tags=["Auth"])
 app.include_router(analytics_router.router, prefix=PREFIX, tags=["Analytics"])
 
 # -----------------------------------------------------------------------------
-# Улучшенная аутентификация с fallback
+# Улучшенная аутентификация без fallback
 # -----------------------------------------------------------------------------
-_bearer = HTTPBearer(auto_error=False)
-
-def _get_jwt_secret_and_opts():
-    """Получение JWT настроек с fallback"""
-    secret = (
-        getattr(settings, "ACCESS_TOKEN_SECRET", None)
-        or getattr(settings, "JWT_SECRET", None)
-        or getattr(settings, "SECRET_KEY", None)
-    )
-    alg = getattr(settings, "JWT_ALGORITHM", "HS256")
-    aud = getattr(settings, "JWT_AUDIENCE", None)
-    iss = getattr(settings, "JWT_ISSUER", None)
-    return secret, alg, aud, iss
-
-async def _get_current_user_from_bearer(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-):
-    """Fallback аутентификация через JWT токен"""
-    if not credentials:
-        # Для /users/me можем вернуть анонимного пользователя в dev режиме
-        class _AnonymousUser:
-            def __init__(self):
-                self.id = "anonymous"
-                self.email = "anonymous@example.com"
-                self.full_name = "Anonymous User"
-                self.is_active = True
-                
-        logger.warning("No authorization header provided, returning anonymous user")
-        return _AnonymousUser()
-
-    token = credentials.credentials
-    secret, alg, aud, iss = _get_jwt_secret_and_opts()
-
-    if not secret:
-        logger.error("JWT secret is not configured")
-        # В dev режиме возвращаем тестового пользователя
-        class _TestUser:
-            def __init__(self):
-                self.id = "test-user"
-                self.email = "test@example.com" 
-                self.full_name = "Test User"
-                self.is_active = True
-        
-        return _TestUser()
-
-    try:
-        options = {"verify_aud": False if not aud else True}
-        payload = jwt.decode(
-            token,
-            secret,
-            algorithms=[alg],
-            audience=aud,
-            issuer=iss,
-            options=options,
-        )
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
-    except jwt.InvalidTokenError as e:
-        logger.warning(f"Invalid token: {e}")
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-    # Создаем минимальный user объект
-    class _MiniUser:
-        def __init__(self, payload):
-            self.id = payload.get("user_id") or payload.get("sub")
-            self.email = payload.get("email")
-            self.full_name = payload.get("name") or payload.get("username")
-            self.is_active = True
-            self.roles = payload.get("roles", [])
-
-    return _MiniUser(payload)
-
 # Импорт основной аутентификации
 try:
     from liderix_api.routes.auth.deps import get_current_user as _get_current_user
@@ -369,34 +319,37 @@ except ImportError:
     try:
         from liderix_api.routes.auth.utils import get_current_user as _get_current_user
     except ImportError:
-        _get_current_user = None
-        logger.warning("No primary auth dependency found, using fallback only")
+        try:
+            from liderix_api.services.auth import get_current_user as _get_current_user
+        except ImportError:
+            _get_current_user = None
+            logger.error("No auth dependency found - auth required endpoints will fail")
 
 async def _composite_current_user(request: Request):
-    """Композитная аутентификация: основная + fallback"""
-    if _get_current_user:
-        try:
-            # Проверяем сигнатуру функции
-            sig = inspect.signature(_get_current_user)
-            if 'request' in sig.parameters:
-                return await _get_current_user(request)
-            else:
-                # Если это dependency, создаем временный объект
-                return await _get_current_user()
-        except HTTPException:
-            raise  # Перебрасываем HTTP исключения как есть
-        except Exception as e:
-            logger.warning(f"Primary auth failed, using fallback: {e}")
-            # Fallback к header-based auth
-            bearer_creds = await _bearer(request)
-            return await _get_current_user_from_bearer(bearer_creds)
+    """Строгая аутентификация для production"""
+    if not _get_current_user:
+        raise HTTPException(
+            status_code=500, 
+            detail="Authentication system not configured"
+        )
     
-    # Только fallback
-    bearer_creds = await _bearer(request)
-    return await _get_current_user_from_bearer(bearer_creds)
+    try:
+        # Проверяем сигнатуру функции
+        sig = inspect.signature(_get_current_user)
+        if 'request' in sig.parameters:
+            return await _get_current_user(request)
+        else:
+            # Если это dependency, создаем временный объект
+            return await _get_current_user()
+    except Exception as e:
+        logger.warning(f"Authentication failed: {e}")
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required"
+        )
 
 # -----------------------------------------------------------------------------
-# /users/me endpoint
+# /users/me endpoint - строгая аутентификация
 # -----------------------------------------------------------------------------
 try:
     from pydantic import BaseModel as _BaseModel
@@ -417,40 +370,23 @@ class _UserMeResponse(_BaseModel):
 
 @app.get(f"{PREFIX}/users/me", tags=["Users"], response_model=_UserMeResponse, name="users:me")
 async def get_me(request: Request):
-    """Получение информации о текущем пользователе - для тестирования без токена"""
-    try:
-        # Пытаемся получить пользователя через auth
-        current_user = await _composite_current_user(request)
-        return {
-            "id": str(getattr(current_user, "id", "")),
-            "email": getattr(current_user, "email", ""),
-            "username": getattr(current_user, "username", None),
-            "full_name": (
-                getattr(current_user, "full_name", None) 
-                or getattr(current_user, "name", None)
-            ),
-            "is_active": getattr(current_user, "is_active", True),
-            "is_verified": getattr(current_user, "is_verified", True),
-            "avatar_url": getattr(current_user, "avatar_url", None),
-            "created_at": str(getattr(current_user, "created_at", "")) if getattr(current_user, "created_at", None) else None,
-            "updated_at": str(getattr(current_user, "updated_at", "")) if getattr(current_user, "updated_at", None) else None,
-            "last_login_at": str(getattr(current_user, "last_login_at", "")) if getattr(current_user, "last_login_at", None) else None,
-        }
-    except Exception as e:
-        logger.warning(f"Auth failed for /users/me, returning test user: {e}")
-        # Возвращаем тестового пользователя для разработки
-        return {
-            "id": "test-dev-user",
-            "email": "dev@test.com",
-            "username": "devuser",
-            "full_name": "Development User",
-            "is_active": True,
-            "is_verified": True,
-            "avatar_url": None,
-            "created_at": "2024-01-01T00:00:00Z",
-            "updated_at": None,
-            "last_login_at": None,
-        }
+    """Получение информации о текущем пользователе"""
+    current_user = await _composite_current_user(request)
+    return {
+        "id": str(getattr(current_user, "id", "")),
+        "email": getattr(current_user, "email", ""),
+        "username": getattr(current_user, "username", None),
+        "full_name": (
+            getattr(current_user, "full_name", None) 
+            or getattr(current_user, "name", None)
+        ),
+        "is_active": getattr(current_user, "is_active", True),
+        "is_verified": getattr(current_user, "is_verified", True),
+        "avatar_url": getattr(current_user, "avatar_url", None),
+        "created_at": str(getattr(current_user, "created_at", "")) if getattr(current_user, "created_at", None) else None,
+        "updated_at": str(getattr(current_user, "updated_at", "")) if getattr(current_user, "updated_at", None) else None,
+        "last_login_at": str(getattr(current_user, "last_login_at", "")) if getattr(current_user, "last_login_at", None) else None,
+    }
 
 # -----------------------------------------------------------------------------
 # Клиентские роутеры с правильными зависимостями
@@ -500,27 +436,6 @@ try:
     logger.info("Organization structure routes loaded successfully")
 except ImportError as e:
     logger.warning(f"Org-structure routes not loaded: {e}")
-
-# -----------------------------------------------------------------------------
-# Временные тестовые эндпоинты для отладки
-# -----------------------------------------------------------------------------
-@app.get(f"{PREFIX}/test", tags=["Test"])
-async def test_endpoint():
-    """Тестовый эндпоинт для проверки CORS"""
-    return {"message": "Test successful", "cors": "working"}
-
-@app.post(f"{PREFIX}/auth/test-login", tags=["Test"])
-async def test_login():
-    """Тестовый логин для отладки"""
-    return {
-        "access_token": "test-token",
-        "token_type": "bearer",
-        "user": {
-            "id": "test-user",
-            "email": "test@example.com",
-            "full_name": "Test User"
-        }
-    }
 
 # -----------------------------------------------------------------------------
 # Error handlers для стандартизации ответов

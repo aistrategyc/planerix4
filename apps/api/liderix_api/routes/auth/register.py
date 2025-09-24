@@ -40,7 +40,7 @@ from .utils import (
 class MessageResponse(BaseModel):
     message: str
 
-router = APIRouter(tags=["Auth"])
+router = APIRouter(prefix="/auth", tags=["Auth"])
 redis = Redis.from_url(settings.REDIS_URL)
 rate_limiter = RateLimiter(redis)
 

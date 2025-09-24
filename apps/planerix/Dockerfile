@@ -9,11 +9,34 @@ WORKDIR /app
 # Для нативных модулей Next/Sharp на Alpine
 RUN apk add --no-cache libc6-compat
 
+
 # pnpm через corepack
 RUN corepack enable && corepack prepare pnpm@9.1.0 --activate
 
 # Копируем lockfile и устанавливаем deps
 COPY package.json pnpm-lock.yaml ./
+
+# Для нативных модулей Next/Sharp на Alpine
+RUN apk add --no-cache libc6-compat
+
+
+# pnpm через corepack
+RUN corepack enable && corepack prepare pnpm@9.1.0 --activate
+
+# Копируем lockfile и устанавливаем deps
+COPY package.json pnpm-lock.yaml ./
+
+# гарантируем наличие public
+RUN mkdir -p /app/public
+
+RUN pnpm install --frozen-lockfile
+
+############################
+# 2) build: сборка Next.js (standalone)
+############################
+FROM node:20-alpine AS build
+WORKDIR /app
+
 RUN pnpm install --frozen-lockfile
 
 ############################

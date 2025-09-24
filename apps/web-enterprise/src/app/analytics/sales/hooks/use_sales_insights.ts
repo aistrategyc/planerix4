@@ -21,7 +21,7 @@ export function useSalesInsights(dateRange: { from?: Date; to?: Date }) {
     if (!dateRange.from || !dateRange.to) return
 
     const client_id = "3a174c50-9d4e-4fef-8d1c-ec2d03f49f5c"
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://api.planerix.com/api"
 
     const fetchInsights = async () => {
       setIsLoading(true)

@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const APP_ORIGIN = process.env.APP_ORIGIN || 'http://localhost:3000';
-const API_ORIGIN = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_ORIGIN = process.env.NEXT_PUBLIC_API_URL || 'https://api.planerix.com https://itstep.app.n8n.cloud';
 
 const csp = `
   default-src 'self';

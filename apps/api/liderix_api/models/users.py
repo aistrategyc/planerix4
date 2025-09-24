@@ -104,6 +104,9 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
     # === Новое: поля для email-верификации ===
     verification_token_hash = Column(String(255), nullable=True, index=True)
     verification_token_expires_at = Column(DateTime(timezone=True), nullable=True)
+    # --- password reset fields ---
+    password_reset_token_hash = Column(String(255), nullable=True, index=True)
+    password_reset_expires_at = Column(DateTime(timezone=True), nullable=True)
 
     # API ключи
     api_keys = relationship(

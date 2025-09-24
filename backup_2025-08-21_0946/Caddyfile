@@ -1,0 +1,67 @@
+# 🌐 Caddy Configuration for Production
+# Автоматические SSL сертификаты от Let's Encrypt
+
+# Landing page - главная страница
+planerix.com, www.planerix.com {
+    reverse_proxy landing:3000
+    
+    # Security headers
+    header {
+        X-Frame-Options DENY
+        X-Content-Type-Options nosniff
+        X-XSS-Protection "1; mode=block"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        -Server
+    }
+    
+    # Logging
+    log {
+        output file /var/log/caddy/planerix.access.log {
+            roll_size 100mb
+            roll_keep 5
+        }
+    }
+}
+
+# Web Enterprise Application
+app.planerix.com {
+    reverse_proxy web:3000
+    
+    header {
+        X-Frame-Options DENY
+        X-Content-Type-Options nosniff
+        X-XSS-Protection "1; mode=block"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        -Server
+    }
+    
+    log {
+        output file /var/log/caddy/app.access.log {
+            roll_size 50mb
+            roll_keep 3
+        }
+    }
+}
+
+# API subdomain
+api.planerix.com {
+    reverse_proxy api:8001
+    
+    header {
+        X-Frame-Options DENY
+        X-Content-Type-Options nosniff
+        -Server
+    }
+    
+    log {
+        output file /var/log/caddy/api.access.log {
+            roll_size 50mb
+            roll_keep 3
+        }
+    }
+}
+
+# Health check endpoint
+:8080 {
+    respond /health "healthy" 200
+}

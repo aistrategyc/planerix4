@@ -1,28 +1,33 @@
 // src/lib/api/tasks.ts
-import api from '@/lib/api/axios'
+import api from "@/lib/api/axios"
 
-// ------------ Types ------------
+// ------------ Types matching backend exactly ------------
 export interface Task {
   id: string
   title: string
   description?: string
   status: TaskStatus
   priority: TaskPriority
-  type: TaskType
+  task_type: TaskType
   project_id?: string
-  assigned_to?: string
+  assignee_id?: string
+  parent_task_id?: string
   created_by: string
   created_at: string
   updated_at: string
   due_date?: string
+  start_date?: string
   estimated_hours?: number
   actual_hours?: number
+  story_points?: number
+  tags?: string[]
+  custom_fields?: Record<string, any>
 }
 
 export enum TaskStatus {
   TODO = "todo",
   IN_PROGRESS = "in_progress",
-  IN_REVIEW = "in_review",
+  IN_REVIEW = "in_review", 
   DONE = "done",
   CANCELLED = "cancelled",
 }
@@ -35,23 +40,28 @@ export enum TaskPriority {
 }
 
 export enum TaskType {
+  TASK = "task",
+  BUG = "bug", 
   FEATURE = "feature",
-  BUG = "bug",
   IMPROVEMENT = "improvement",
-  DOCUMENTATION = "documentation",
-  TESTING = "testing",
+  RESEARCH = "research",
 }
 
 export interface TaskCreate {
   title: string
   description?: string
-  status?: TaskStatus
   priority?: TaskPriority
-  type?: TaskType
-  project_id?: string
-  assigned_to?: string
+  task_type?: TaskType
+  assignee_id?: string
   due_date?: string
+  start_date?: string
   estimated_hours?: number
+  story_points?: number
+  tags?: string[]
+  custom_fields?: Record<string, any>
+  project_id?: string
+  parent_task_id?: string
+  status?: TaskStatus
 }
 
 export interface TaskUpdate {
@@ -59,12 +69,16 @@ export interface TaskUpdate {
   description?: string
   status?: TaskStatus
   priority?: TaskPriority
-  type?: TaskType
+  task_type?: TaskType
   project_id?: string
-  assigned_to?: string
+  assignee_id?: string
   due_date?: string
+  start_date?: string
   estimated_hours?: number
   actual_hours?: number
+  story_points?: number
+  tags?: string[]
+  custom_fields?: Record<string, any>
 }
 
 export interface TaskFilters {
@@ -72,9 +86,9 @@ export interface TaskFilters {
   per_page?: number
   status?: TaskStatus
   priority?: TaskPriority
-  type?: TaskType
+  task_type?: TaskType
   project_id?: string
-  assigned_to?: string
+  assignee_id?: string
   created_by?: string
   search?: string
 }
@@ -89,29 +103,28 @@ export interface TaskStats {
 
 // ------------ Tasks API ------------
 export class TasksAPI {
-  // list with filters
   static async getTasks(filters?: TaskFilters): Promise<Task[]> {
-  const params = new URLSearchParams()
-  if (filters) {
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        params.append(key, String(value))
-      }
-    })
+    const params = new URLSearchParams()
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          params.append(key, String(value))
+        }
+      })
+    }
+
+    const q = params.toString()
+    const url = q ? `tasks/?${q}` : "tasks/"
+
+    const { data } = await api.get(url)
+
+    // 🔧 Нормализуем ответ в массив
+    const items = Array.isArray(data)
+      ? data
+      : data?.items ?? data?.results ?? data?.tasks ?? []
+
+    return items as Task[]
   }
-
-  const q = params.toString()
-  const url = q ? `tasks/?${q}` : 'tasks/'
-
-  const { data } = await api.get(url)
-
-  // 🔧 Нормализуем ответ в массив
-  const items = Array.isArray(data)
-    ? data
-    : data?.items ?? data?.results ?? data?.tasks ?? []
-
-  return items as Task[]
-}
 
   static async getTask(taskId: string): Promise<Task> {
     const { data } = await api.get(`tasks/${taskId}`)
@@ -119,7 +132,7 @@ export class TasksAPI {
   }
 
   static async createTask(taskData: TaskCreate): Promise<Task> {
-    const { data } = await api.post('tasks/', taskData)
+    const { data } = await api.post("tasks/", taskData)
     return data
   }
 
@@ -137,9 +150,9 @@ export class TasksAPI {
     return data
   }
 
-  static async updateTaskAssignment(taskId: string, assignedTo: string): Promise<Task> {
+  static async updateTaskAssignment(taskId: string, assigneeId: string): Promise<Task> {
     const { data } = await api.patch(`tasks/${taskId}/assignment`, {
-      assigned_to: assignedTo,
+      assignee_id: assigneeId,
     })
     return data
   }
@@ -155,7 +168,7 @@ export class TasksAPI {
   }
 
   static async getTaskStats(): Promise<TaskStats> {
-    const { data } = await api.get('tasks/stats')
+    const { data } = await api.get("tasks/stats")
     return data
   }
 }
@@ -169,15 +182,13 @@ export interface User {
 
 export class UsersAPI {
   static async getUsers(): Promise<User[]> {
-    // ❗ было 'users/users/' — исправлено
-    const { data } = await api.get('users/')
-    return data
+    const { data } = await api.get("users/")
+    return Array.isArray(data) ? data : data?.items ?? data?.results ?? []
   }
 
   static async searchUsers(query: string): Promise<User[]> {
-    // ❗ было 'users/users/search' — исправлено
     const { data } = await api.get(`users/search?q=${encodeURIComponent(query)}`)
-    return data
+    return Array.isArray(data) ? data : data?.items ?? data?.results ?? []
   }
 }
 
@@ -191,8 +202,7 @@ export interface Project {
 
 export class ProjectsAPI {
   static async getProjects(): Promise<Project[]> {
-    // ❗ было 'projects/projects/' — исправлено
-    const { data } = await api.get('projects/')
-    return data
+    const { data } = await api.get("projects/")
+    return Array.isArray(data) ? data : data?.items ?? data?.results ?? []
   }
 }

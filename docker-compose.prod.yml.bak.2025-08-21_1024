@@ -1,0 +1,130 @@
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
+
+services:
+  postgres:
+    image: postgres:14-alpine
+    container_name: liderix-postgres
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-liderixapp}
+      POSTGRES_USER: ${POSTGRES_USER:-manfromlamp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lashd87123kKJSDAH81}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-manfromlamp} -d ${POSTGRES_DB:-liderixapp}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: liderix-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: liderix-api
+    restart: unless-stopped
+    env_file:
+      - ./apps/api/.env.production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - app-network
+    expose:
+      - "8001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  web:
+    build:
+      context: ./apps/web-enterprise
+      dockerfile: Dockerfile
+    container_name: liderix-web
+    restart: unless-stopped
+    env_file:
+      - ./apps/web-enterprise/.env.production
+    environment:
+      - INTERNAL_API_URL=http://api:8001/api
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - app-network
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  landing:
+    build:
+      context: ./apps/planerix
+      dockerfile: Dockerfile
+    container_name: planerix-landing
+    restart: unless-stopped
+    env_file:
+      - ./apps/landing/.env.production
+    networks:
+      - app-network
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: liderix-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_started
+      web:
+        condition: service_started
+      landing:
+        condition: service_started
+    networks:
+      - app-network

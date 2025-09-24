@@ -28,6 +28,7 @@ class Project(Base, OrgFKMixin, TimestampMixin, SoftDeleteMixin):
     meta_data = Column("metadata", JSONB, nullable=True, default=lambda: {})
     start_date = Column(DateTime(timezone=True), nullable=True)
     end_date = Column(DateTime(timezone=True), nullable=True)
+    is_public = Column(Boolean, default=False, nullable=False, index=True)
     organization = relationship("Organization", lazy="selectin", overlaps="projects")
     members = relationship("ProjectMember", back_populates="project", cascade="all, delete-orphan", lazy="selectin", overlaps="project,members")
     tasks = relationship("ProjectTask", back_populates="project", cascade="all, delete-orphan", lazy="selectin", overlaps="project,tasks")

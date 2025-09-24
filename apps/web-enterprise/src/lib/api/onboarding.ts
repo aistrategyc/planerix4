@@ -41,23 +41,46 @@ export class OnboardingAPI {
   }
 
   /**
-   * Массовое приглашение пользователей
+   * Массовое приглашение пользователей (через invitations)
+   * Используем правильный endpoint для приглашений по email
    */
   static async bulkInvite(
     orgId: string, 
     invites: InviteItem[]
   ): Promise<BulkInviteResponse> {
     try {
-      const payload = {
-        memberships: invites.map(invite => ({
-          user_id: invite.email, // предполагаем, что бэкенд принимает email
-          role: invite.role,
-          department_id: invite.department_id
-        }))
+      // Используем отдельные приглашения через invitations endpoint
+      const results = {
+        created: [] as any[],
+        errors: [] as any[],
+        total: invites.length
       }
       
-      const response = await api.post(`/orgs/${orgId}/memberships/bulk`, payload)
-      return response.data
+      for (let i = 0; i < invites.length; i++) {
+        const invite = invites[i]
+        try {
+          const payload = {
+            email: invite.email,
+            role: invite.role || 'member',
+            department_id: invite.department_id || null
+          }
+          
+          const response = await api.post(`/orgs/${orgId}/memberships/bulk-invite`, payload)
+          results.created.push({
+            invitation_id: response.data.id,
+            email: invite.email,
+            role: invite.role || 'member'
+          })
+        } catch (error: any) {
+          results.errors.push({
+            index: i,
+            email: invite.email,
+            error: error.response?.data?.detail || error.message
+          })
+        }
+      }
+      
+      return results
     } catch (error: any) {
       console.error('Bulk invite error:', error)
       throw error
@@ -73,12 +96,12 @@ export class OnboardingAPI {
   ): Promise<any> {
     try {
       const payload = {
-        user_id: invite.email, // или используйте специальный эндпоинт для email
-        role: invite.role,
-        department_id: invite.department_id
+        invited_email: invite.email,
+        role: invite.role || 'member',
+        department_id: invite.department_id || null
       }
       
-      const response = await api.post(`/orgs/${orgId}/memberships`, payload)
+      const response = await api.post(`/orgs/${orgId}/memberships/bulk-invite`, payload)
       return response.data
     } catch (error: any) {
       console.error('Create invite error:', error)
@@ -92,7 +115,7 @@ export class OnboardingAPI {
   static async getUserOrganizations(): Promise<OrganizationResponse[]> {
     try {
       const response = await api.get('/orgs')
-      return response.data
+      return response.data.items || response.data
     } catch (error: any) {
       console.error('Get user organizations error:', error)
       throw error
@@ -167,6 +190,19 @@ export class OnboardingAPI {
       return response.data.items || response.data
     } catch (error: any) {
       console.error('Get members error:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Получить приглашения организации
+   */
+  static async getInvitations(orgId: string): Promise<any[]> {
+    try {
+      const response = await api.get(`/orgs/${orgId}/memberships/bulk-invite`)
+      return response.data.items || response.data
+    } catch (error: any) {
+      console.error('Get invitations error:', error)
       throw error
     }
   }

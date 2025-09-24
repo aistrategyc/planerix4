@@ -143,16 +143,16 @@ async def request_password_reset(
     reset_expires_at = now_utc() + timedelta(hours=1)  # 1 hour expiry
     
     # Store reset token
-    async with session.begin():
-        await session.execute(
-            update(User)
-            .where(User.id == user.id)
-            .values(
-                password_reset_token_hash=reset_token_hash,
-                password_reset_expires_at=reset_expires_at,
-                updated_at=now_utc()
-            )
+    await session.execute(
+        update(User)
+        .where(User.id == user.id)
+        .values(
+            password_reset_token_hash=reset_token_hash,
+            password_reset_expires_at=reset_expires_at,
+            updated_at=now_utc()
         )
+    )
+    await session.commit()
     
     # Send reset email
     background.add_task(send_password_reset_email, email, user.username, reset_token)
@@ -188,66 +188,66 @@ async def confirm_password_reset(
         AuthError.problem(400, "urn:problem:weak-password", 
                          "Weak Password", password_error)
     
-    async with session.begin():
-        user = await session.scalar(select(User).where(User.email == email))
+    user = await session.scalar(select(User).where(User.email == email))
         
-        if not user:
-            await AuditLogger.log_event(
-                session, None, "auth.password_reset.user_not_found", False, ip, user_agent,
-                {"email": email}
-            )
-            AuthError.problem(400, "urn:problem:invalid-reset-token", 
-                             "Invalid Reset Token", "Invalid or expired reset token")
-        
-        # Validate reset token
-        if not user.password_reset_token_hash:
-            await AuditLogger.log_event(
-                session, user.id, "auth.password_reset.no_token", False, ip, user_agent,
-                {"email": email}
-            )
-            AuthError.problem(400, "urn:problem:invalid-reset-token", 
-                             "Invalid Reset Token", "No active reset token found")
-        
-        # Constant-time comparison
-        if not _secrets.compare_digest(user.password_reset_token_hash, token_hash):
-            await AuditLogger.log_event(
-                session, user.id, "auth.password_reset.wrong_token", False, ip, user_agent,
-                {"email": email}
-            )
-            AuthError.problem(400, "urn:problem:invalid-reset-token", 
-                             "Invalid Reset Token", "Invalid or expired reset token")
-        
-        # Check token expiration
-        if not user.password_reset_expires_at or user.password_reset_expires_at < now_utc():
-            await AuditLogger.log_event(
-                session, user.id, "auth.password_reset.expired_token", False, ip, user_agent,
-                {"email": email}
-            )
-            AuthError.problem(400, "urn:problem:reset-token-expired", 
-                             "Reset Token Expired", "Reset token has expired. Please request a new one.")
-        
-        # Check if new password is same as current (optional security measure)
-        if verify_password(data.new_password, user.hashed_password):
-            await AuditLogger.log_event(
-                session, user.id, "auth.password_reset.same_password", False, ip, user_agent,
-                {"email": email}
-            )
-            AuthError.problem(400, "urn:problem:same-password", 
-                             "Same Password", "New password cannot be the same as current password")
-        
-        # Update password and clear reset token
-        new_password_hash = hash_password(data.new_password)
-        await session.execute(
-            update(User)
-            .where(User.id == user.id)
-            .values(
-                hashed_password=new_password_hash,
-                password_reset_token_hash=None,
-                password_reset_expires_at=None,
-                password_changed_at=now_utc(),
-                updated_at=now_utc()
-            )
+    if not user:
+        await AuditLogger.log_event(
+            session, None, "auth.password_reset.user_not_found", False, ip, user_agent,
+            {"email": email}
         )
+        AuthError.problem(400, "urn:problem:invalid-reset-token", 
+                         "Invalid Reset Token", "Invalid or expired reset token")
+        
+    # Validate reset token
+    if not user.password_reset_token_hash:
+        await AuditLogger.log_event(
+            session, user.id, "auth.password_reset.no_token", False, ip, user_agent,
+            {"email": email}
+        )
+        AuthError.problem(400, "urn:problem:invalid-reset-token", 
+                         "Invalid Reset Token", "No active reset token found")
+        
+    # Constant-time comparison
+    if not _secrets.compare_digest(user.password_reset_token_hash, token_hash):
+        await AuditLogger.log_event(
+            session, user.id, "auth.password_reset.wrong_token", False, ip, user_agent,
+            {"email": email}
+        )
+        AuthError.problem(400, "urn:problem:invalid-reset-token", 
+                         "Invalid Reset Token", "Invalid or expired reset token")
+        
+    # Check token expiration
+    if not user.password_reset_expires_at or user.password_reset_expires_at < now_utc():
+        await AuditLogger.log_event(
+            session, user.id, "auth.password_reset.expired_token", False, ip, user_agent,
+            {"email": email}
+        )
+        AuthError.problem(400, "urn:problem:reset-token-expired", 
+                         "Reset Token Expired", "Reset token has expired. Please request a new one.")
+        
+    # Check if new password is same as current (optional security measure)
+    if verify_password(data.new_password, user.hashed_password):
+        await AuditLogger.log_event(
+            session, user.id, "auth.password_reset.same_password", False, ip, user_agent,
+            {"email": email}
+        )
+        AuthError.problem(400, "urn:problem:same-password", 
+                         "Same Password", "New password cannot be the same as current password")
+        
+    # Update password and clear reset token
+    new_password_hash = hash_password(data.new_password)
+    await session.execute(
+        update(User)
+        .where(User.id == user.id)
+        .values(
+            hashed_password=new_password_hash,
+            password_reset_token_hash=None,
+            password_reset_expires_at=None,
+            password_changed_at=now_utc(),
+            updated_at=now_utc()
+        )
+    )
+    await session.commit()
     
     # Revoke all existing refresh tokens for security
     from .utils import TokenWhitelist
@@ -291,16 +291,16 @@ async def cancel_password_reset(
         return generic_response
     
     # Clear reset token
-    async with session.begin():
-        await session.execute(
-            update(User)
-            .where(User.id == user.id)
-            .values(
-                password_reset_token_hash=None,
-                password_reset_expires_at=None,
-                updated_at=now_utc()
-            )
+    await session.execute(
+        update(User)
+        .where(User.id == user.id)
+        .values(
+            password_reset_token_hash=None,
+            password_reset_expires_at=None,
+            updated_at=now_utc()
         )
+    )
+    await session.commit()
     
     await AuditLogger.log_event(
         session, user.id, "auth.password_reset.cancelled", True, ip, user_agent,
