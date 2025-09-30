@@ -1,10 +1,13 @@
 from fastapi import APIRouter
-from . import sales, ads, marketing, overview, creatives, campaigns
+from . import sales, ads, marketing, overview, creatives, campaigns, dashboard
 
 router = APIRouter()
 
 # Main dashboard endpoints
 router.include_router(overview.router, prefix="/overview", tags=["Dashboard Overview"])
+
+# Analytics dashboard - direct endpoints without prefix for /api/analytics/dashboard
+router.include_router(dashboard.router, tags=["Analytics Dashboard"])
 
 # Sales analytics
 router.include_router(sales.router, prefix="/sales", tags=["Sales Analytics"])

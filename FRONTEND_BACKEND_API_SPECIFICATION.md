@@ -1,4 +1,299 @@
-# Planerix Frontend ↔ Backend API спецификация
+# Frontend-Backend API Specification
+
+## Обзор
+
+Этот документ определяет единую спецификацию API между фронтендом (Next.js) и бекендом (FastAPI) для предотвращения расхождений в моделях и вызовах.
+
+**Обновлено:** 30 сентября 2025
+
+## Базовые конфигурации
+
+### URL и префиксы
+
+```bash
+# Backend URL
+http://localhost:8001/api
+
+# Frontend URL
+http://localhost:3002
+
+# API префикс
+/api
+
+# Все backend endpoints начинаются с /api/
+```
+
+### Аутентификация
+
+```bash
+POST /api/auth/login
+POST /api/auth/refresh
+GET  /api/auth/me
+```
+
+**Структура токена:**
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "token_type": "bearer",
+  "expires_in": 900,
+  "refresh_expires_in": null,
+  "user": null
+}
+```
+
+**Заголовки авторизации:**
+```
+Authorization: Bearer <access_token>
+```
+
+## Основные endpoints
+
+### 1. Пользователи
+
+| Endpoint | Метод | Описание | Frontend API |
+|----------|-------|----------|--------------|
+| `/api/users/me` | GET | Текущий пользователь | `getCurrentUser()` |
+| `/api/users/me` | PATCH | Обновить профиль | `updateUserProfile(updates)` |
+| `/api/users/me/stats` | GET | Статистика пользователя | `getUserStats(userId)` |
+| `/api/users/search` | GET | Поиск пользователей | `searchUsers(query)` |
+| `/api/users/` | GET | Список пользователей | `listUsers(search, page, perPage)` |
+
+**Модель пользователя:**
+```typescript
+interface UserProfile {
+  id: string
+  email: string
+  username: string
+  avatar_url?: string
+  is_active?: boolean
+  last_login_at?: string
+}
+
+interface UserStats {
+  total_tasks: number
+  completed_tasks: number
+  in_progress_tasks: number
+  overdue_tasks: number
+  completion_rate: number
+  active_projects: number
+}
+```
+
+### 2. Организации
+
+| Endpoint | Метод | Описание | Frontend API |
+|----------|-------|----------|--------------|
+| `/api/orgs/` | GET | Список организаций | `getOrganizations()` |
+| `/api/orgs/` | POST | Создать организацию | `createOrganization(payload)` |
+| `/api/orgs/{orgId}` | GET | Получить организацию | `getOrganization(orgId)` |
+| `/api/orgs/{orgId}` | PATCH | Обновить организацию | `updateOrganization(orgId, updates)` |
+| `/api/orgs/{orgId}/departments/` | GET | Департаменты организации | `getOrgDepartments(orgId)` |
+| `/api/orgs/{orgId}/memberships/` | GET | Участники организации | `getOrgMembers(orgId)` |
+
+**Модель организации:**
+```typescript
+interface Organization {
+  id: string
+  name: string
+  description?: string
+  website?: string
+  slug?: string
+  created_at: string
+  updated_at: string
+}
+```
+
+### 3. Департаменты
+
+| Endpoint | Метод | Описание | Frontend API |
+|----------|-------|----------|--------------|
+| `/api/orgs/{orgId}/departments/` | GET | Список департаментов | `getDepartments(orgId)` |
+| `/api/orgs/{orgId}/departments/` | POST | Создать департамент | `createDepartment(orgId, payload)` |
+| `/api/orgs/{orgId}/departments/tree` | GET | Дерево департаментов | API вызов |
+| `/api/orgs/{orgId}/departments/{deptId}` | GET | Получить департамент | API вызов |
+
+**Модель департамента:**
+```typescript
+interface Department {
+  id: string
+  name: string
+  description?: string
+  parent_id?: string
+  org_id: string
+  created_at: string
+  updated_at: string
+}
+```
+
+### 4. Приглашения
+
+| Endpoint | Метод | Описание | Frontend API |
+|----------|-------|----------|--------------|
+| `/api/orgs/{orgId}/invitations` | POST | Создать приглашение | `inviteToOrganization()` |
+| `/api/orgs/{orgId}/memberships/bulk-invite` | POST | Массовые приглашения | `bulkInvite()` |
+| `/api/invitations/{token}` | GET | Получить приглашение | API вызов |
+
+**Модель приглашения:**
+```typescript
+interface InviteItem {
+  email: string
+  role?: string
+  department_id?: string
+}
+```
+
+### 5. Аналитика и Dashboard
+
+| Endpoint | Метод | Описание | Frontend API |
+|----------|-------|----------|--------------|
+| `/api/dashboard/` | GET | Основной dashboard | API вызов |
+| `/api/analytics/dashboard` | GET | Аналитическая панель | API вызов |
+| `/api/analytics/realtime` | GET | Реальное время | API вызов |
+| `/api/analytics/performance` | GET | Показатели производительности | API вызов |
+| `/api/analytics/revenue-trend` | GET | Тренды доходов | API вызов |
+
+## Статусы ошибок
+
+| Код | Описание | Обработка |
+|-----|----------|-----------|
+| 200 | Успешно | Данные в response.data |
+| 401 | Не авторизован | Редирект на логин |
+| 403 | Недостаточно прав | Показать ошибку |
+| 404 | Не найдено | Показать 404 |
+| 422 | Ошибка валидации | Показать ошибки полей |
+| 500 | Серверная ошибка | Показать общую ошибку |
+
+## Соглашения Frontend
+
+### API клиент
+```typescript
+// apps/web-enterprise/src/lib/api/config.ts
+const API_BASE_URL = "http://localhost:8001/api"
+
+// Все API вызовы идут через axios instance с базовым URL
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+```
+
+### Обработка ошибок
+```typescript
+// Единообразная обработка ошибок
+catch (error: any) {
+  const message = error?.response?.data?.detail || 'Unknown error'
+  const status = error?.response?.status
+
+  if (status === 401) {
+    // Редирект на логин
+  } else {
+    // Показать toast с ошибкой
+    toast({ title: 'Error', description: message, variant: 'destructive' })
+  }
+}
+```
+
+### TypeScript типы
+```typescript
+// Все типы определены в apps/web-enterprise/src/types/
+// - profile.ts - пользователи, организации
+// - onboarding.ts - онбординг
+// И т.д.
+```
+
+## Соглашения Backend
+
+### Структура ответов
+```python
+# Успешный ответ - прямой возврат данных
+return data
+
+# Ошибка - HTTPException с detail
+raise HTTPException(status_code=400, detail="Error message")
+
+# Список с пагинацией
+return {
+    "items": [...],
+    "total": count,
+    "page": page,
+    "per_page": per_page
+}
+```
+
+### Модели SQLAlchemy
+```python
+# Базовые mixins используются везде:
+from .mixins import TimestampMixin, SoftDeleteMixin
+
+class Model(Base, TimestampMixin, SoftDeleteMixin):
+    # Нестандартные relationships должны быть согласованы
+    # back_populates использовать только если есть обратная связь
+```
+
+### Роутеры
+```python
+# Все роутеры подключаются в main.py с префиксом /api
+app.include_router(router, prefix="/api", tags=["Tag"])
+
+# Каждый роутер должен иметь правильные зависимости
+```
+
+## Статус KPI системы
+
+**ВНИМАНИЕ:** KPI модель временно упрощена до базовой структуры БД:
+
+```python
+# Текущие поля KPI:
+- id, name, description
+- target_value, current_value, unit
+- is_active, on_track
+- org_id
+- created_at, updated_at, is_deleted, deleted_at
+```
+
+KPI роутер временно отключен до создания соответствующей миграции.
+
+## Проверенные endpoints (30.09.2025)
+
+✅ **Работают корректно:**
+- POST /api/auth/login
+- GET /api/users/me
+- GET /api/users/me/stats
+- GET /api/orgs/
+- GET /api/dashboard/
+- GET /api/analytics/dashboard
+- GET /api/analytics/realtime
+- GET /api/analytics/performance
+- GET /api/analytics/revenue-trend
+
+❌ **Временно отключены:**
+- GET /api/kpis/* (ожидает миграцию)
+
+## Инструменты для тестирования
+
+### Скрипт Python для тестирования API
+```bash
+python3 /Users/Kirill/planerix_new/test_api.py
+```
+
+### Скрипт Bash (проблемный - не использовать)
+```bash
+./test_api.sh  # НЕ РАБОТАЕТ из-за проблем с JSON в curl
+```
+
+## Следующие шаги
+
+1. **Приоритет 1:** Восстановить KPI систему с правильной миграцией
+2. **Приоритет 2:** Проверить endpoints приглашений
+3. **Приоритет 3:** Проверить онбординг процесс
+4. **Приоритет 4:** Добавить недостающие CRUD операции
+
+---
+
+**Важно:** Этот документ должен обновляться при каждом изменении API или моделей для поддержания согласованности между фронтендом и бекендом.
 
 ## Архитектура взаимодействия
 

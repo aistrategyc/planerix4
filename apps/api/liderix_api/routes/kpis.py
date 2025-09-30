@@ -18,7 +18,7 @@ from liderix_api.schemas.kpis import (
 from liderix_api.db import get_async_session
 from liderix_api.services.auth import get_current_user
 from liderix_api.models.users import User
-from liderix_api.services.permissions import check_organization_access
+from liderix_api.services.permissions import check_organization_permission
 
 router = APIRouter(prefix="", tags=["KPIs & Performance Metrics"])
 
@@ -41,7 +41,7 @@ async def get_kpis(
     current_user: User = Depends(get_current_user)
 ):
     """Get KPIs with advanced filtering, pagination and search."""
-    await check_organization_access(session, current_user.org_id, current_user.id)
+    await check_organization_permission(session, current_user.org_id, current_user.id)
 
     # Build base query
     query = select(KPI).where(
@@ -129,7 +129,7 @@ async def get_kpi(
     current_user: User = Depends(get_current_user)
 ):
     """Get a specific KPI with optional measurement history."""
-    await check_organization_access(session, current_user.org_id, current_user.id)
+    await check_organization_permission(session, current_user.org_id, current_user.id)
 
     query = select(KPI).options(
         selectinload(KPI.measurements) if include_all_measurements else selectinload(KPI.measurements).limit(10)
@@ -155,7 +155,7 @@ async def create_kpi(
     current_user: User = Depends(get_current_user)
 ):
     """Create a new KPI with optional initial measurements."""
-    await check_organization_access(session, current_user.org_id, current_user.id)
+    await check_organization_permission(session, current_user.org_id, current_user.id)
 
     # Create KPI
     kpi_data = data.model_dump(exclude={'initial_measurements'})
@@ -203,7 +203,7 @@ async def update_kpi(
     current_user: User = Depends(get_current_user)
 ):
     """Update an existing KPI."""
-    await check_organization_access(session, current_user.org_id, current_user.id)
+    await check_organization_permission(session, current_user.org_id, current_user.id)
 
     result = await session.execute(
         select(KPI).options(
@@ -242,7 +242,7 @@ async def delete_kpi(
     current_user: User = Depends(get_current_user)
 ):
     """Delete a KPI (soft delete by default)."""
-    await check_organization_access(session, current_user.org_id, current_user.id)
+    await check_organization_permission(session, current_user.org_id, current_user.id)
 
     result = await session.execute(
         select(KPI).where(
@@ -276,7 +276,7 @@ async def add_kpi_measurement(
     current_user: User = Depends(get_current_user)
 ):
     """Add a new measurement to a KPI."""
-    await check_organization_access(session, current_user.org_id, current_user.id)
+    await check_organization_permission(session, current_user.org_id, current_user.id)
 
     # Verify KPI exists and belongs to organization
     kpi = await session.execute(
@@ -321,7 +321,7 @@ async def get_kpi_measurements(
     current_user: User = Depends(get_current_user)
 ):
     """Get measurements for a specific KPI."""
-    await check_organization_access(session, current_user.org_id, current_user.id)
+    await check_organization_permission(session, current_user.org_id, current_user.id)
 
     # Verify KPI access
     kpi_check = await session.execute(
@@ -357,7 +357,7 @@ async def update_measurement(
     current_user: User = Depends(get_current_user)
 ):
     """Update a KPI measurement."""
-    await check_organization_access(session, current_user.org_id, current_user.id)
+    await check_organization_permission(session, current_user.org_id, current_user.id)
 
     result = await session.execute(
         select(KPIMeasurement).join(KPI).where(
@@ -388,7 +388,7 @@ async def delete_measurement(
     current_user: User = Depends(get_current_user)
 ):
     """Delete a KPI measurement."""
-    await check_organization_access(session, current_user.org_id, current_user.id)
+    await check_organization_permission(session, current_user.org_id, current_user.id)
 
     result = await session.execute(
         select(KPIMeasurement).join(KPI).where(
@@ -414,7 +414,7 @@ async def get_kpi_dashboard(
     current_user: User = Depends(get_current_user)
 ):
     """Get KPI dashboard overview."""
-    await check_organization_access(session, current_user.org_id, current_user.id)
+    await check_organization_permission(session, current_user.org_id, current_user.id)
 
     # Get all KPIs for the organization
     query = select(KPI).options(
@@ -486,7 +486,7 @@ async def get_kpi_trend(
     current_user: User = Depends(get_current_user)
 ):
     """Get trend data for a specific KPI."""
-    await check_organization_access(session, current_user.org_id, current_user.id)
+    await check_organization_permission(session, current_user.org_id, current_user.id)
 
     # Get KPI with measurements
     kpi_result = await session.execute(
@@ -563,7 +563,7 @@ async def bulk_update_kpis(
     current_user: User = Depends(get_current_user)
 ):
     """Update multiple KPIs at once."""
-    await check_organization_access(session, current_user.org_id, current_user.id)
+    await check_organization_permission(session, current_user.org_id, current_user.id)
 
     # Get KPIs to update
     result = await session.execute(

@@ -59,12 +59,12 @@ class Organization(Base, TimestampMixin, SoftDeleteMixin):
         lazy="selectin",
         overlaps="organization",
     )
-    kpis = relationship(
-        "KPI",
-        cascade="all, delete-orphan",
-        lazy="selectin",
-        overlaps="organization",
-    )
+    # kpis = relationship(
+    #     "KPI",
+    #     cascade="all, delete-orphan",
+    #     lazy="selectin",
+    #     overlaps="organization",
+    # )  # DISABLED: No FK relationship in current KPI model
     objectives = relationship(
         "Objective",
         cascade="all, delete-orphan",

@@ -39,7 +39,7 @@ class KPIMeasurementBase(BaseModel):
     notes: Optional[str] = None
     data_source: Optional[str] = None
     confidence_level: Optional[float] = Field(None, ge=0.0, le=1.0)
-    metadata: Optional[Dict[str, Any]] = None
+    meta_data: Optional[Dict[str, Any]] = None
     is_automated: bool = False
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
@@ -53,7 +53,7 @@ class KPIMeasurementUpdate(BaseModel):
     notes: Optional[str] = None
     data_source: Optional[str] = None
     confidence_level: Optional[float] = Field(None, ge=0.0, le=1.0)
-    metadata: Optional[Dict[str, Any]] = None
+    meta_data: Optional[Dict[str, Any]] = None
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 

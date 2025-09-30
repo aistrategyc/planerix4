@@ -43,7 +43,7 @@ def upgrade() -> None:
             sa.Column('notes', sa.Text(), nullable=True),
             sa.Column('data_source', sa.String(255), nullable=True),
             sa.Column('measured_by', postgresql.UUID(as_uuid=True), nullable=True),
-            sa.Column('metadata', sa.JSON(), nullable=True),
+            sa.Column('meta_data', sa.JSON(), nullable=True),
             sa.Column('is_automated', sa.Boolean(), nullable=False, server_default='false'),
             sa.Column('confidence_level', sa.Float(), nullable=True),
             sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),

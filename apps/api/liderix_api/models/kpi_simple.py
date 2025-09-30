@@ -1,12 +1,12 @@
 # Упрощённая KPI модель, соответствующая текущей структуре БД
 from uuid import uuid4
-from sqlalchemy import Column, String, Float, Boolean, DateTime
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy import Column, String, Float, Boolean, DateTime, UUID as PG_UUID
+from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 
-from liderix_api.db import Base
-from .mixins import TimestampMixin, SoftDeleteMixin
+from liderix_api.models.base import Base, TimestampMixin
 
-class KPI(Base, TimestampMixin, SoftDeleteMixin):
+class KPI(Base, TimestampMixin):
     """
     Упрощённая модель KPI, соответствующая текущей структуре БД.
     """
@@ -35,7 +35,9 @@ class KPI(Base, TimestampMixin, SoftDeleteMixin):
         index=True
     )
 
-    # Мягкое удаление осуществляется SoftDeleteMixin
+    # Мягкое удаление
+    is_deleted = Column(Boolean, nullable=False, default=False)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
 
     def __repr__(self):
         return f"<KPI {self.name}: {self.current_value}/{self.target_value}>"
