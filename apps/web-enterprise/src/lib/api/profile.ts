@@ -1,7 +1,7 @@
 // apps/web-enterprise/src/lib/api/profile.ts
 // Production-ready API for users/organizations with normalized user stats.
 
-import api from '@/lib/api/axios'
+import { api } from '@/lib/api/config'
 import { errorToMessage } from '@/lib/ui/errorToMessage'
 import type {
   UserProfile,

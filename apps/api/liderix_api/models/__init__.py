@@ -30,6 +30,7 @@ from .memberships import Membership
 from .notifications import Notification
 from .okrs import Objective, KeyResult
 
+from .projects import Project
 from .project_members import ProjectMember
 
 from .rate_limits import RateLimit

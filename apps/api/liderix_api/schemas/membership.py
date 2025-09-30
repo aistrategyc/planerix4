@@ -169,18 +169,6 @@ class MembershipBulkCreateItem(BaseModel):
 
 
 class MembershipBulkCreateRequest(BaseModel):
-nclass MembershipBulkInviteItem(BaseModel):
-    """Элемент для пакетного приглашения по email."""
-    email: EmailStr
-    role: Optional[Role] = "member"
-    department_id: Optional[UUID] = None
-
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
-
-class MembershipBulkInviteRequest(BaseModel):
-    memberships: List[MembershipBulkInviteItem] = Field(..., min_items=1, max_items=100)
-
-    model_config = ConfigDict(extra="forbid")
     memberships: List[MembershipBulkCreateItem] = Field(..., min_items=1, max_items=100)
 
     model_config = ConfigDict(extra="forbid")
@@ -192,6 +180,21 @@ class MembershipStatsResponse(BaseModel):
     status_distribution: Dict[str, int] = Field(default_factory=dict)
     department_distribution: Dict[str, int] = Field(default_factory=dict)
     recent_joins_30d: int
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class MembershipBulkInviteItem(BaseModel):
+    """Элемент для пакетного приглашения по email."""
+    email: EmailStr
+    role: Optional[Role] = "member"
+    department_id: Optional[UUID] = None
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+
+class MembershipBulkInviteRequest(BaseModel):
+    memberships: List[MembershipBulkInviteItem] = Field(..., min_items=1, max_items=100)
 
     model_config = ConfigDict(extra="forbid")
 
@@ -212,17 +215,5 @@ __all__ = [
     "MembershipBulkCreateRequest",
     "MembershipBulkInviteItem",
     "MembershipBulkInviteRequest",
-nclass MembershipBulkInviteItem(BaseModel):
-    """Элемент для пакетного приглашения по email."""
-    email: EmailStr
-    role: Optional[Role] = "member"
-    department_id: Optional[UUID] = None
-
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
-
-class MembershipBulkInviteRequest(BaseModel):
-    memberships: List[MembershipBulkInviteItem] = Field(..., min_items=1, max_items=100)
-
-    model_config = ConfigDict(extra="forbid")
     "MembershipStatsResponse",
 ]

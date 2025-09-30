@@ -111,44 +111,11 @@ async def get_liderix_session() -> AsyncGenerator[AsyncSession, None]:
                 pass  # Игнорируем ошибки закрытия
 
 # -----------------------------------------------------------------------------
-# БД: клиентская (ITSTEP) - с улучшенной обработкой
+# БД: клиентская (ITSTEP) - используем из db.py для единообразия
 # -----------------------------------------------------------------------------
-engine_itstep: Optional[AsyncEngine] = None
-SessionItstep: Optional[sessionmaker] = None
+from liderix_api.db import get_itstep_session, itstep_engine
 
-if settings.ITSTEP_DB_URL:
-    try:
-        engine_itstep = create_async_engine(
-            settings.ITSTEP_DB_URL,
-            echo=False,
-            pool_pre_ping=True,
-            pool_size=getattr(settings, "CLIENT_DB_POOL_SIZE", 3),
-            max_overflow=getattr(settings, "CLIENT_DB_MAX_OVERFLOW", 5),
-            pool_timeout=20,
-            pool_recycle=3600,
-        )
-        SessionItstep = sessionmaker(engine_itstep, class_=AsyncSession, expire_on_commit=False)
-        logger.info("Client DB (ITSTEP) engine created successfully")
-    except Exception as e:
-        logger.error(f"Failed to create client database engine: {e}")
-        engine_itstep = None
-        SessionItstep = None
-else:
-    logger.warning("ITSTEP_DB_URL is not set — client analytics routes will return 503.")
-
-async def get_itstep_session() -> AsyncGenerator[AsyncSession, None]:
-    if SessionItstep is None:
-        raise HTTPException(status_code=503, detail="Client DB is not configured")
-    
-    async with SessionItstep() as session:
-        try:
-            yield session
-        except Exception as e:
-            logger.error(f"Client database session error: {e}")
-            await session.rollback()
-            raise
-        finally:
-            await session.close()
+logger.info("Using ITSTEP DB configuration from db.py module")
 
 # -----------------------------------------------------------------------------
 # Middleware: Suppress audit logs for auth errors
@@ -205,9 +172,9 @@ async def on_startup():
             await asyncio.sleep(2)
     
     # Warmup client DB (не критично)
-    if engine_itstep is not None:
+    if itstep_engine is not None:
         try:
-            async with engine_itstep.begin() as conn:
+            async with itstep_engine.begin() as conn:
                 await conn.run_sync(lambda *_: None)
             logger.info("Client DB (ITSTEP) connection is warm.")
         except Exception as e:
@@ -227,9 +194,9 @@ async def on_shutdown():
     except Exception as e:
         logger.warning(f"Dispose primary DB error: {e}")
     
-    if engine_itstep is not None:
+    if itstep_engine is not None:
         try:
-            await engine_itstep.dispose()
+            await itstep_engine.dispose()
             logger.info("Client DB connections disposed.")
         except Exception as e:
             logger.warning(f"Dispose client DB error: {e}")
@@ -265,9 +232,9 @@ async def readiness():
         overall_status = "degraded"
     
     # Проверка клиентской БД
-    if engine_itstep is not None:
+    if itstep_engine is not None:
         try:
-            async with engine_itstep.begin() as conn:
+            async with itstep_engine.begin() as conn:
                 await conn.run_sync(lambda *_: None)
             checks["client_db"] = {"status": "healthy", "type": "postgresql"}
         except Exception as e:
@@ -299,6 +266,13 @@ from liderix_api.routes import (
     analytics as analytics_router,
 )
 
+# Import test analytics endpoint
+try:
+    from liderix_api.test_analytics_endpoint import router as test_analytics_router
+    TEST_ANALYTICS_AVAILABLE = True
+except ImportError:
+    TEST_ANALYTICS_AVAILABLE = False
+
 # Подключение роутеров
 app.include_router(users_router.router, prefix=PREFIX, tags=["Users"])
 app.include_router(client_router.router, prefix=PREFIX, tags=["Clients"])
@@ -307,7 +281,51 @@ app.include_router(tasks_router.router, prefix=PREFIX, tags=["Tasks"])
 app.include_router(okrs_router.router, prefix=PREFIX, tags=["OKRs"])
 app.include_router(kpis_router.router, prefix=PREFIX, tags=["KPIs"])
 app.include_router(auth_router.router, prefix=PREFIX, tags=["Auth"])
-app.include_router(analytics_router.router, prefix=PREFIX, tags=["Analytics"])
+app.include_router(analytics_router.router, prefix=f"{PREFIX}/analytics", tags=["Analytics"])
+
+# Add test analytics router if available
+if TEST_ANALYTICS_AVAILABLE:
+    app.include_router(test_analytics_router, prefix=PREFIX, tags=["Test Analytics"])
+
+# Direct test endpoints for ITstep analytics
+@app.get("/api/test-itstep/health")
+async def test_itstep_health():
+    """Direct test endpoint for ITstep analytics"""
+    return {
+        "status": "healthy",
+        "service": "ITstep Direct Analytics",
+        "database_url_configured": bool(os.getenv("ITSTEP_DB_URL")),
+        "timestamp": "2025-09-29"
+    }
+
+@app.get("/api/test-itstep/connection")
+async def test_itstep_connection():
+    """Direct test connection to ITstep database"""
+    import asyncpg
+
+    ITSTEP_DB_URL = os.getenv("ITSTEP_DB_URL", "postgresql+asyncpg://bi_app:Resurgam65!@92.242.60.211:5432/itstep_final")
+
+    try:
+        # Convert URL for asyncpg
+        db_url = ITSTEP_DB_URL.replace("postgresql+asyncpg://", "postgresql://")
+        conn = await asyncpg.connect(db_url)
+
+        # Test query
+        result = await conn.fetchrow("SELECT version() as db_version, current_database() as db_name")
+        await conn.close()
+
+        return {
+            "status": "success",
+            "message": "ITstep database connection successful",
+            "database": result["db_name"] if result else "unknown",
+            "version": result["db_version"] if result else "unknown"
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Connection failed: {str(e)}",
+            "database_url": ITSTEP_DB_URL.replace("Resurgam65!", "***") # Hide password
+        }
 
 # -----------------------------------------------------------------------------
 # Улучшенная аутентификация без fallback
@@ -392,7 +410,7 @@ async def get_me(request: Request):
 # Клиентские роутеры с правильными зависимостями
 # -----------------------------------------------------------------------------
 from liderix_api.routes.dashboard import overview as dashboard_router
-from liderix_api.routes.analytics import sales as sales_router
+# from liderix_api.routes.analytics import sales as sales_router  # DISABLED - conflicts with main analytics router
 
 app.include_router(
     dashboard_router.router,
@@ -401,12 +419,13 @@ app.include_router(
     dependencies=[Depends(get_itstep_session)],
 )
 
-app.include_router(
-    sales_router.router,
-    prefix=f"{PREFIX}/analytics/sales",
-    tags=["Client Analytics"],
-    dependencies=[Depends(get_itstep_session)],
-)
+# DISABLED: Conflicting with main analytics router at /api/analytics
+# app.include_router(
+#     sales_router.router,
+#     prefix=f"{PREFIX}/analytics/sales",
+#     tags=["Client Analytics"],
+#     dependencies=[Depends(get_itstep_session)],
+# )
 
 # --- Опциональные модули ---
 # AI инсайты

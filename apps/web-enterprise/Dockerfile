@@ -53,8 +53,8 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=3000
-RUN apk add --no-cache libc6-compat
+ENV PORT=3001
+RUN apk add --no-cache libc6-compat curl
 
 # Безопасный пользователь
 RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
@@ -65,6 +65,6 @@ COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
 
 USER nextjs
-EXPOSE 3000
+EXPOSE 3001
 
 CMD ["node", "server.js"]

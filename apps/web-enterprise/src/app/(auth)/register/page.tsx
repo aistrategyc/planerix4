@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle, Loader2 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
-import { useAuth } from "@/app/(auth)/hooks/useAuth"
+import { useAuth } from "@/contexts/auth-context"
 
 // ✅ СХЕМА ВАЛИДАЦИИ С first_name и last_name
 const registerSchema = z.object({
@@ -74,14 +74,7 @@ export default function RegisterPage() {
     setApiError(null)
 
     try {
-      await doRegister({
-        email: data.email,
-        password: data.password,
-        username: data.username,
-        first_name: data.first_name,
-        last_name: data.last_name,
-        terms_accepted: data.terms_accepted,
-      })
+      await doRegister(data)
       // navigation happens inside useAuth.register (to /verify-email)
     } catch {
       // useAuth already handles the error and sets authError

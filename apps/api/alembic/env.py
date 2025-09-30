@@ -42,18 +42,15 @@ target_metadata = Base.metadata
 
 # --- DB URL ---
 def get_database_url() -> str:
-    """Получает URL базы данных и преобразует для синхронного Alembic"""
-    url = os.getenv("ALEMBIC_DATABASE_URL", settings.LIDERIX_DB_URL)
-    if not url:
-        raise ValueError("Database URL not found in settings or environment")
-    
-    # Преобразуем async URL в sync для Alembic
-    if "+asyncpg" in url:
-        url = url.replace("postgresql+asyncpg://", "postgresql://")
-    elif "+psycopg" in url:
-        url = url.replace("postgresql+psycopg://", "postgresql://")
-    
-    return url
+    """
+    Returns the database URL for Alembic migrations from settings.
+    """
+    # Получаем URL из настроек приложения
+    db_url = settings.LIDERIX_DB_URL
+    # Конвертируем asyncpg URL в синхронный для alembic
+    if db_url and "postgresql+asyncpg://" in db_url:
+        db_url = db_url.replace("postgresql+asyncpg://", "postgresql://")
+    return db_url
 
 # --- Схема для хранения alembic_version ---
 def get_version_table_schema():

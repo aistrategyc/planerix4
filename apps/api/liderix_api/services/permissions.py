@@ -13,7 +13,7 @@ from sqlalchemy import select, and_, or_
 
 from liderix_api.models.users import User, UserRole
 from liderix_api.models.memberships import Membership, MembershipRole
-from liderix_api.models.projects import Project, ProjectMemberRole
+from liderix_api.models.projects import Project
 from liderix_api.models.project_members import ProjectMember
 
 logger = logging.getLogger(__name__)

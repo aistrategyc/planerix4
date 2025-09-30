@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
-import { useAuth } from "@/app/(auth)/hooks/useAuth";
+import { useAuth } from "@/contexts/auth-context";
 import { useCompany, useCompanyTeam, useDepartments } from "@/app/company/hooks/useCompany";
 import {
   Activity,

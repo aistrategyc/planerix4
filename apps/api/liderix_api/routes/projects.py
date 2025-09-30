@@ -17,8 +17,9 @@ from sqlalchemy.exc import IntegrityError
 from enum import Enum
 
 from liderix_api.db import get_async_session
-from liderix_api.models.projects import Project, ProjectTask
+from liderix_api.models.projects import Project
 from liderix_api.models.project_members import ProjectMember
+from liderix_api.models.tasks import Task
 from liderix_api.models.users import User
 from liderix_api.models.memberships import Membership, MembershipStatus
 from liderix_api.config.settings import settings
@@ -140,14 +141,14 @@ async def _get_project_stats(session: AsyncSession, project_id: UUID) -> Dict[st
     """Get project statistics"""
     # Task counts by status
     task_stats = await session.execute(
-        select(ProjectTask.status, func.count(ProjectTask.id))
+        select(Task.status, func.count(Task.id))
         .where(
             and_(
-                ProjectTask.project_id == project_id,
-                ProjectTask.deleted_at.is_(None)
+                Task.project_id == project_id,
+                Task.deleted_at.is_(None)
             )
         )
-        .group_by(ProjectTask.status)
+        .group_by(Task.status)
     )
     
     task_distribution = {status: count for status, count in task_stats}
@@ -515,7 +516,7 @@ async def delete_project(
             delete(ProjectMember).where(ProjectMember.project_id == project_id)
         )
         await session.execute(
-            delete(ProjectTask).where(ProjectTask.project_id == project_id)
+            delete(Task).where(Task.project_id == project_id)
         )
         await session.delete(project)
         action = "project.hard_delete"

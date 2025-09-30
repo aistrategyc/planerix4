@@ -64,7 +64,7 @@ export function useSalesData(dateRange?: { from?: Date; to?: Date }) {
     if (dateRange?.to) query.append("to", dateRange.to.toISOString())
 
     try {
-      const res = await fetch(`/api/analytics/sales?${query.toString()}`)
+      const res = await fetch(`/api/analytics/marketing/sales?${query.toString()}`)
       const json = await res.json()
 
       const mappedWeekly = (json.weekly ?? []).map((item: any) => ({

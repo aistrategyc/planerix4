@@ -1,5 +1,5 @@
 // lib/api/company.ts
-import api from '@/lib/api/axios'
+import { api } from '@/lib/api/config'
 import type { Department, Membership, TeamMember } from '@/types/profile'
 export type { Department, Membership, TeamMember } from '@/types/profile'
 export interface Client {

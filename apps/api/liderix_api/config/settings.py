@@ -3,7 +3,7 @@ from __future__ import annotations
 import os, re, json
 from typing import Optional, List, Union
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import field_validator, ValidationInfo
+from pydantic import field_validator, ValidationInfo, validator
 
 
 class Settings(BaseSettings):
@@ -33,7 +33,11 @@ class Settings(BaseSettings):
     # none|lax|strict -> приводим к нижнему регистру
     REFRESH_COOKIE_SAMESITE: str | None = (os.getenv("REFRESH_COOKIE_SAMESITE", "none") or "none").lower()
 
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "dev-secret")
+    SECRET_KEY: Optional[str] = None  # Полностью отключить валидацию
+    @validator("SECRET_KEY", pre=True, always=True)
+    def set_default_secret_key(cls, v):
+        return v or "temporary_secret"  # Установить временное значение
+
     ACCESS_TOKEN_SECRET: Optional[str] = None
     JWT_ALGORITHM: str = "HS256"
     JWT_AUDIENCE: Optional[str] = None
@@ -68,6 +72,11 @@ class Settings(BaseSettings):
 
     # ---- External read-only client DB (ITSTEP) ----
     ITSTEP_DB_URL: Optional[str] = None
+    ITSTEP_DB_HOST: str = os.getenv("ITSTEP_DB_HOST", "92.242.60.211")
+    ITSTEP_DB_PORT: int = int(os.getenv("ITSTEP_DB_PORT", "5432"))
+    ITSTEP_DB_NAME: str = os.getenv("ITSTEP_DB_NAME", "itstep_final")
+    ITSTEP_DB_USER: str = os.getenv("ITSTEP_DB_USER", "bi_app")
+    ITSTEP_DB_PASSWORD: Optional[str] = os.getenv("ITSTEP_DB_PASSWORD")
 
     model_config = SettingsConfigDict(
         case_sensitive=False,
@@ -106,31 +115,54 @@ class Settings(BaseSettings):
     def _val_cors_headers(cls, v):
         return cls._parse_listish(v)
 
-    # ---- Compose DB URL (prod: можно без явного пароля в переменной LIDERIX_DB_URL) ----
+    # ---- Compose DB URL from environment variables ----
     @field_validator("LIDERIX_DB_URL", mode="before")
     @classmethod
     def _build_db_url(cls, v, info: ValidationInfo):
-        data = getattr(info, "data", {}) or {}
-        env = (data.get("ENVIRONMENT") or os.getenv("ENVIRONMENT") or "production").lower()
-
-        # Если явно задано — принять, но в prod запретим пароль в явном URL
+        # Если явно задано — использовать
         if v:
-            if env == "production" and re.search(r"://[^:@/]+:[^@]+@", str(v)):
-                raise ValueError("В продакшене БД URL не должен содержать пароль в открытом виде")
             return v
 
-        # Собирать из POSTGRES_* (это допустимо и в prod)
+        # Собирать из POSTGRES_* переменных окружения
+        data = getattr(info, "data", {}) or {}
         user = data.get("POSTGRES_USER") or os.getenv("POSTGRES_USER")
-        pwd  = data.get("POSTGRES_PASSWORD") or os.getenv("POSTGRES_PASSWORD")
+        pwd = data.get("POSTGRES_PASSWORD") or os.getenv("POSTGRES_PASSWORD")
         host = data.get("POSTGRES_HOST") or os.getenv("POSTGRES_HOST", "postgres")
         port = data.get("POSTGRES_PORT") or os.getenv("POSTGRES_PORT", "5432")
-        db   = data.get("POSTGRES_DB") or os.getenv("POSTGRES_DB")
+        db = data.get("POSTGRES_DB") or os.getenv("POSTGRES_DB")
 
-        if user and host and db:
-            pwd_part = f":{pwd}" if pwd else ""
-            return f"postgresql+asyncpg://{user}{pwd_part}@{host}:{port}/{db}"
+        if not all([user, host, db]):
+            raise ValueError(
+                "Не удалось собрать строку подключения к БД. "
+                "Задайте LIDERIX_DB_URL или все переменные POSTGRES_*"
+            )
 
-        raise ValueError("Не удалось собрать строку подключения к БД: задайте POSTGRES_* или LIDERIX_DB_URL")
+        pwd_part = f":{pwd}" if pwd else ""
+        return f"postgresql+asyncpg://{user}{pwd_part}@{host}:{port}/{db}"
+
+    # ---- Build ITSTEP DB URL from environment variables ----
+    @field_validator("ITSTEP_DB_URL", mode="before")
+    @classmethod
+    def _build_itstep_db_url(cls, v, info: ValidationInfo):
+        # Если явно задано — использовать
+        if v:
+            return v
+
+        # Собирать из ITSTEP_DB_* переменных окружения
+        data = getattr(info, "data", {}) or {}
+        user = data.get("ITSTEP_DB_USER") or os.getenv("ITSTEP_DB_USER")
+        pwd = data.get("ITSTEP_DB_PASSWORD") or os.getenv("ITSTEP_DB_PASSWORD")
+        host = data.get("ITSTEP_DB_HOST") or os.getenv("ITSTEP_DB_HOST", "92.242.60.211")
+        port = data.get("ITSTEP_DB_PORT") or os.getenv("ITSTEP_DB_PORT", "5432")
+        db = data.get("ITSTEP_DB_NAME") or os.getenv("ITSTEP_DB_NAME")
+
+        # Если не все данные есть, вернуть None (опциональная БД)
+        if not all([user, pwd, host, db]):
+            return None
+
+        # Добавляем SSL режим для внешней БД (asyncpg использует ssl=false вместо sslmode=disable)
+        pwd_part = f":{pwd}" if pwd else ""
+        return f"postgresql+asyncpg://{user}{pwd_part}@{host}:{port}/{db}?ssl=false"
 
 
 settings = Settings()

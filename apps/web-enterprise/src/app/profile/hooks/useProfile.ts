@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useToast } from '@/components/ui/use-toast'
-import { useAuth } from '@/app/(auth)/hooks/useAuth'
+import { useAuth } from '@/contexts/auth-context'
 import {
   getCurrentUser,
   updateUserProfile,

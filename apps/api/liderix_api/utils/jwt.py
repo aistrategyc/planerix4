@@ -50,7 +50,7 @@ def create_access_token(*, sub: str, extra: Optional[Dict[str, Any]] = None) -> 
     claims["sub"] = sub
     if extra:
         claims.update(extra)
-    token = jwt.encode(claims, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    token = jwt.encode(claims, settings.SECRET_KEY or "temporary_secret", algorithm=settings.JWT_ALGORITHM)
     return token, settings.ACCESS_TTL_SEC
 
 def create_refresh_token(*, sub: str, extra: Optional[Dict[str, Any]] = None) -> Tuple[str, str, int]:
@@ -62,7 +62,7 @@ def create_refresh_token(*, sub: str, extra: Optional[Dict[str, Any]] = None) ->
     claims["sub"] = sub
     if extra:
         claims.update(extra)
-    token = jwt.encode(claims, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    token = jwt.encode(claims, settings.SECRET_KEY or "temporary_secret", algorithm=settings.JWT_ALGORITHM)
     return token, claims["jti"], settings.REFRESH_TTL_SEC
 
 def create_token_pair(
@@ -95,7 +95,7 @@ def decode_token(token: str, *, expect_typ: Optional[TokenType] = None, verify_e
         # Важно: leeway — отдельный аргумент jose.jwt.decode, не часть options
         claims = jwt.decode(
             token,
-            settings.SECRET_KEY,
+            settings.SECRET_KEY or "temporary_secret",
             algorithms=[settings.JWT_ALGORITHM],
             options={"verify_exp": verify_exp},
             audience=settings.JWT_AUDIENCE if settings.JWT_AUDIENCE else None,

@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useCallback, useMemo } from "react"
+import { useState, useCallback, useMemo, useEffect } from "react"
 import ProtectedRoute from "@/components/auth/ProtectedRoute"
+import { useOkrs } from "./hooks/useOkrs"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -35,105 +36,8 @@ import {
   Clock
 } from "lucide-react"
 
-interface Objective {
-  id: string
-  title: string
-  description?: string
-  progress: number
-  status: 'draft' | 'active' | 'completed' | 'at_risk' | 'cancelled'
-  priority: 'low' | 'medium' | 'high' | 'critical'
-  owner: string
-  team?: string
-  startDate: string
-  endDate: string
-  keyResults: KeyResult[]
-  created_at: string
-  updated_at: string
-}
+import { type OKR, type OKRCreate } from "@/lib/api/okr"
 
-interface KeyResult {
-  id: string
-  title: string
-  description?: string
-  progress: number
-  target: number
-  current: number
-  unit: string
-  status: 'not_started' | 'on_track' | 'at_risk' | 'completed'
-  owner?: string
-}
-
-// Mock data for demonstration
-const mockObjectives: Objective[] = [
-  {
-    id: "1",
-    title: "Increase Monthly Revenue by 25%",
-    description: "Drive revenue growth through improved sales processes and customer acquisition",
-    progress: 68,
-    status: 'active',
-    priority: 'high',
-    owner: "John Smith",
-    team: "Sales",
-    startDate: "2024-01-01",
-    endDate: "2024-12-31",
-    created_at: "2024-01-01T00:00:00Z",
-    updated_at: "2024-01-15T10:30:00Z",
-    keyResults: [
-      {
-        id: "kr1",
-        title: "Achieve $2.5M in monthly revenue",
-        progress: 70,
-        target: 2500000,
-        current: 1750000,
-        unit: "$",
-        status: 'on_track'
-      },
-      {
-        id: "kr2", 
-        title: "Increase customer acquisition by 40%",
-        progress: 65,
-        target: 140,
-        current: 91,
-        unit: "customers",
-        status: 'on_track'
-      }
-    ]
-  },
-  {
-    id: "2",
-    title: "Improve Product Quality & User Experience",
-    description: "Enhance product reliability and user satisfaction metrics",
-    progress: 45,
-    status: 'at_risk',
-    priority: 'critical',
-    owner: "Sarah Johnson",
-    team: "Product",
-    startDate: "2024-02-01", 
-    endDate: "2024-06-30",
-    created_at: "2024-02-01T00:00:00Z",
-    updated_at: "2024-02-10T14:20:00Z",
-    keyResults: [
-      {
-        id: "kr3",
-        title: "Reduce bug reports by 50%",
-        progress: 30,
-        target: 50,
-        current: 15,
-        unit: "%",
-        status: 'at_risk'
-      },
-      {
-        id: "kr4",
-        title: "Increase user satisfaction score to 4.5/5",
-        progress: 60,
-        target: 4.5,
-        current: 4.2,
-        unit: "★",
-        status: 'on_track'
-      }
-    ]
-  }
-]
 
 export default function OKRPage() {
   return (
@@ -145,23 +49,34 @@ export default function OKRPage() {
 
 function OKRPageContent() {
   const { toast } = useToast()
-  
-  const [objectives, setObjectives] = useState<Objective[]>(mockObjectives)
+  const { okrs, loading, error, loadOkrs, createOkr, updateOkr, deleteOkr } = useOkrs()
+
+  const [objectives, setObjectives] = useState<OKR[]>([])
+
+  // Load OKRs on component mount
+  useEffect(() => {
+    loadOkrs()
+  }, [loadOkrs])
+
+  // Update local state when okrs change
+  useEffect(() => {
+    setObjectives(okrs)
+  }, [okrs])
   const [searchQuery, setSearchQuery] = useState("")
   const [filterStatus, setFilterStatus] = useState<string>("all")
   const [filterPriority, setFilterPriority] = useState<string>("all")
-  const [selectedObjective, setSelectedObjective] = useState<Objective | null>(null)
+  const [selectedObjective, setSelectedObjective] = useState<OKR | null>(null)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showDetailDialog, setShowDetailDialog] = useState(false)
 
-  const [newObjective, setNewObjective] = useState({
+  const [newObjective, setNewObjective] = useState<Partial<OKRCreate>>({
     title: "",
     description: "",
     priority: "medium" as const,
     owner: "",
     team: "",
-    startDate: "",
-    endDate: ""
+    start_date: "",
+    end_date: ""
   })
 
   const filteredObjectives = useMemo(() => {
@@ -175,7 +90,7 @@ function OKRPageContent() {
     })
   }, [objectives, searchQuery, filterStatus, filterPriority])
 
-  const getStatusColor = (status: Objective['status']) => {
+  const getStatusColor = (status: OKR['status']) => {
     switch (status) {
       case 'draft': return 'bg-gray-100 text-gray-800'
       case 'active': return 'bg-blue-100 text-blue-800'
@@ -186,7 +101,7 @@ function OKRPageContent() {
     }
   }
 
-  const getPriorityColor = (priority: Objective['priority']) => {
+  const getPriorityColor = (priority: OKR['priority']) => {
     switch (priority) {
       case 'critical': return 'bg-red-500 text-white'
       case 'high': return 'bg-orange-500 text-white'
@@ -196,7 +111,7 @@ function OKRPageContent() {
     }
   }
 
-  const getKRStatusColor = (status: KeyResult['status']) => {
+  const getKRStatusColor = (status: OKR['key_results'][0]['status']) => {
     switch (status) {
       case 'not_started': return 'bg-gray-100 text-gray-800'
       case 'on_track': return 'bg-green-100 text-green-800'
@@ -206,42 +121,50 @@ function OKRPageContent() {
     }
   }
 
-  const handleCreateObjective = useCallback(() => {
-    if (!newObjective.title.trim()) {
+  const handleCreateObjective = useCallback(async () => {
+    if (!newObjective.title?.trim()) {
       toast({ title: "Error", description: "Objective title is required", variant: "destructive" })
       return
     }
 
-    const newObj: Objective = {
-      id: Date.now().toString(),
-      title: newObjective.title.trim(),
-      description: newObjective.description?.trim() || undefined,
-      progress: 0,
-      status: 'draft',
-      priority: newObjective.priority,
-      owner: newObjective.owner.trim() || "Unassigned",
-      team: newObjective.team?.trim() || undefined,
-      startDate: newObjective.startDate,
-      endDate: newObjective.endDate,
-      keyResults: [],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+    if (!newObjective.owner?.trim()) {
+      toast({ title: "Error", description: "Owner is required", variant: "destructive" })
+      return
     }
 
-    setObjectives(prev => [...prev, newObj])
-    setNewObjective({
-      title: "",
-      description: "",
-      priority: "medium",
-      owner: "",
-      team: "",
-      startDate: "",
-      endDate: ""
-    })
-    setShowCreateDialog(false)
-    
-    toast({ title: "Success", description: "Objective created successfully" })
-  }, [newObjective, toast])
+    if (!newObjective.start_date || !newObjective.end_date) {
+      toast({ title: "Error", description: "Start and end dates are required", variant: "destructive" })
+      return
+    }
+
+    const createData: OKRCreate = {
+      title: newObjective.title.trim(),
+      description: newObjective.description?.trim() || undefined,
+      priority: newObjective.priority || 'medium',
+      owner: newObjective.owner.trim(),
+      team: newObjective.team?.trim() || undefined,
+      start_date: newObjective.start_date,
+      end_date: newObjective.end_date
+    }
+
+    const success = await createOkr(createData)
+
+    if (success) {
+      setNewObjective({
+        title: "",
+        description: "",
+        priority: "medium",
+        owner: "",
+        team: "",
+        start_date: "",
+        end_date: ""
+      })
+      setShowCreateDialog(false)
+      toast({ title: "Success", description: "Objective created successfully" })
+    } else {
+      toast({ title: "Error", description: error || "Failed to create objective", variant: "destructive" })
+    }
+  }, [newObjective, createOkr, error, toast])
 
   const stats = useMemo(() => {
     const total = objectives.length
@@ -253,8 +176,34 @@ function OKRPageContent() {
     return { total, active, completed, atRisk, avgProgress }
   }, [objectives])
 
+  // Show loading state
+  if (loading && objectives.length === 0) {
+    return (
+      <div className="p-6 max-w-7xl mx-auto space-y-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading OKRs...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
+      {/* Error Message */}
+      {error && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 text-red-600">
+              <AlertCircle className="w-4 h-4" />
+              <span>{error}</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Header */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div className="flex items-center gap-2">
@@ -313,7 +262,7 @@ function OKRPageContent() {
             <DialogContent className="sm:max-w-[500px]">
               <DialogHeader>
                 <DialogTitle>Create New Objective</DialogTitle>
-                <DialogDescription>Define a new strategic objective with measurable key results</DialogDescription>
+                <DialogDescription>Define a new strategic objective with clear ownership and timeline. You can add key results after creating the objective.</DialogDescription>
               </DialogHeader>
               
               <div className="grid gap-4 py-4">
@@ -358,7 +307,7 @@ function OKRPageContent() {
                   </div>
 
                   <div className="grid gap-2">
-                    <Label htmlFor="owner">Owner</Label>
+                    <Label htmlFor="owner">Owner *</Label>
                     <Input
                       id="owner"
                       value={newObjective.owner}
@@ -383,21 +332,21 @@ function OKRPageContent() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
-                    <Label htmlFor="startDate">Start Date</Label>
+                    <Label htmlFor="startDate">Start Date *</Label>
                     <Input
                       id="startDate"
                       type="date"
-                      value={newObjective.startDate}
-                      onChange={(e) => setNewObjective({ ...newObjective, startDate: e.target.value })}
+                      value={newObjective.start_date || ""}
+                      onChange={(e) => setNewObjective({ ...newObjective, start_date: e.target.value })}
                     />
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="endDate">End Date</Label>
+                    <Label htmlFor="endDate">End Date *</Label>
                     <Input
                       id="endDate"
                       type="date"
-                      value={newObjective.endDate}
-                      onChange={(e) => setNewObjective({ ...newObjective, endDate: e.target.value })}
+                      value={newObjective.end_date || ""}
+                      onChange={(e) => setNewObjective({ ...newObjective, end_date: e.target.value })}
                     />
                   </div>
                 </div>
@@ -407,8 +356,15 @@ function OKRPageContent() {
                 <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleCreateObjective}>
-                  Create Objective
+                <Button onClick={handleCreateObjective} disabled={loading}>
+                  {loading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Creating...
+                    </>
+                  ) : (
+                    "Create Objective"
+                  )}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -533,21 +489,21 @@ function OKRPageContent() {
                   )}
                   <div className="flex items-center gap-1">
                     <Calendar className="w-4 h-4" />
-                    {new Date(objective.startDate).toLocaleDateString()} - {new Date(objective.endDate).toLocaleDateString()}
+                    {new Date(objective.start_date).toLocaleDateString()} - {new Date(objective.end_date).toLocaleDateString()}
                   </div>
                 </div>
 
                 {/* Key Results Summary */}
-                {objective.keyResults.length > 0 && (
+                {objective.key_results && objective.key_results.length > 0 && (
                   <div className="border-t pt-3">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="text-sm font-medium">Key Results</h4>
                       <Badge variant="outline" className="text-xs">
-                        {objective.keyResults.length} KRs
+                        {objective.key_results.length} KRs
                       </Badge>
                     </div>
                     <div className="space-y-1">
-                      {objective.keyResults.slice(0, 2).map((kr) => (
+                      {objective.key_results.slice(0, 2).map((kr: any) => (
                         <div key={kr.id} className="flex items-center justify-between text-sm">
                           <span className="flex-1 truncate">{kr.title}</span>
                           <div className="flex items-center gap-2">
@@ -560,9 +516,9 @@ function OKRPageContent() {
                           </div>
                         </div>
                       ))}
-                      {objective.keyResults.length > 2 && (
+                      {objective.key_results.length > 2 && (
                         <div className="text-xs text-muted-foreground">
-                          +{objective.keyResults.length - 2} more key results
+                          +{objective.key_results.length - 2} more key results
                         </div>
                       )}
                     </div>
@@ -577,15 +533,19 @@ function OKRPageContent() {
           <Card>
             <CardContent className="p-12 text-center">
               <Target className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium mb-2">No objectives found</h3>
+              <h3 className="text-lg font-medium mb-2">
+                {searchQuery || filterStatus !== "all" || filterPriority !== "all"
+                  ? "No objectives found"
+                  : "Welcome to OKRs!"}
+              </h3>
               <p className="text-muted-foreground mb-4">
                 {searchQuery || filterStatus !== "all" || filterPriority !== "all"
-                  ? "Try adjusting your filters or search terms"
-                  : "Get started by creating your first objective"}
+                  ? "Try adjusting your filters or search terms to find what you're looking for."
+                  : "OKRs (Objectives & Key Results) help you set and track ambitious goals. Start by creating your first strategic objective with measurable key results."}
               </p>
               <Button onClick={() => setShowCreateDialog(true)}>
                 <Plus className="w-4 h-4 mr-2" />
-                Create Objective
+                {objectives.length === 0 ? "Create Your First Objective" : "Create Objective"}
               </Button>
             </CardContent>
           </Card>
@@ -613,7 +573,7 @@ function OKRPageContent() {
               <Tabs defaultValue="overview" className="w-full">
                 <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="overview">Overview</TabsTrigger>
-                  <TabsTrigger value="key-results">Key Results ({selectedObjective.keyResults.length})</TabsTrigger>
+                  <TabsTrigger value="key-results">Key Results ({selectedObjective.key_results?.length || 0})</TabsTrigger>
                   <TabsTrigger value="activity">Activity</TabsTrigger>
                 </TabsList>
 
@@ -644,11 +604,11 @@ function OKRPageContent() {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label>Start Date</Label>
-                        <p className="text-sm">{new Date(selectedObjective.startDate).toLocaleDateString()}</p>
+                        <p className="text-sm">{new Date(selectedObjective.start_date).toLocaleDateString()}</p>
                       </div>
                       <div>
                         <Label>End Date</Label>
-                        <p className="text-sm">{new Date(selectedObjective.endDate).toLocaleDateString()}</p>
+                        <p className="text-sm">{new Date(selectedObjective.end_date).toLocaleDateString()}</p>
                       </div>
                     </div>
 
@@ -663,9 +623,9 @@ function OKRPageContent() {
                 </TabsContent>
 
                 <TabsContent value="key-results" className="space-y-4">
-                  {selectedObjective.keyResults.length > 0 ? (
+                  {selectedObjective.key_results && selectedObjective.key_results.length > 0 ? (
                     <div className="space-y-4">
-                      {selectedObjective.keyResults.map((kr) => (
+                      {selectedObjective.key_results.map((kr: any) => (
                         <Card key={kr.id}>
                           <CardContent className="p-4">
                             <div className="space-y-3">

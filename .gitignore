@@ -34,6 +34,11 @@ pnpm-debug.log*
 .env
 .env.*
 !.env.example
+# 🚨 КРИТИЧНО: Никогда не коммитить production конфигурации
+.env.production
+apps/*/.env.production
+**/.env.production
+**/env.production
 
 # 🔒 Дополнительная защита от случайного коммита секретов
 **/secrets/

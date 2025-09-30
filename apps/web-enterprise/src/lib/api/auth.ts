@@ -77,7 +77,7 @@ function extractErrorMessage(err: unknown): string {
 
 export async function register(payload: RegisterSchema): Promise<MessageResponse> {
   try {
-    const { data } = await api.post<MessageResponse>("/register", payload)
+    const { data } = await api.post<MessageResponse>("/auth/register", payload)
     return data
   } catch (err) {
     throw new Error(extractErrorMessage(err))
@@ -164,7 +164,7 @@ export async function validateRefresh(): Promise<{ valid: boolean } & Record<str
 
 export async function resendVerification(email: string): Promise<MessageResponse> {
   try {
-    const { data } = await api.post<MessageResponse>("/resend-verification", { email })
+    const { data } = await api.post<MessageResponse>("/auth/resend-verification", { email })
     return data
   } catch (err) {
     throw new Error(extractErrorMessage(err))
@@ -174,7 +174,7 @@ export async function resendVerification(email: string): Promise<MessageResponse
 // Вариант 1: подтверждение по GET /verify?token=...
 export async function verifyEmailByToken(token: string): Promise<MessageResponse> {
   try {
-    const { data } = await api.get<MessageResponse>("/verify", { params: { token } })
+    const { data } = await api.get<MessageResponse>("/auth/verify", { params: { token } })
     return data
   } catch (err) {
     throw new Error(extractErrorMessage(err))
@@ -185,7 +185,7 @@ export async function verifyEmailByToken(token: string): Promise<MessageResponse
 // Вариант 2: подтверждение по POST /verify { token }
 export async function verifyEmail(token: string): Promise<MessageResponse> {
   try {
-    const { data } = await api.post<MessageResponse>("/verify", { token })
+    const { data } = await api.post<MessageResponse>("/auth/verify", { token })
     return data
   } catch (err) {
     throw new Error(extractErrorMessage(err))
@@ -256,4 +256,23 @@ export async function getMe(): Promise<UserMe> {
 
 export function isAuthenticated(): boolean {
   return Boolean(getAccessToken())
+}
+
+// =============================
+// API Service object (для совместимости с существующим кодом)
+// =============================
+
+export const apiService = {
+  auth: {
+    login,
+    logout,
+    register,
+    refresh,
+    getMe,
+    isAuthenticated,
+    requestPasswordReset,
+    confirmPasswordReset,
+    verifyEmail,
+    resendVerification
+  }
 }

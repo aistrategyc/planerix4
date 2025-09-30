@@ -9,17 +9,6 @@ WORKDIR /app
 # Для нативных модулей Next/Sharp на Alpine
 RUN apk add --no-cache libc6-compat
 
-
-# pnpm через corepack
-RUN corepack enable && corepack prepare pnpm@9.1.0 --activate
-
-# Копируем lockfile и устанавливаем deps
-COPY package.json pnpm-lock.yaml ./
-
-# Для нативных модулей Next/Sharp на Alpine
-RUN apk add --no-cache libc6-compat
-
-
 # pnpm через corepack
 RUN corepack enable && corepack prepare pnpm@9.1.0 --activate
 
@@ -37,23 +26,19 @@ RUN pnpm install --frozen-lockfile
 FROM node:20-alpine AS build
 WORKDIR /app
 
-RUN pnpm install --frozen-lockfile
-
-############################
-# 2) build: сборка Next.js (standalone)
-############################
-FROM node:20-alpine AS build
-WORKDIR /app
-
 RUN apk add --no-cache libc6-compat
 RUN corepack enable && corepack prepare pnpm@9.1.0 --activate
 
 # Подхватываем аргументы окружения из docker-compose
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_API_PREFIX
 ARG RESEND_API_KEY
 ARG RESEND_FROM
 ARG CONTACT_TO
 
 # Делаем их доступными на этапе билда
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_PREFIX=$NEXT_PUBLIC_API_PREFIX
 ENV RESEND_API_KEY=$RESEND_API_KEY
 ENV RESEND_FROM=$RESEND_FROM
 ENV CONTACT_TO=$CONTACT_TO

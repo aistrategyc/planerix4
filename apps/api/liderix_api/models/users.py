@@ -1,23 +1,15 @@
 from __future__ import annotations
 
 import uuid
-import enum
 from datetime import datetime
 
-from sqlalchemy import Column, String, Boolean, Enum, Text, DateTime, Index
+from sqlalchemy import Column, String, Boolean, Enum as SQLEnum, Text, DateTime, Index
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 from sqlalchemy.orm import relationship
 
 from liderix_api.db import Base
+from liderix_api.enums import UserRole
 from .mixins import TimestampMixin, SoftDeleteMixin
-
-class UserRole(enum.Enum):
-    """
-    Роли пользователей приложения.
-    """
-    admin = "admin"
-    member = "member"
-    guest = "guest"
 
 class User(Base, TimestampMixin, SoftDeleteMixin):
     """
@@ -64,8 +56,8 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
         DateTime(timezone=True),
         nullable=True)
     role = Column(
-        String(6),  # ✅ ИСПРАВЛЕНО: использовать String вместо Enum
-        default="member",
+        SQLEnum(UserRole),
+        default=UserRole.MEMBER,
         nullable=False)
     position = Column(
         String(200),
@@ -204,19 +196,19 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
         "Task",
         foreign_keys="Task.assignee_id",
         back_populates="assignee",
-        lazy="selectin")
-    
+        lazy="select")
+
     tasks_created = relationship(
         "Task",
         foreign_keys="Task.creator_id",
         back_populates="creator",
-        lazy="selectin")
-    
+        lazy="select")
+
     tasks_reported = relationship(
         "Task",
         foreign_keys="Task.reporter_id",
         back_populates="reporter",
-        lazy="selectin")
+        lazy="select")
     
     # Комментарии к задачам
     task_comments = relationship(
@@ -225,18 +217,7 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
         back_populates="user",
         lazy="selectin")
     
-    # Задачи проектов (разные роли)
-    project_tasks_assigned = relationship(
-        "ProjectTask",
-        foreign_keys="ProjectTask.assignee_id",
-        back_populates="assignee",
-        lazy="selectin")
-    
-    project_tasks_created = relationship(
-        "ProjectTask",
-        foreign_keys="ProjectTask.creator_id",
-        back_populates="creator",
-        lazy="selectin")
+    # Removed ProjectTask relationships - model doesn't exist
     
     # Файловые активы (владелец)
     file_assets = relationship(

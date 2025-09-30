@@ -6,7 +6,7 @@ from enum import Enum as PythonEnum
 from sqlalchemy import (
     Column,
     String,
-    Enum,
+    Enum as SQLEnum,
     DateTime,
     ForeignKey,
     Index,
@@ -15,20 +15,8 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 from sqlalchemy.orm import relationship, validates
 
 from liderix_api.db import Base
+from liderix_api.enums import MembershipRole, MembershipStatus
 from .mixins import TimestampMixin, SoftDeleteMixin, OrgFKMixin
-
-
-class MembershipRole(PythonEnum):
-    OWNER = "OWNER"
-    ADMIN = "ADMIN"
-    MEMBER = "MEMBER"
-    VIEWER = "VIEWER"
-
-
-class MembershipStatus(PythonEnum):
-    ACTIVE = "ACTIVE"
-    INACTIVE = "INACTIVE"
-    PENDING = "PENDING"
 
 
 class Membership(Base, OrgFKMixin, TimestampMixin, SoftDeleteMixin):
@@ -59,33 +47,17 @@ class Membership(Base, OrgFKMixin, TimestampMixin, SoftDeleteMixin):
         index=True)
 
     role = Column(
-        Enum(MembershipRole, name="membershiprole", native_enum=True),
+        SQLEnum(MembershipRole),
         default=MembershipRole.MEMBER,
         nullable=False
     )
 
     status = Column(
-        Enum(MembershipStatus, name="membershipstatus", native_enum=True),
+        SQLEnum(MembershipStatus),
         default=MembershipStatus.ACTIVE,
         nullable=False
     )
-    @validates("role")
-    def _coerce_role(self, key, value):
-        if isinstance(value, str):
-            try:
-                return MembershipRole[value.upper()]
-            except KeyError as e:
-                raise ValueError(f"Invalid membership role: {value}") from e
-        return value
-
-    @validates("status")
-    def _coerce_status(self, key, value):
-        if isinstance(value, str):
-            try:
-                return MembershipStatus[value.upper()]
-            except KeyError as e:
-                raise ValueError(f"Invalid membership status: {value}") from e
-        return value
+    # Removed validators - using centralized enums
 
     invited_by_id = Column(
         PG_UUID(as_uuid=True),

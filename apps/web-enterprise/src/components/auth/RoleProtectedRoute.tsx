@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { useAuth } from "@/app/(auth)/hooks/useAuth"
+import { useAuth } from "@/contexts/auth-context"
 import ProtectedRoute from "./ProtectedRoute"
 import { Loader2, ShieldX } from "lucide-react"
 import { Button } from "@/components/ui/button"

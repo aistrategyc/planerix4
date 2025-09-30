@@ -1,19 +1,19 @@
 // hooks/useTasks.ts
 import { useState, useEffect, useCallback } from 'react'
 import { useToast } from '@/components/ui/use-toast'
-import { 
-  TasksAPI, 
-  UsersAPI, 
-  ProjectsAPI, 
-  Task, 
-  TaskCreate, 
-  TaskUpdate, 
-  TaskStatus, 
-  TaskFilters, 
-  User, 
+import {
+  TasksAPI,
+  UsersAPI,
+  Task,
+  TaskCreate,
+  TaskUpdate,
+  TaskStatus,
+  TaskFilters,
+  User,
   Project,
   TaskStats,
 } from '@/lib/api/tasks'
+import { ProjectsAPI } from '@/lib/api/projects'
 import { errorToMessage } from '@/lib/ui/errorToMessage'
 
 
@@ -192,7 +192,7 @@ export const useProjects = () => {
   const fetchProjects = useCallback(async () => {
     try {
       setLoading(true)
-      const fetchedProjects = await ProjectsAPI.getProjects()
+      const fetchedProjects = await ProjectsAPI.list()
       setProjects(fetchedProjects)
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to fetch projects')

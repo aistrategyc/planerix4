@@ -1,5 +1,5 @@
 // src/lib/api/tasks.ts
-import api from "@/lib/api/axios"
+import { api } from "@/lib/api/config"
 
 // ------------ Types matching backend exactly ------------
 export interface Task {
@@ -192,16 +192,17 @@ export class UsersAPI {
   }
 }
 
-// ------------ Projects API (для выбора проекта) ------------
-export interface Project {
+// ------------ Projects API import ------------
+// Note: Full Projects API moved to @/lib/api/projects.ts
+// This is a minimal interface for task-project relationships
+export interface ProjectBasic {
   id: string
   name: string
-  description?: string
   status: string
 }
 
-export class ProjectsAPI {
-  static async getProjects(): Promise<Project[]> {
+export class TaskProjectsAPI {
+  static async getProjectsForTasks(): Promise<ProjectBasic[]> {
     const { data } = await api.get("projects/")
     return Array.isArray(data) ? data : data?.items ?? data?.results ?? []
   }

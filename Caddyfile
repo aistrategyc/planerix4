@@ -1,67 +1,182 @@
 # 🌐 Caddy Configuration for Production
-# Автоматические SSL сертификаты от Let Encrypt
+# Автоматические SSL сертификаты от Let's Encrypt
+
+# Global options
+{
+    email {$SSL_EMAIL}
+
+    # Production-ready settings
+    servers {
+        protocol {
+            allow_h2c
+        }
+    }
+}
 
 # Landing page - главная страница
-planerix.com, www.planerix.com {
-    reverse_proxy planerix-landing:3000
-    
+{$MAIN_DOMAIN:planerix.com}, www.{$MAIN_DOMAIN:planerix.com} {
+    reverse_proxy planerix-landing-prod:3000
+
     # Security headers
     header {
         X-Frame-Options DENY
         X-Content-Type-Options nosniff
         X-XSS-Protection "1; mode=block"
-        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "geolocation=(), microphone=(), camera=()"
         -Server
     }
-    
+
+    # Compression
+    encode gzip
+
     # Logging
     log {
-        output file /var/log/caddy/planerix.access.log {
+        output file /data/logs/planerix.access.log {
             roll_size 100mb
             roll_keep 5
         }
+        format json
+    }
+
+    # Error handling
+    handle_errors {
+        @5xx expression {http.error.status_code} >= 500
+        rewrite @5xx /error.html
+        file_server
     }
 }
 
 # Web Enterprise Application
-app.planerix.com {
-    reverse_proxy liderix-web:3000
-    
+{$APP_DOMAIN:app.planerix.com} {
+    reverse_proxy planerix-web-prod:3000 {
+        # Load balancing for future scaling
+        health_uri /api/health
+        health_interval 30s
+        health_timeout 5s
+    }
+
+    # Security headers
     header {
-        X-Frame-Options DENY
+        X-Frame-Options SAMEORIGIN
         X-Content-Type-Options nosniff
         X-XSS-Protection "1; mode=block"
-        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.{$MAIN_DOMAIN:planerix.com};"
         -Server
     }
-    
+
+    # Compression
+    encode gzip
+
+    # Rate limiting
+    rate_limit {
+        zone static {
+            key {remote_host}
+            events 100
+            window 1m
+        }
+    }
+
+    # Logging
     log {
-        output file /var/log/caddy/app.access.log {
+        output file /data/logs/app.access.log {
             roll_size 50mb
             roll_keep 3
         }
+        format json
+    }
+
+    # Error handling
+    handle_errors {
+        @4xx expression {http.error.status_code} >= 400 && {http.error.status_code} < 500
+        @5xx expression {http.error.status_code} >= 500
+        rewrite @4xx /404.html
+        rewrite @5xx /error.html
+        file_server
     }
 }
 
 # API subdomain
-api.planerix.com {
-    reverse_proxy liderix-api:8001
-    
+{$API_DOMAIN:api.planerix.com} {
+    reverse_proxy planerix-api-prod:8001 {
+        # Health check
+        health_uri /api/health
+        health_interval 30s
+        health_timeout 5s
+
+        # Request buffering for large uploads
+        flush_interval -1
+    }
+
+    # CORS headers for API
     header {
+        Access-Control-Allow-Origin "https://{$APP_DOMAIN:app.planerix.com}"
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+        Access-Control-Allow-Credentials "true"
         X-Frame-Options DENY
         X-Content-Type-Options nosniff
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
         -Server
     }
-    
+
+    # Handle preflight requests
+    @options method OPTIONS
+    respond @options 200 {
+        Access-Control-Allow-Origin "https://{$APP_DOMAIN:app.planerix.com}"
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+        Access-Control-Max-Age "86400"
+    }
+
+    # Compression
+    encode gzip
+
+    # Rate limiting for API
+    rate_limit {
+        zone api {
+            key {remote_host}
+            events 1000
+            window 1m
+        }
+    }
+
+    # Logging
     log {
-        output file /var/log/caddy/api.access.log {
+        output file /data/logs/api.access.log {
+            roll_size 50mb
+            roll_keep 3
+        }
+        format json
+    }
+}
+
+# Traefik Dashboard (if needed)
+traefik.{$MAIN_DOMAIN:planerix.com} {
+    basicauth {
+        admin $2a$10$IOwEOE7dVhzVqpfgvf7I3u6FqYHfGKIgKH9t4mKk8RuqaXoEZ9.GS
+    }
+
+    reverse_proxy traefik:8080
+
+    header {
+        X-Frame-Options DENY
+        -Server
+    }
+
+    log {
+        output file /data/logs/traefik.access.log {
             roll_size 50mb
             roll_keep 3
         }
     }
 }
 
-# Health check endpoint
+# Health check endpoint for monitoring
 :8080 {
     respond /health "healthy" 200
+    respond /ready "ready" 200
 }

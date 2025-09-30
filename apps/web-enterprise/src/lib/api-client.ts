@@ -46,7 +46,7 @@ class APIClient {
 
   private async _performRefresh(): Promise<boolean> {
     try {
-      const response = await fetch(`${this.baseURL}/auth/refresh`, {
+      const response = await fetch(`${this.baseURL}/api/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

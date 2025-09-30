@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ChevronsUpDown } from 'lucide-react'
-import { useAuth } from '@/app/(auth)/hooks/useAuth';
+import { useAuth } from '@/contexts/auth-context';
 import { CompanyAPI } from '@/lib/api/company';
 
 type HeaderProps = {
@@ -27,7 +27,7 @@ type HeaderProps = {
 export default function Header({ onMenuClick }: HeaderProps) {
   const [isScrolled, setIsScrolled] = useState(false);
   const router = useRouter();
-  const { user, logout, loading: authLoading } = useAuth();
+  const { user, logout, isLoading: authLoading } = useAuth();
   const [companyName, setCompanyName] = useState<string | null>(null);
 
   useEffect(() => {
@@ -193,7 +193,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                         <BarChart3 className="mr-2 h-4 w-4" />
                         <span>Организация</span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => router.push('/settings')}>
+                      <DropdownMenuItem onClick={() => router.push('/profile')}>
                         <SettingsIcon className="mr-2 h-4 w-4" />
                         <span>Настройки</span>
                       </DropdownMenuItem>

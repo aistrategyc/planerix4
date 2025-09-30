@@ -3,15 +3,30 @@
 // + optional Bearer from localStorage (dev).
 
 import axios, { AxiosError, AxiosRequestConfig, InternalAxiosRequestConfig } from "axios"
+import process from 'process'; // Standard Node.js import
 
 // --------------------------------------------------
-// Base URL
+// Base URL - разный для сервера и клиента
 // --------------------------------------------------
-export const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "https://api.planerix.com/api"
-).replace(/\/+$/, "")
+function getApiBaseUrl(): string {
+  // На сервере (в Docker) используем INTERNAL_API_URL
+  if (typeof window === "undefined") {
+    return (
+      process.env.INTERNAL_API_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      "http://localhost:8001/api"
+    ).replace(/\/+$/, "")
+  }
+
+  // В браузере используем публичный URL
+  return (
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    "http://localhost:8001/api"
+  ).replace(/\/+$/, "")
+}
+
+export const API_BASE_URL = getApiBaseUrl()
 
 // --------------------------------------------------
 // Token helpers (dev only; в prod полагаемся на httpOnly refresh cookie)
@@ -114,7 +129,7 @@ async function doRefresh(): Promise<string | null> {
 // Response: единый обработчик 401 + повтор запроса
 // --------------------------------------------------
 api.interceptors.response.use(
-  (res) => res,
+  (res: any) => res, // Explicitly type 'res' as 'any'
   async (error: AxiosError) => {
     const original = (error.config || {}) as AxiosRequestConfig & { _retry?: boolean }
     const status = error.response?.status

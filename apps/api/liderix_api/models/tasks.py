@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import uuid
-from enum import Enum as PythonEnum
 from datetime import datetime, timezone
 
 from sqlalchemy import (
     Column,
     String,
     Text,
-    Enum,
+    Enum as SQLEnum,
     DateTime,
     ForeignKey,
     Index,
@@ -21,30 +20,11 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from liderix_api.db import Base
+from liderix_api.enums import TaskStatus, TaskPriority, TaskType
 from .mixins import TimestampMixin, SoftDeleteMixin, OrgFKMixin
 
 
-class TaskStatus(PythonEnum):
-    TODO = "todo"
-    IN_PROGRESS = "in_progress"
-    IN_REVIEW = "in_review"
-    DONE = "done"
-    CANCELLED = "cancelled"
-
-
-class TaskPriority(PythonEnum):
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    URGENT = "urgent"
-
-
-class TaskType(PythonEnum):
-    TASK = "task"
-    BUG = "bug"
-    FEATURE = "feature"
-    IMPROVEMENT = "improvement"
-    RESEARCH = "research"
+# Using centralized enums from liderix_api.enums
 
 
 class Task(Base, OrgFKMixin, TimestampMixin, SoftDeleteMixin):
@@ -85,17 +65,17 @@ class Task(Base, OrgFKMixin, TimestampMixin, SoftDeleteMixin):
         nullable=True)
 
     status = Column(
-        Enum(TaskStatus, native_enum=False),
+        SQLEnum(TaskStatus),
         default=TaskStatus.TODO,
         nullable=False)
 
     priority = Column(
-        Enum(TaskPriority, native_enum=False),
+        SQLEnum(TaskPriority),
         default=TaskPriority.MEDIUM,
         nullable=False)
 
     task_type = Column(
-        Enum(TaskType, native_enum=False),
+        SQLEnum(TaskType),
         default=TaskType.TASK,
         nullable=False)
 

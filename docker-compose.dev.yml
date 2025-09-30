@@ -70,19 +70,22 @@ services:
       context: ./apps/web-enterprise
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
-        NEXT_PUBLIC_API_PREFIX: ${NEXT_PUBLIC_API_PREFIX}
-        NEXT_PUBLIC_AI_AGENT_WEBHOOK_URL: ${NEXT_PUBLIC_AI_AGENT_WEBHOOK_URL}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8001}
+        NEXT_PUBLIC_API_PREFIX: ${NEXT_PUBLIC_API_PREFIX:-/api}
+        NEXT_PUBLIC_AI_AGENT_WEBHOOK_URL: ${NEXT_PUBLIC_AI_AGENT_WEBHOOK_URL:-http://localhost:8001/webhook}
     restart: unless-stopped
+    environment:
+      - INTERNAL_API_URL=http://backend:8001
+      - NEXT_PUBLIC_API_URL=http://localhost:8001
     env_file:
       - ./apps/web-enterprise/.env.local
     depends_on:
       backend:
         condition: service_healthy
     ports:
-      - "3002:3000"          # web-enterprise на :3002
+      - "3002:3001"          # web-enterprise на :3002 (внутренний порт 3001)
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000 >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://web-enterprise:3001 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -93,11 +96,11 @@ services:
       context: ./apps/planerix
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
-        NEXT_PUBLIC_API_PREFIX: ${NEXT_PUBLIC_API_PREFIX}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8001}
+        NEXT_PUBLIC_API_PREFIX: ${NEXT_PUBLIC_API_PREFIX:-/api}
         RESEND_API_KEY: ${RESEND_API_KEY}
-        RESEND_FROM: ${RESEND_FROM}
-        CONTACT_TO: ${CONTACT_TO}
+        RESEND_FROM: ${RESEND_FROM:-notifications@planerix.com}
+        CONTACT_TO: ${CONTACT_TO:-kprolieiev@gmail.com}
     restart: unless-stopped
     env_file:
       - ./apps/planerix/.env.local   # можешь убрать, если всё есть в корневом .env
@@ -111,7 +114,7 @@ services:
     ports:
       - "3001:3000"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000 >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://planerix-landing:3000 >/dev/null 2>&1 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10

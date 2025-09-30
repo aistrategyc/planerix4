@@ -26,8 +26,8 @@ type NavItem = {
 
 const MAIN: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: Home },
-  { href: '/okr', label: 'OKR', icon: Target },
   { href: '/tasks', label: 'Tasks', icon: ListChecks },
+  { href: '/okr', label: 'OKR', icon: Target },
   { href: '/crm', label: 'CRM', icon: BarChart },
   { href: '/marketing', label: 'Marketing', icon: Megaphone, badge: 'New' },
   { href: '/ads', label: 'Ads', icon: Megaphone },
