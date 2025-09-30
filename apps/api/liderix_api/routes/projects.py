@@ -197,7 +197,6 @@ async def list_projects(
     
     # Build base query
     query = select(Project).options(
-        selectinload(Project.owner),
         selectinload(Project.organization)
     )
     
@@ -219,9 +218,7 @@ async def list_projects(
     )
     user_org_ids = list(user_orgs)
     
-    access_filters = [
-        Project.owner_id == current_user.id,  # Own projects
-    ]
+    access_filters = []
     
     # Projects in user's organizations
     if user_org_ids:
@@ -251,8 +248,9 @@ async def list_projects(
     if status:
         filters.append(Project.status == status)
     
-    if priority:
-        filters.append(Project.priority == priority)
+    # TODO: Add priority field to Project model
+    # if priority:
+    #     filters.append(Project.priority == priority)
     
     if org_id:
         if org_id not in user_org_ids:
@@ -269,8 +267,9 @@ async def list_projects(
             )
         )
     
-    if owned_by_me:
-        filters.append(Project.owner_id == current_user.id)
+    # TODO: Add owner_id field to Project model
+    # if owned_by_me:
+    #     filters.append(Project.owner_id == current_user.id)
     
     if member_of and user_project_list:
         filters.append(Project.id.in_(user_project_list))
@@ -356,17 +355,13 @@ async def create_project(
         id=uuid4(),
         name=data.name.strip(),
         description=data.description.strip() if data.description else None,
-        owner_id=current_user.id,
+        # TODO: Add owner_id field to Project model
+        # owner_id=current_user.id,
         org_id=data.org_id,
         status=data.status or ProjectStatus.DRAFT,
-        priority=data.priority or ProjectPriority.MEDIUM,
+        is_public=data.is_public if data.is_public is not None else True,
         start_date=data.start_date,
         end_date=data.end_date,
-        budget=data.budget,
-        is_public=data.is_public if data.is_public is not None else True,
-        tags=data.tags or [],
-        created_at=now_utc(),
-        updated_at=now_utc()
     )
     
     session.add(project)
@@ -655,10 +650,11 @@ async def remove_project_member(
     """Remove member from project"""
     project = await _get_project_with_access(session, project_id, current_user, "write")
     
+    # TODO: Add owner_id field to Project model
     # Cannot remove project owner
-    if user_id == project.owner_id:
-        problem(400, "urn:problem:cannot-remove-owner", "Cannot Remove Owner", 
-                "Project owner cannot be removed from the project")
+    # if user_id == project.owner_id:
+    #     problem(400, "urn:problem:cannot-remove-owner", "Cannot Remove Owner",
+    #             "Project owner cannot be removed from the project")
     
     member = await session.scalar(
         select(ProjectMember).where(

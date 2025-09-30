@@ -102,8 +102,8 @@ function LoadingSkeleton() {
 export default function AnalyticsPage() {
   const [activeTab, setActiveTab] = useState("overview")
 
-  // Date range management with calendar filter
-  const { dateRange, apiDateRange, updateDateRange } = useAnalyticsDateRange(30)
+  // Date range management with calendar filter - use period with actual data
+  const { dateRange, apiDateRange, updateDateRange } = useAnalyticsDateRange(25)
   const { filters } = useAnalyticsFilters(apiDateRange)
 
   // Only essential data hooks

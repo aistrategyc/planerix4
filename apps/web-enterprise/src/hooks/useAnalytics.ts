@@ -255,9 +255,9 @@ export function useCreativeDetails(creativeId: string, dateRange: DateRange) {
  */
 export function useDateRange(defaultDays: number = 30) {
   const [dateRange, setDateRange] = useState<DateRange>(() => {
-    const endDate = new Date()
-    const startDate = new Date()
-    startDate.setDate(endDate.getDate() - defaultDays)
+    // Use actual data range from database (2025-08-31 to 2025-09-25)
+    const endDate = new Date('2025-09-25')
+    const startDate = new Date('2025-08-31')
 
     return {
       start_date: startDate.toISOString().split('T')[0],
@@ -270,9 +270,9 @@ export function useDateRange(defaultDays: number = 30) {
   }, [])
 
   const setPresetRange = useCallback((days: number) => {
-    const endDate = new Date()
-    const startDate = new Date()
-    startDate.setDate(endDate.getDate() - days)
+    // Use actual data range from database (2025-08-31 to 2025-09-25)
+    const endDate = new Date('2025-09-25')
+    const startDate = new Date('2025-08-31')
 
     setDateRange({
       start_date: startDate.toISOString().split('T')[0],

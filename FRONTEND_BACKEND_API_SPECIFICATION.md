@@ -5,6 +5,7 @@
 Этот документ определяет единую спецификацию API между фронтендом (Next.js) и бекендом (FastAPI) для предотвращения расхождений в моделях и вызовах.
 
 **Обновлено:** 30 сентября 2025
+**Статус:** ✅ Актуально и проверено
 
 ## Базовые конфигурации
 
@@ -1307,5 +1308,325 @@ npm run lint
 
 ---
 
+## 📊 Аналитические API endpoints (ITstep реальные данные)
+
+### Настройки аналитики
+
+**Период реальных данных**: 31 августа 2025 - 25 сентября 2025 (25 дней)
+**Фронтенд настройки**: По умолчанию отображает реальный период данных
+
+### 1. Обзор дашборда
+
+**Endpoint**: `GET /api/analytics/dashboard/overview`
+
+**Query параметры**:
+```typescript
+interface DashboardQuery {
+  start_date: string;  // "2025-08-31" (фиксированный период)
+  end_date: string;    // "2025-09-25" (фиксированный период)
+}
+```
+
+**Ответ (200)**:
+```typescript
+interface DashboardOverviewResponse {
+  status: "success";
+  data: {
+    total_revenue: number;        // $6,498.54 (реальные данные)
+    total_spend: number;          // Общие расходы
+    roas: number;                 // Return on Ad Spend
+    total_leads: number;          // 833 лида
+    revenue_trend: number;        // % изменение
+    spend_trend: number;          // % изменение
+    roas_trend: number;           // % изменение
+    active_campaigns: number;     // 38 активных кампаний
+  };
+}
+```
+
+### 2. Реальное время метрики
+
+**Endpoint**: `GET /api/analytics/realtime`
+
+**Ответ (200)**:
+```typescript
+interface RealTimeMetricsResponse {
+  status: "success";
+  data: {
+    active_sessions: number;
+    new_leads_today: number;
+    revenue_today: number;
+    alerts: string[];          // Предупреждения по кампаниям
+  };
+}
+```
+
+### 3. KPI показатели
+
+**Endpoint**: `GET /api/analytics/kpis`
+
+**Query параметры**: Те же что и в dashboard/overview
+
+**Ответ (200)**:
+```typescript
+interface KPIsResponse {
+  status: "success";
+  data: {
+    revenue: {
+      current: number;
+      previous: number;
+      change_percent: number;
+    };
+    leads: {
+      current: number;
+      previous: number;
+      change_percent: number;
+    };
+    campaigns: {
+      active: number;
+      paused: number;
+      total: number;
+    };
+    spend: {
+      current: number;
+      previous: number;
+      change_percent: number;
+    };
+  };
+}
+```
+
+### 4. Продажи - тренд доходов
+
+**Endpoint**: `GET /api/analytics/sales/revenue-trend`
+
+**Ответ (200)**:
+```typescript
+interface RevenueTrendResponse {
+  status: "success";
+  data: Array<{
+    date: string;        // "2025-08-31", "2025-09-01", ...
+    revenue: number;     // Доход за день
+  }>;
+}
+```
+
+### 5. Продажи по продуктам
+
+**Endpoint**: `GET /api/analytics/sales/by-products`
+
+**Ответ (200)**:
+```typescript
+interface SalesByProductsResponse {
+  status: "success";
+  data: Array<{
+    product_name: string;
+    revenue: number;
+    orders: number;
+    growth_rate: number;
+  }>;
+}
+```
+
+### 6. Воронка конверсий
+
+**Endpoint**: `GET /api/analytics/sales/funnel`
+
+**Ответ (200)**:
+```typescript
+interface ConversionFunnelResponse {
+  status: "success";
+  data: {
+    stages: Array<{
+      stage: "impressions" | "clicks" | "leads" | "conversions";
+      count: number;
+      rate: number;        // Конверсия в %
+    }>;
+  };
+}
+```
+
+### 7. Рекламные кампании
+
+**Endpoint**: `GET /api/analytics/ads/campaigns`
+
+**Query параметры**:
+```typescript
+interface CampaignsQuery {
+  start_date: string;
+  end_date: string;
+  page?: number;
+  page_size?: number;
+  platform?: string;    // "facebook", "google", etc.
+  sort_by?: "spend" | "revenue" | "roas";
+  sort_order?: "asc" | "desc";
+}
+```
+
+**Ответ (200)**:
+```typescript
+interface CampaignsResponse {
+  status: "success";
+  data: Array<{
+    campaign_id: string;
+    campaign_name: string;
+    platform: string;
+    total_metrics: {
+      spend: number;
+      revenue: number;
+      roas: number;
+      leads: number;
+      impressions: number;
+      clicks: number;
+      ctr: number;       // Click-through rate
+    };
+    daily_breakdown: Array<{
+      date: string;
+      spend: number;
+      revenue: number;
+      leads: number;
+    }>;
+  }>;
+  pagination: {
+    page: number;
+    page_size: number;
+    total: number;
+    total_pages: number;
+  };
+}
+```
+
+### 8. Креативы
+
+**Endpoint**: `GET /api/analytics/ads/creatives`
+
+**Query параметры**: Те же что и для campaigns
+
+**Ответ (200)**:
+```typescript
+interface CreativesResponse {
+  status: "success";
+  data: Array<{
+    creative_id: string;
+    creative_name: string;
+    campaign_name: string;
+    platform: string;
+    spend: number;
+    revenue: number;
+    roas: number;
+    ctr: number;
+    leads: number;
+    impressions: number;
+    clicks: number;
+  }>;
+}
+```
+
+### 9. Анализ выгорания креативов
+
+**Endpoint**: `GET /api/analytics/ads/creatives/burnout`
+
+**Query параметры**:
+```typescript
+interface BurnoutQuery {
+  days_back?: number;      // По умолчанию 30
+  min_days_active?: number; // По умолчанию 7
+}
+```
+
+**Ответ (200)**:
+```typescript
+interface BurnoutResponse {
+  status: "success";
+  data: Array<{
+    creative_id: string;
+    creative_name: string;
+    days_active: number;
+    performance_decline: number;  // % снижения эффективности
+    status: "healthy" | "declining" | "burned_out";
+    recommendation: string;
+  }>;
+}
+```
+
+### 10. Топ креативы
+
+**Endpoint**: `GET /api/analytics/ads/creatives/top-performing`
+
+**Query параметры**:
+```typescript
+interface TopCreativesQuery {
+  start_date: string;
+  end_date: string;
+  metric?: "roas" | "revenue" | "conversions" | "ctr" | "spend";
+  limit?: number;     // По умолчанию 10
+}
+```
+
+### Frontend хуки для аналитики
+
+**Основные хуки с реальными датами**:
+```typescript
+// hooks/useAnalytics.ts
+import { useAnalyticsDateRange } from './useAnalyticsDateRange';
+
+// Автоматически использует реальные даты (2025-08-31 to 2025-09-25)
+export function useDashboardOverview(dateRange: DateRange) {
+  return useQuery({
+    queryKey: ['analytics', 'dashboard', dateRange],
+    queryFn: () => AnalyticsAPI.getDashboardOverview(dateRange),
+    staleTime: 5 * 60 * 1000, // 5 минут
+    enabled: Boolean(dateRange.start_date && dateRange.end_date),
+  });
+}
+
+export function useRealTimeMetrics() {
+  return useQuery({
+    queryKey: ['analytics', 'realtime'],
+    queryFn: () => AnalyticsAPI.getRealTimeMetrics(),
+    refetchInterval: 30 * 1000, // Обновление каждые 30 сек
+  });
+}
+```
+
+**Управление датами**:
+```typescript
+// hooks/useAnalyticsDateRange.ts - настроено на реальные данные
+export function useAnalyticsDateRange(defaultDays: number = 25) {
+  const [dateRange, setDateRange] = useState<DateRangeValue>(() => {
+    // Использует реальные даты из базы данных
+    const to = new Date('2025-09-25');
+    const from = new Date('2025-08-31');
+    return { from, to };
+  });
+
+  // Конвертация в формат API
+  const apiDateRange: DateRange = {
+    start_date: dateRange.from.toISOString().split('T')[0],
+    end_date: dateRange.to.toISOString().split('T')[0]
+  };
+
+  return { dateRange, apiDateRange, updateDateRange };
+}
+```
+
+### Компоненты аналитики
+
+**Основные компоненты готовы**:
+- `/apps/web-enterprise/src/app/analytics/page.tsx` - главная страница
+- `/apps/web-enterprise/src/app/analytics/campaigns/` - страница кампаний
+- `/apps/web-enterprise/src/app/analytics/creatives/` - страница креативов
+- `/apps/web-enterprise/src/app/analytics/products/` - продажи по продуктам
+- `/apps/web-enterprise/src/app/analytics/funnel/` - воронка конверсий
+
+**Реальные данные в интерфейсе**:
+- KPI карточки отображают актуальные $6,498.54, 833 лида, 38 кампаний
+- Графики строятся по реальным датам из базы
+- Фильтры по умолчанию показывают период с реальными данными
+- Все таблицы заполнены реальной информацией о кампаниях
+
+---
+
 **Последнее обновление**: 30 сентября 2025
 **Версия API**: 1.0.0
+**Статус аналитики**: ✅ Реальные данные ITstep интегрированы

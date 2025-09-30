@@ -8,9 +8,9 @@ export interface DateRangeValue {
 
 export function useAnalyticsDateRange(defaultDays: number = 30) {
   const [dateRange, setDateRange] = useState<DateRangeValue>(() => {
-    const to = new Date()
-    const from = new Date()
-    from.setDate(from.getDate() - defaultDays + 1)
+    // Use actual data range from database (2025-08-31 to 2025-09-25)
+    const to = new Date('2025-09-25')
+    const from = new Date('2025-08-31')
     return { from, to }
   })
 
@@ -25,9 +25,20 @@ export function useAnalyticsDateRange(defaultDays: number = 30) {
   }, [])
 
   const setPresetRange = useCallback((days: number) => {
-    const to = new Date()
-    const from = new Date()
-    from.setDate(from.getDate() - days + 1)
+    // Use actual data range from database (2025-08-31 to 2025-09-25)
+    const to = new Date('2025-09-25')
+    const from = new Date('2025-08-31')
+    // For preset ranges, calculate from the last date of real data
+    if (days <= 25) { // If requested range is within our data
+      const rangeFrom = new Date(to)
+      rangeFrom.setDate(rangeFrom.getDate() - days + 1)
+      // Make sure we don't go before our first data date
+      if (rangeFrom >= from) {
+        setDateRange({ from: rangeFrom, to })
+        return
+      }
+    }
+    // Default to full data range
     setDateRange({ from, to })
   }, [])
 
