@@ -1,41 +1,94 @@
 "use client"
 
-import { useState } from "react"
-import { useDataAnalytics } from "@/hooks/useDataAnalytics"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
-import { TrendingUp, DollarSign, Users, FileText, Target, RefreshCcw } from "lucide-react"
+import { TrendingUp, TrendingDown, DollarSign, Users, FileText, Target, RefreshCcw, ArrowUp, ArrowDown, Minus } from "lucide-react"
+import * as dataAnalyticsApi from "@/lib/api/data-analytics"
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"]
 
-export default function DataAnalyticsPage() {
-  const {
-    kpi,
-    leadsTrend,
-    spendTrend,
-    campaigns,
-    wowCampaigns,
-    utmSources,
-    platformShare,
-    topCampaigns,
-    loading,
-    error,
-    filters,
-    setFilters,
-    refetch,
-  } = useDataAnalytics()
+type CompareMode = "auto" | "custom" | "disabled"
 
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(["google", "meta"])
+export default function DataAnalyticsV4Page() {
+  // Filters
+  const [dateFrom, setDateFrom] = useState("2025-09-01")
+  const [dateTo, setDateTo] = useState("2025-09-30")
+  const [platforms, setPlatforms] = useState<string[]>(["google", "meta"])
+  const [compareMode, setCompareMode] = useState<CompareMode>("auto")
+  const [prevFrom, setPrevFrom] = useState("")
+  const [prevTo, setPrevTo] = useState("")
+  const [minSpend, setMinSpend] = useState(0)
 
-  const handlePlatformChange = (platform: string) => {
-    const newPlatforms = selectedPlatforms.includes(platform)
-      ? selectedPlatforms.filter((p) => p !== platform)
-      : [...selectedPlatforms, platform]
-    setSelectedPlatforms(newPlatforms)
-    setFilters({ platforms: newPlatforms.join(",") })
+  // Data states
+  const [kpiCompare, setKpiCompare] = useState<any>(null)
+  const [leadsTrendCompare, setLeadsTrendCompare] = useState<any[]>([])
+  const [spendTrendCompare, setSpendTrendCompare] = useState<any[]>([])
+  const [campaignsCompare, setCampaignsCompare] = useState<any[]>([])
+  const [platformShareCompare, setPlatformShareCompare] = useState<any[]>([])
+  const [topMovers, setTopMovers] = useState<any>(null)
+  const [budgetRecommendations, setBudgetRecommendations] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchData = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const platformsStr = platforms.join(",")
+      const compareParams = {
+        date_from: dateFrom,
+        date_to: dateTo,
+        platforms: platformsStr,
+        ...(compareMode === "custom" && prevFrom && prevTo ? { prev_from: prevFrom, prev_to: prevTo } : {}),
+      }
+
+      const [kpi, leadsTrend, spendTrend, campaigns, share, movers, reco] = await Promise.all([
+        dataAnalyticsApi.getKPICompare(compareParams),
+        dataAnalyticsApi.getLeadsTrendCompare(compareParams),
+        dataAnalyticsApi.getSpendTrendCompare(compareParams),
+        dataAnalyticsApi.getCampaignsCompare({ ...compareParams, limit: 20, min_spend: minSpend }),
+        dataAnalyticsApi.getPlatformShareCompare(compareParams),
+        dataAnalyticsApi.getTopMovers({ ...compareParams, n: 3, target_roas: 3, kill_roas: 0.8, min_leads: 5 }),
+        dataAnalyticsApi.getBudgetRecommendations({ ...compareParams, limit: 10, target_roas: 5, kill_roas: 1, min_leads: 5 }),
+      ])
+
+      setKpiCompare(kpi)
+      setLeadsTrendCompare(leadsTrend.data || [])
+      setSpendTrendCompare(spendTrend.data || [])
+      setCampaignsCompare(campaigns.data || [])
+      setPlatformShareCompare(share.data || [])
+      setTopMovers(movers)
+      setBudgetRecommendations(reco.data || [])
+    } catch (err: any) {
+      setError(err.message || "Failed to fetch data")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchData()
+  }, [dateFrom, dateTo, platforms, compareMode, prevFrom, prevTo, minSpend])
+
+  const renderDelta = (current: number, prev: number, pct: number | null, isReverse = false) => {
+    if (prev === 0) return <span className="text-gray-400 text-sm">New</span>
+
+    const diff = current - prev
+    const isPositive = isReverse ? diff < 0 : diff > 0
+    const Icon = diff > 0 ? ArrowUp : diff < 0 ? ArrowDown : Minus
+
+    return (
+      <div className="flex items-center gap-1 text-sm">
+        <Icon className={`h-3 w-3 ${isPositive ? "text-green-600" : "text-red-600"}`} />
+        <span className={isPositive ? "text-green-600" : "text-red-600"}>
+          {pct !== null ? `${pct.toFixed(1)}%` : `${diff > 0 ? "+" : ""}${diff}`}
+        </span>
+      </div>
+    )
   }
 
   if (error) {
@@ -44,9 +97,7 @@ export default function DataAnalyticsPage() {
         <Card className="bg-red-50 border-red-200">
           <CardContent className="p-6">
             <p className="text-red-600">Error: {error}</p>
-            <Button onClick={refetch} className="mt-4">
-              Retry
-            </Button>
+            <Button onClick={fetchData} className="mt-4">Retry</Button>
           </CardContent>
         </Card>
       </div>
@@ -54,14 +105,14 @@ export default function DataAnalyticsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Data Analytics</h1>
-          <p className="text-gray-500 mt-1">ITstep client analytics dashboard</p>
+          <h1 className="text-3xl font-bold text-gray-900">Data Analytics v4</h1>
+          <p className="text-gray-500 mt-1">ITstep — Period-over-Period Analysis</p>
         </div>
-        <Button onClick={refetch} disabled={loading} variant="outline" size="sm">
+        <Button onClick={fetchData} disabled={loading} variant="outline" size="sm">
           <RefreshCcw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
           Refresh
         </Button>
@@ -70,25 +121,17 @@ export default function DataAnalyticsPage() {
       {/* Filters */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Filters</CardTitle>
+          <CardTitle className="text-lg">Filters & Compare Mode</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label className="text-sm font-medium mb-2 block">Date From</label>
-              <Input
-                type="date"
-                value={filters.date_from}
-                onChange={(e) => setFilters({ date_from: e.target.value })}
-              />
+              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
             </div>
             <div>
               <label className="text-sm font-medium mb-2 block">Date To</label>
-              <Input
-                type="date"
-                value={filters.date_to}
-                onChange={(e) => setFilters({ date_to: e.target.value })}
-              />
+              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
             </div>
             <div>
               <label className="text-sm font-medium mb-2 block">Platforms</label>
@@ -97,8 +140,12 @@ export default function DataAnalyticsPage() {
                   <Button
                     key={platform}
                     size="sm"
-                    variant={selectedPlatforms.includes(platform) ? "default" : "outline"}
-                    onClick={() => handlePlatformChange(platform)}
+                    variant={platforms.includes(platform) ? "default" : "outline"}
+                    onClick={() => {
+                      setPlatforms(prev =>
+                        prev.includes(platform) ? prev.filter(p => p !== platform) : [...prev, platform]
+                      )
+                    }}
                   >
                     {platform}
                   </Button>
@@ -106,19 +153,37 @@ export default function DataAnalyticsPage() {
               </div>
             </div>
             <div>
-              <label className="text-sm font-medium mb-2 block">Min Spend</label>
-              <Input
-                type="number"
-                value={filters.min_spend || 0}
-                onChange={(e) => setFilters({ min_spend: parseFloat(e.target.value) || 0 })}
-              />
+              <label className="text-sm font-medium mb-2 block">Compare Mode</label>
+              <Select value={compareMode} onValueChange={(v) => setCompareMode(v as CompareMode)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Auto (prev period)</SelectItem>
+                  <SelectItem value="custom">Custom dates</SelectItem>
+                  <SelectItem value="disabled">Disabled</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
+
+          {compareMode === "custom" && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t">
+              <div>
+                <label className="text-sm font-medium mb-2 block">Previous Period From</label>
+                <Input type="date" value={prevFrom} onChange={(e) => setPrevFrom(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-2 block">Previous Period To</label>
+                <Input type="date" value={prevTo} onChange={(e) => setPrevTo(e.target.value)} />
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* KPI Cards */}
-      {kpi && (
+      {/* KPI Cards with Compare */}
+      {kpiCompare && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           <Card>
             <CardHeader className="pb-2">
@@ -128,7 +193,8 @@ export default function DataAnalyticsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{kpi.leads.toLocaleString()}</div>
+              <div className="text-2xl font-bold">{kpiCompare.leads_cur.toLocaleString()}</div>
+              {renderDelta(kpiCompare.leads_cur, kpiCompare.leads_prev, kpiCompare.leads_diff_pct)}
             </CardContent>
           </Card>
 
@@ -140,7 +206,7 @@ export default function DataAnalyticsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{kpi.n_contracts.toLocaleString()}</div>
+              <div className="text-2xl font-bold">{kpiCompare.n_contracts_cur.toLocaleString()}</div>
             </CardContent>
           </Card>
 
@@ -152,7 +218,8 @@ export default function DataAnalyticsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${kpi.revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              <div className="text-2xl font-bold">₴{(kpiCompare.revenue_cur / 1000).toFixed(1)}k</div>
+              {renderDelta(kpiCompare.revenue_cur, kpiCompare.revenue_prev, kpiCompare.revenue_diff_pct)}
             </CardContent>
           </Card>
 
@@ -164,7 +231,8 @@ export default function DataAnalyticsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${kpi.spend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              <div className="text-2xl font-bold">₴{(kpiCompare.spend_cur / 1000).toFixed(1)}k</div>
+              {renderDelta(kpiCompare.spend_cur, kpiCompare.spend_prev, kpiCompare.spend_diff_pct, true)}
             </CardContent>
           </Card>
 
@@ -177,7 +245,10 @@ export default function DataAnalyticsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {kpi.cpl ? `$${kpi.cpl.toFixed(2)}` : "N/A"}
+                {kpiCompare.cpl_cur ? `₴${kpiCompare.cpl_cur.toFixed(0)}` : "N/A"}
+              </div>
+              <div className="text-xs text-gray-400 mt-1">
+                prev: {kpiCompare.cpl_prev ? `₴${kpiCompare.cpl_prev.toFixed(0)}` : "N/A"}
               </div>
             </CardContent>
           </Card>
@@ -191,28 +262,32 @@ export default function DataAnalyticsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {kpi.roas ? kpi.roas.toFixed(2) : "N/A"}
+                {kpiCompare.roas_cur ? kpiCompare.roas_cur.toFixed(2) : "N/A"}
+              </div>
+              <div className="text-xs text-gray-400 mt-1">
+                prev: {kpiCompare.roas_prev ? kpiCompare.roas_prev.toFixed(2) : "N/A"}
               </div>
             </CardContent>
           </Card>
         </div>
       )}
 
-      {/* Trends */}
+      {/* Trends Compare */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Leads Trend</CardTitle>
+            <CardTitle>Leads Trend Compare</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={leadsTrend}>
+              <LineChart data={leadsTrendCompare}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="dt" />
                 <YAxis />
                 <Tooltip />
                 <Legend />
-                <Line type="monotone" dataKey="leads" stroke="#3b82f6" strokeWidth={2} />
+                <Line type="monotone" dataKey="leads_cur" stroke="#3b82f6" strokeWidth={2} name="Current" />
+                <Line type="monotone" dataKey="leads_prev_shifted" stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 5" name="Previous" />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
@@ -220,82 +295,142 @@ export default function DataAnalyticsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Spend Trend</CardTitle>
+            <CardTitle>Spend Trend Compare</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={spendTrend}>
+              <LineChart data={spendTrendCompare}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="dt" />
                 <YAxis />
                 <Tooltip />
                 <Legend />
-                <Line type="monotone" dataKey="spend" stroke="#10b981" strokeWidth={2} />
+                <Line type="monotone" dataKey="spend_cur" stroke="#10b981" strokeWidth={2} name="Current" />
+                <Line type="monotone" dataKey="spend_prev_shifted" stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 5" name="Previous" />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
 
-      {/* Platform Share Pie Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Leads by Platform</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={platformShare}
-                dataKey="leads"
-                nameKey="platform"
-                cx="50%"
-                cy="50%"
-                outerRadius={100}
-                label
-              >
-                {platformShare.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+      {/* Top Movers (Winners/Losers/Watch) */}
+      {topMovers && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <Card className="border-green-200 bg-green-50">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2 text-green-700">
+                <TrendingUp className="h-5 w-5" />
+                Winners (Scale) — {topMovers.winners.length}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {topMovers.winners.map((campaign: any, idx: number) => (
+                  <div key={idx} className="p-3 bg-white rounded border border-green-100">
+                    <div className="font-medium text-sm truncate">{campaign.campaign_name}</div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {campaign.leads_cur} leads • ROAS: {campaign.roas_cur?.toFixed(2) || "N/A"} • ₴{campaign.spend_cur.toFixed(0)}
+                    </div>
+                  </div>
                 ))}
-              </Pie>
-              <Tooltip />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+                {topMovers.winners.length === 0 && (
+                  <p className="text-sm text-gray-500">No winners found</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
-      {/* Campaigns Table */}
+          <Card className="border-yellow-200 bg-yellow-50">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2 text-yellow-700">
+                <Minus className="h-5 w-5" />
+                Watch — {topMovers.watch.length}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {topMovers.watch.map((campaign: any, idx: number) => (
+                  <div key={idx} className="p-3 bg-white rounded border border-yellow-100">
+                    <div className="font-medium text-sm truncate">{campaign.campaign_name}</div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {campaign.leads_cur} leads • ROAS: {campaign.roas_cur?.toFixed(2) || "N/A"} • ₴{campaign.spend_cur.toFixed(0)}
+                    </div>
+                  </div>
+                ))}
+                {topMovers.watch.length === 0 && (
+                  <p className="text-sm text-gray-500">No campaigns to watch</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-red-200 bg-red-50">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2 text-red-700">
+                <TrendingDown className="h-5 w-5" />
+                Losers (Pause) — {topMovers.losers.length}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {topMovers.losers.map((campaign: any, idx: number) => (
+                  <div key={idx} className="p-3 bg-white rounded border border-red-100">
+                    <div className="font-medium text-sm truncate">{campaign.campaign_name}</div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {campaign.leads_cur} leads • ROAS: {campaign.roas_cur?.toFixed(2) || "N/A"} • ₴{campaign.spend_cur.toFixed(0)}
+                    </div>
+                  </div>
+                ))}
+                {topMovers.losers.length === 0 && (
+                  <p className="text-sm text-gray-500">No losers found</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Budget Recommendations */}
       <Card>
         <CardHeader>
-          <CardTitle>Campaigns (Top 20)</CardTitle>
+          <CardTitle>Budget Recommendations (Top 10)</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
+                  <th className="text-left p-2">Action</th>
                   <th className="text-left p-2">Platform</th>
                   <th className="text-left p-2">Campaign</th>
                   <th className="text-right p-2">Leads</th>
-                  <th className="text-right p-2">Contracts</th>
-                  <th className="text-right p-2">Revenue</th>
                   <th className="text-right p-2">Spend</th>
                   <th className="text-right p-2">CPL</th>
                   <th className="text-right p-2">ROAS</th>
+                  <th className="text-right p-2">Δ Leads</th>
                 </tr>
               </thead>
               <tbody>
-                {campaigns.slice(0, 20).map((campaign, idx) => (
+                {budgetRecommendations.map((reco: any, idx: number) => (
                   <tr key={idx} className="border-b hover:bg-gray-50">
-                    <td className="p-2">{campaign.platform}</td>
-                    <td className="p-2">{campaign.campaign_name}</td>
-                    <td className="text-right p-2">{campaign.leads}</td>
-                    <td className="text-right p-2">{campaign.n_contracts}</td>
-                    <td className="text-right p-2">${campaign.revenue.toFixed(2)}</td>
-                    <td className="text-right p-2">${campaign.spend.toFixed(2)}</td>
-                    <td className="text-right p-2">{campaign.cpl ? `$${campaign.cpl.toFixed(2)}` : "N/A"}</td>
-                    <td className="text-right p-2">{campaign.roas ? campaign.roas.toFixed(2) : "N/A"}</td>
+                    <td className="p-2">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        reco.action === "scale" ? "bg-green-100 text-green-700" :
+                        reco.action === "pause" ? "bg-red-100 text-red-700" :
+                        "bg-yellow-100 text-yellow-700"
+                      }`}>
+                        {reco.action.toUpperCase()}
+                      </span>
+                    </td>
+                    <td className="p-2">{reco.platform}</td>
+                    <td className="p-2 max-w-xs truncate">{reco.campaign_name}</td>
+                    <td className="text-right p-2">{reco.leads_cur}</td>
+                    <td className="text-right p-2">₴{reco.spend_cur.toFixed(0)}</td>
+                    <td className="text-right p-2">{reco.cpl_cur ? `₴${reco.cpl_cur.toFixed(0)}` : "—"}</td>
+                    <td className="text-right p-2">{reco.roas_cur ? reco.roas_cur.toFixed(2) : "—"}</td>
+                    <td className={`text-right p-2 ${reco.leads_diff >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      {reco.leads_diff >= 0 ? "+" : ""}{reco.leads_diff}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -304,10 +439,69 @@ export default function DataAnalyticsPage() {
         </CardContent>
       </Card>
 
-      {/* Week-over-Week Table */}
+      {/* Platform Share Compare */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Platform Share Compare</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={platformShareCompare}
+                  dataKey="cur_leads"
+                  nameKey="platform"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={100}
+                  label={(entry) => `${entry.platform}: ${entry.share_cur_pct?.toFixed(1)}%`}
+                >
+                  {platformShareCompare.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Share Details</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left p-2">Platform</th>
+                  <th className="text-right p-2">Current %</th>
+                  <th className="text-right p-2">Previous %</th>
+                  <th className="text-right p-2">Δ p.p.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {platformShareCompare.map((share, idx) => (
+                  <tr key={idx} className="border-b">
+                    <td className="p-2 font-medium">{share.platform}</td>
+                    <td className="text-right p-2">{share.share_cur_pct?.toFixed(1) || "—"}%</td>
+                    <td className="text-right p-2">{share.share_prev_pct?.toFixed(1) || "—"}%</td>
+                    <td className={`text-right p-2 ${(share.share_diff_pp || 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      {share.share_diff_pp !== null ? `${share.share_diff_pp > 0 ? "+" : ""}${share.share_diff_pp.toFixed(1)}` : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Campaigns Compare Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Week-over-Week Campaigns (Top 20)</CardTitle>
+          <CardTitle>Campaigns Period-over-Period (Top 20)</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -318,60 +512,25 @@ export default function DataAnalyticsPage() {
                   <th className="text-left p-2">Campaign</th>
                   <th className="text-right p-2">Leads Cur</th>
                   <th className="text-right p-2">Leads Prev</th>
-                  <th className="text-right p-2">Δ Leads</th>
                   <th className="text-right p-2">Δ %</th>
+                  <th className="text-right p-2">ROAS Cur</th>
+                  <th className="text-right p-2">CPL Cur</th>
                   <th className="text-right p-2">Spend Cur</th>
-                  <th className="text-right p-2">Spend Prev</th>
                 </tr>
               </thead>
               <tbody>
-                {wowCampaigns.slice(0, 20).map((campaign, idx) => (
+                {campaignsCompare.map((campaign, idx) => (
                   <tr key={idx} className="border-b hover:bg-gray-50">
                     <td className="p-2">{campaign.platform}</td>
-                    <td className="p-2">{campaign.campaign_name}</td>
-                    <td className="text-right p-2">{campaign.leads_cur}</td>
-                    <td className="text-right p-2">{campaign.leads_prev}</td>
-                    <td className={`text-right p-2 ${campaign.leads_diff >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      {campaign.leads_diff >= 0 ? "+" : ""}{campaign.leads_diff}
-                    </td>
+                    <td className="p-2 max-w-xs truncate">{campaign.campaign_name}</td>
+                    <td className="text-right p-2 font-medium">{campaign.leads_cur}</td>
+                    <td className="text-right p-2 text-gray-500">{campaign.leads_prev}</td>
                     <td className={`text-right p-2 ${(campaign.leads_diff_pct || 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      {campaign.leads_diff_pct ? `${campaign.leads_diff_pct.toFixed(1)}%` : "N/A"}
+                      {campaign.leads_diff_pct ? `${campaign.leads_diff_pct.toFixed(1)}%` : "—"}
                     </td>
-                    <td className="text-right p-2">${campaign.spend_cur.toFixed(2)}</td>
-                    <td className="text-right p-2">${campaign.spend_prev.toFixed(2)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* UTM Sources Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>UTM Sources (Top 20)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left p-2">Platform</th>
-                  <th className="text-left p-2">UTM Source</th>
-                  <th className="text-right p-2">Leads</th>
-                  <th className="text-right p-2">Contracts</th>
-                  <th className="text-right p-2">Revenue</th>
-                </tr>
-              </thead>
-              <tbody>
-                {utmSources.slice(0, 20).map((source, idx) => (
-                  <tr key={idx} className="border-b hover:bg-gray-50">
-                    <td className="p-2">{source.platform}</td>
-                    <td className="p-2">{source.utm_source}</td>
-                    <td className="text-right p-2">{source.leads}</td>
-                    <td className="text-right p-2">{source.n_contracts}</td>
-                    <td className="text-right p-2">${source.revenue.toFixed(2)}</td>
+                    <td className="text-right p-2">{campaign.roas_cur ? campaign.roas_cur.toFixed(2) : "—"}</td>
+                    <td className="text-right p-2">{campaign.cpl_cur ? `₴${campaign.cpl_cur.toFixed(0)}` : "—"}</td>
+                    <td className="text-right p-2">₴{campaign.spend_cur.toFixed(0)}</td>
                   </tr>
                 ))}
               </tbody>
