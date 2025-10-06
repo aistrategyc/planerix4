@@ -35,6 +35,7 @@ export default function DataAnalyticsV4Page() {
   const [error, setError] = useState<string | null>(null)
 
   const fetchData = async () => {
+    console.log("[DataAnalytics] fetchData called")
     setLoading(true)
     setError(null)
     try {
@@ -45,6 +46,8 @@ export default function DataAnalyticsV4Page() {
         platforms: platformsStr,
         ...(compareMode === "custom" && prevFrom && prevTo ? { prev_from: prevFrom, prev_to: prevTo } : {}),
       }
+
+      console.log("[DataAnalytics] Fetching with params:", compareParams)
 
       // Use allSettled to allow independent widget failures
       const results = await Promise.allSettled([
@@ -72,9 +75,18 @@ export default function DataAnalyticsV4Page() {
         .filter(({ result }) => result.status === "rejected")
 
       if (failedWidgets.length > 0) {
-        console.warn("Some widgets failed to load:", failedWidgets)
+        console.warn("[DataAnalytics] Some widgets failed to load:", failedWidgets)
+      } else {
+        console.log("[DataAnalytics] All widgets loaded successfully")
       }
+
+      console.log("[DataAnalytics] Data loaded:", {
+        hasKPI: !!kpiCompare,
+        leadsTrendCount: leadsTrendCompare.length,
+        campaignsCount: campaignsCompare.length
+      })
     } catch (err: any) {
+      console.error("[DataAnalytics] Fetch error:", err)
       setError(err.message || "Failed to fetch data")
     } finally {
       setLoading(false)
