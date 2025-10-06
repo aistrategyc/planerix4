@@ -77,42 +77,6 @@ export const getBudgetRecommendations = async (params: BudgetRecoParams) => {
   return response.data
 }
 
-// Legacy v3 Basic Endpoints (for backward compatibility)
-export const getKPI = async (params: { date_from: string; date_to: string; platforms?: string }) => {
-  const response = await apiClient.get("/data-analytics/v5/kpi", { params })
-  return response.data
-}
-
-export const getLeadsTrend = async (params: { date_from: string; date_to: string; platforms?: string }) => {
-  const response = await apiClient.get("/data-analytics/v5/trend/leads", { params })
-  return response.data
-}
-
-export const getSpendTrend = async (params: { date_from: string; date_to: string; platforms?: string }) => {
-  const response = await apiClient.get("/data-analytics/v5/trend/spend", { params })
-  return response.data
-}
-
-export const getCampaigns = async (params: { date_from: string; date_to: string; platforms?: string; min_spend?: number; limit?: number }) => {
-  const response = await apiClient.get("/data-analytics/v5/campaigns", { params })
-  return response.data
-}
-
-export const getPlatformShare = async (params: { date_from: string; date_to: string; platforms?: string }) => {
-  const response = await apiClient.get("/data-analytics/v5/share/platforms", { params })
-  return response.data
-}
-
-export const getUTMSources = async (params: { date_from: string; date_to: string; platforms?: string; limit?: number }) => {
-  const response = await apiClient.get("/data-analytics/v5/utm-sources", { params })
-  return response.data
-}
-
-export const getWoWCampaigns = async (params: { platforms?: string; limit?: number }) => {
-  const response = await apiClient.get("/data-analytics/v5/campaigns/wow", { params })
-  return response.data
-}
-
 // ============================================
 // Legacy v3 compatibility wrappers for useDataAnalytics hook
 // ============================================
