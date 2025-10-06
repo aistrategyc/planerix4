@@ -1,1177 +1,483 @@
-# Текущая База Данных - Анализ и Маппинг для Planerix Analytics
-
-## Анализ Текущей Структуры БД
-
-### Существующие Таблицы в staging
-
-1. **crm_requests_attribution** - Атрибуция CRM запросов
-2. **crm_requests** - CRM запросы (лиды)
-3. **fb_ads_creative_insights** - Статистика креативов Facebook
-4. **fb_ads_adset_insights** - Статистика наборов объявлений Facebook
-5. **fb_ads_campaign_insights** - Статистика кампаний Facebook
-6. **ga4_sessions** - Сессии Google Analytics 4
-7. **ga4_events** - События Google Analytics 4
-
----
-
-## Маппинг Существующих Таблиц на Требуемую Структуру
-
-### 1. CRM и Лиды
-
-#### Текущая таблица: `crm_requests`
-**Маппинг на требуемую структуру `leads`:**
-
-| Требуемое поле | Текущее поле | Тип | Примечание |
-|----------------|--------------|-----|------------|
-| id | request_id | bigint | ✅ Есть |
-| external_id | request_id | bigint | ✅ Можно использовать |
-| first_name | request_name | text | ✅ Есть (нужно разделить) |
-| last_name | request_name | text | ⚠️ Нужно парсить |
-| email | request_email | text | ✅ Есть |
-| phone | request_phone | text | ✅ Есть |
-| age | - | - | ❌ Нет |
-| gender | - | - | ❌ Нет |
-| city | request_city | text | ✅ Есть |
-| source_id | - | - | ⚠️ Нужна связь |
-| campaign_id | - | - | ⚠️ Нужна связь |
-| creative_id | - | - | ⚠️ Нужна связь |
-| product_id | request_product | text | ⚠️ Нужна нормализация |
-| branch_id | request_branch | text | ⚠️ Нужна нормализация |
-| lead_score | - | - | ❌ Нет |
-| temperature | - | - | ❌ Нет |
-| status | request_status | text | ✅ Есть |
-| stage | - | - | ❌ Нет |
-| contract_value | - | - | ❌ Нет |
-| payment_status | - | - | ❌ Нет |
-| created_at | request_created_at | timestamp | ✅ Есть |
-| last_contact_at | - | - | ❌ Нет |
-
-**SQL для создания VIEW:**
-\`\`\`sql
-CREATE OR REPLACE VIEW v_leads AS
-SELECT 
-    r.request_id as id,
-    r.request_id::text as external_id,
-    SPLIT_PART(r.request_name, ' ', 1) as first_name,
-    CASE 
-        WHEN array_length(string_to_array(r.request_name, ' '), 1) > 1 
-        THEN array_to_string(string_to_array(r.request_name, ' ')[2:], ' ')
-        ELSE NULL 
-    END as last_name,
-    r.request_email as email,
-    r.request_phone as phone,
-    NULL::integer as age,
-    NULL::varchar as gender,
-    r.request_city as city,
-    a.source_id,
-    a.campaign_id,
-    a.creative_id,
-    p.id as product_id,
-    b.id as branch_id,
-    0 as lead_score,
-    'cold' as temperature,
-    r.request_status as status,
-    'lead' as stage,
-    NULL::decimal as contract_value,
-    NULL::varchar as payment_status,
-    r.request_created_at as created_at,
-    r.request_created_at as last_contact_at
-FROM staging.crm_requests r
-LEFT JOIN staging.crm_requests_attribution a ON r.request_id = a.request_id
-LEFT JOIN products p ON r.request_product = p.name
-LEFT JOIN branches b ON r.request_branch = b.name;
-\`\`\`
-
----
-
-#### Текущая таблица: `crm_requests_attribution`
-**Маппинг на требуемую структуру для связи с источниками:**
-
-| Требуемое поле | Текущее поле | Тип | Примечание |
-|----------------|--------------|-----|------------|
-| utm_source | utm_source | text | ✅ Есть |
-| utm_medium | utm_medium | text | ✅ Есть |
-| utm_campaign | utm_campaign | text | ✅ Есть |
-| utm_content | utm_content | text | ✅ Есть |
-| utm_term | utm_term | text | ✅ Есть |
-| source_id | - | - | ⚠️ Нужна связь с traffic_sources |
-| campaign_id | - | - | ⚠️ Нужна связь с campaigns |
-| creative_id | - | - | ⚠️ Нужна связь с creatives |
-
----
-
-### 2. Facebook Ads - Креативы
-
-#### Текущая таблица: `fb_ads_creative_insights`
-**Маппинг на требуемую структуру `creative_daily_stats`:**
-
-| Требуемое поле | Текущее поле | Тип | Примечание |
-|----------------|--------------|-----|------------|
-| creative_id | ad_id | text | ✅ Есть |
-| date | date_start | date | ✅ Есть |
-| impressions | impressions | numeric | ✅ Есть |
-| clicks | clicks | numeric | ✅ Есть |
-| reach | reach | numeric | ✅ Есть |
-| frequency | frequency | numeric | ✅ Есть |
-| conversions | actions_offsite_conversion_fb_pixel_purchase | numeric | ✅ Есть |
-| leads | actions_offsite_conversion_fb_pixel_lead | numeric | ✅ Есть |
-| spend | spend | numeric | ✅ Есть |
-| revenue | - | - | ❌ Нет |
-| ctr | ctr | numeric | ✅ Есть |
-| cpc | cpc | numeric | ✅ Есть |
-| cpa | cost_per_action_type_offsite_conversion | numeric | ✅ Есть |
-| cpm | cpm | numeric | ✅ Есть |
-| roas | - | - | ❌ Нужно рассчитать |
-| cvr | - | - | ⚠️ Можно рассчитать |
-| engagement_count | - | - | ⚠️ Можно суммировать actions |
-| video_views | video_play_actions | numeric | ✅ Есть |
-| video_view_rate | video_thruplay_watched_actions | numeric | ✅ Есть |
-
-**Доступные метрики в fb_ads_creative_insights:**
-- impressions, clicks, reach, frequency
-- ctr, cpc, cpm
-- spend
-- actions (multiple types)
-- video metrics
-- engagement metrics
-- conversion metrics
-
-**SQL для создания VIEW:**
-\`\`\`sql
-CREATE OR REPLACE VIEW v_creative_daily_stats AS
-SELECT 
-    c.ad_id::text as creative_id,
-    c.date_start as date,
-    c.impressions::integer,
-    c.clicks::integer,
-    c.reach::integer,
-    c.frequency::decimal,
-    COALESCE(c.actions_offsite_conversion_fb_pixel_purchase, 0)::integer as conversions,
-    COALESCE(c.actions_offsite_conversion_fb_pixel_lead, 0)::integer as leads,
-    c.spend::decimal,
-    NULL::decimal as revenue, -- Нужно джойнить с CRM
-    c.ctr::decimal,
-    c.cpc::decimal,
-    c.cost_per_action_type_offsite_conversion::decimal as cpa,
-    c.cpm::decimal,
-    NULL::decimal as roas, -- Рассчитывается через revenue
-    CASE 
-        WHEN c.clicks > 0 THEN (COALESCE(c.actions_offsite_conversion_fb_pixel_purchase, 0)::decimal / c.clicks * 100)
-        ELSE 0 
-    END as cvr,
-    COALESCE(c.actions_like + c.actions_comment + c.actions_post_reaction, 0)::integer as engagement_count,
-    c.video_play_actions::integer as video_views,
-    c.video_thruplay_watched_actions::decimal as video_view_rate
-FROM staging.fb_ads_creative_insights c;
-\`\`\`
-
----
-
-### 3. Facebook Ads - Кампании
-
-#### Текущая таблица: `fb_ads_campaign_insights`
-**Маппинг на требуемую структуру `campaign_daily_stats`:**
-
-| Требуемое поле | Текущее поле | Тип | Примечание |
-|----------------|--------------|-----|------------|
-| campaign_id | campaign_id | text | ✅ Есть |
-| date | date_start | date | ✅ Есть |
-| impressions | impressions | numeric | ✅ Есть |
-| clicks | clicks | numeric | ✅ Есть |
-| reach | reach | numeric | ✅ Есть |
-| spend | spend | numeric | ✅ Есть |
-| conversions | actions_offsite_conversion | numeric | ✅ Есть |
-| ctr | ctr | numeric | ✅ Есть |
-| cpc | cpc | numeric | ✅ Есть |
-| cpa | cost_per_action_type | numeric | ✅ Есть |
-| roas | - | - | ❌ Нет |
-
----
-
-### 4. Google Analytics 4 - Сессии
-
-#### Текущая таблица: `ga4_sessions`
-**Маппинг на требуемую структуру `traffic_sessions`:**
-
-| Требуемое поле | Текущее поле | Тип | Примечание |
-|----------------|--------------|-----|------------|
-| session_id | session_id | text | ✅ Есть |
-| user_id | user_pseudo_id | text | ✅ Есть |
-| source_id | - | - | ⚠️ Нужна связь |
-| utm_source | session_source | text | ✅ Есть |
-| utm_medium | session_medium | text | ✅ Есть |
-| utm_campaign | session_campaign | text | ✅ Есть |
-| device_type | device_category | text | ✅ Есть |
-| browser | device_web_browser | text | ✅ Есть |
-| os | device_operating_system | text | ✅ Есть |
-| country | geo_country | text | ✅ Есть |
-| city | geo_city | text | ✅ Есть |
-| page_views | - | - | ⚠️ Нужно агрегировать из events |
-| duration | session_engaged_time | integer | ✅ Есть |
-| bounce | - | - | ⚠️ Можно рассчитать |
-| converted | - | - | ⚠️ Нужно джойнить с conversions |
-| started_at | session_start_timestamp | timestamp | ✅ Есть |
-| ended_at | - | - | ⚠️ Можно рассчитать |
-
-**SQL для создания VIEW:**
-\`\`\`sql
-CREATE OR REPLACE VIEW v_traffic_sessions AS
-SELECT 
-    s.session_id,
-    s.user_pseudo_id as user_id,
-    NULL::integer as source_id, -- Нужна связь
-    NULL::integer as campaign_id,
-    s.session_source as utm_source,
-    s.session_medium as utm_medium,
-    s.session_campaign as utm_campaign,
-    s.device_category as device_type,
-    s.device_web_browser as browser,
-    s.device_operating_system as os,
-    s.geo_country as country,
-    s.geo_city as city,
-    0 as page_views, -- Агрегировать из events
-    s.session_engaged_time as duration,
-    CASE WHEN s.session_engaged_time < 10 THEN true ELSE false END as bounce,
-    false as converted, -- Джойн с conversions
-    s.session_start_timestamp as started_at,
-    NULL::timestamp as ended_at
-FROM staging.ga4_sessions s;
-\`\`\`
-
----
-
-### 5. Google Analytics 4 - События
-
-#### Текущая таблица: `ga4_events`
-**Маппинг на требуемую структуру `funnel_events`:**
-
-| Требуемое поле | Текущее поле | Тип | Примечание |
-|----------------|--------------|-----|------------|
-| user_id | user_pseudo_id | text | ✅ Есть |
-| session_id | session_id | text | ✅ Есть |
-| event_type | event_name | text | ✅ Есть |
-| event_stage | - | - | ⚠️ Нужно маппить |
-| utm_source | utm_source | text | ✅ Есть |
-| utm_medium | utm_medium | text | ✅ Есть |
-| utm_campaign | utm_campaign | text | ✅ Есть |
-| device_type | device_category | text | ✅ Есть |
-| country | geo_country | text | ✅ Есть |
-| city | geo_city | text | ✅ Есть |
-| page_url | page_location | text | ✅ Есть |
-| referrer_url | page_referrer | text | ✅ Есть |
-| event_timestamp | event_timestamp | timestamp | ✅ Есть |
-
-**Маппинг event_name на event_type:**
-\`\`\`sql
-CASE event_name
-    WHEN 'page_view' THEN 'page_view'
-    WHEN 'form_submit' THEN 'lead'
-    WHEN 'generate_lead' THEN 'lead'
-    WHEN 'purchase' THEN 'purchase'
-    WHEN 'add_to_cart' THEN 'add_to_cart'
-    WHEN 'begin_checkout' THEN 'begin_checkout'
-    ELSE event_name
-END
-\`\`\`
-
----
-
-## Недостающие Данные
-
-### 1. Справочники (Critical - без них не работает нормализация)
-
-#### ❌ `products` - Продукты
-\`\`\`sql
-CREATE TABLE products (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL UNIQUE,
-    category VARCHAR(100),
-    price DECIMAL(10, 2),
-    duration_months INTEGER,
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Заполнить из уникальных значений request_product
-INSERT INTO products (name, category, price)
-SELECT DISTINCT 
-    request_product,
-    'IT Education',
-    CASE 
-        WHEN request_product LIKE '%дітей%' THEN 2800
-        WHEN request_product LIKE '%Front-end%' THEN 4800
-        WHEN request_product LIKE '%QA%' THEN 4200
-        ELSE 3500
-    END
-FROM staging.crm_requests
-WHERE request_product IS NOT NULL;
-\`\`\`
-
-#### ❌ `branches` - Филиалы
-\`\`\`sql
-CREATE TABLE branches (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL UNIQUE,
-    city VARCHAR(100) NOT NULL,
-    region VARCHAR(100),
-    is_active BOOLEAN DEFAULT true
-);
-
--- Заполнить из уникальных значений request_branch
-INSERT INTO branches (name, city, region)
-SELECT DISTINCT 
-    request_branch,
-    request_city,
-    CASE 
-        WHEN request_city = 'Київ' THEN 'Київська область'
-        WHEN request_city = 'Харків' THEN 'Харківська область'
-        WHEN request_city = 'Дніпро' THEN 'Дніпропетровська область'
-        WHEN request_city = 'Львів' THEN 'Львівська область'
-        WHEN request_city = 'Одеса' THEN 'Одеська область'
-        ELSE NULL
-    END
-FROM staging.crm_requests
-WHERE request_branch IS NOT NULL;
-\`\`\`
-
-#### ❌ `traffic_sources` - Источники трафика
-\`\`\`sql
-CREATE TABLE traffic_sources (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL UNIQUE,
-    type VARCHAR(50),
-    platform VARCHAR(50),
-    is_active BOOLEAN DEFAULT true
-);
-
--- Заполнить из GA4 и атрибуции
-INSERT INTO traffic_sources (name, type, platform)
-SELECT DISTINCT 
-    session_source,
-    CASE 
-        WHEN session_medium = 'cpc' THEN 'paid'
-        WHEN session_medium = 'organic' THEN 'organic'
-        WHEN session_medium = '(none)' THEN 'direct'
-        ELSE 'referral'
-    END,
-    CASE 
-        WHEN session_source ILIKE '%facebook%' THEN 'Facebook'
-        WHEN session_source ILIKE '%google%' THEN 'Google'
-        WHEN session_source ILIKE '%instagram%' THEN 'Instagram'
-        ELSE session_source
-    END
-FROM staging.ga4_sessions
-WHERE session_source IS NOT NULL;
-\`\`\`
-
----
-
-### 2. Связи между таблицами (Critical)
-
-#### ❌ `campaigns` - Таблица кампаний
-\`\`\`sql
-CREATE TABLE campaigns (
-    id SERIAL PRIMARY KEY,
-    external_id VARCHAR(255) UNIQUE, -- campaign_id из Facebook
-    name VARCHAR(255) NOT NULL,
-    product_id INTEGER REFERENCES products(id),
-    branch_id INTEGER REFERENCES branches(id),
-    source_id INTEGER REFERENCES traffic_sources(id),
-    objective VARCHAR(50),
-    status VARCHAR(50) DEFAULT 'active',
-    budget DECIMAL(10, 2),
-    start_date DATE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Заполнить из Facebook кампаний
-INSERT INTO campaigns (external_id, name, source_id, status)
-SELECT DISTINCT 
-    campaign_id,
-    campaign_name,
-    (SELECT id FROM traffic_sources WHERE name = 'Facebook' LIMIT 1),
-    'active'
-FROM staging.fb_ads_campaign_insights
-WHERE campaign_id IS NOT NULL;
-\`\`\`
-
-#### ❌ `creatives` - Таблица креативов
-\`\`\`sql
-CREATE TABLE creatives (
-    id SERIAL PRIMARY KEY,
-    external_id VARCHAR(255) UNIQUE, -- ad_id из Facebook
-    campaign_id INTEGER REFERENCES campaigns(id),
-    name VARCHAR(255) NOT NULL,
-    type VARCHAR(50),
-    platform VARCHAR(50),
-    product_id INTEGER REFERENCES products(id),
-    branch_id INTEGER REFERENCES branches(id),
-    title TEXT,
-    body TEXT,
-    status VARCHAR(50) DEFAULT 'active',
-    is_personalized BOOLEAN DEFAULT false,
-    theme VARCHAR(100),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Заполнить из Facebook креативов
-INSERT INTO creatives (external_id, name, type, platform, status)
-SELECT DISTINCT 
-    ad_id,
-    ad_name,
-    'image', -- По умолчанию, можно дополнить логикой
-    'Facebook',
-    'active'
-FROM staging.fb_ads_creative_insights
-WHERE ad_id IS NOT NULL;
-\`\`\`
-
----
-
-### 3. Дополнительные поля в CRM (Medium Priority)
-
-Добавить к существующей структуре:
-- `age` - возраст лида
-- `gender` - пол лида
-- `lead_score` - оценка лида (0-100)
-- `temperature` - температура лида (hot/warm/cold)
-- `stage` - этап в воронке
-- `contract_value` - стоимость контракта
-- `payment_status` - статус оплаты
-- `last_contact_at` - дата последнего контакта
-
----
-
-### 4. Revenue данные (Critical для ROAS)
-
-#### ❌ Связь креативов с доходом
-Нужно связать:
-- `fb_ads_creative_insights.ad_id` → `crm_requests_attribution.creative_id` → `crm_requests.contract_value`
-
-**Временное решение - VIEW для расчета revenue:**
-\`\`\`sql
-CREATE OR REPLACE VIEW v_creative_revenue AS
-SELECT 
-    a.creative_id,
-    c.date_start as date,
-    COUNT(DISTINCT r.request_id) as conversions,
-    SUM(CASE WHEN r.request_status = 'converted' THEN 
-        COALESCE(r.contract_value, 
-            CASE 
-                WHEN r.request_product LIKE '%Front-end%' THEN 4800
-                WHEN r.request_product LIKE '%QA%' THEN 4200
-                WHEN r.request_product LIKE '%дітей%' THEN 2800
-                ELSE 3500
-            END
-        )
-        ELSE 0 
-    END) as revenue
-FROM staging.crm_requests_attribution a
-JOIN staging.crm_requests r ON a.request_id = r.request_id
-JOIN staging.fb_ads_creative_insights c ON a.creative_id = c.ad_id
-WHERE a.creative_id IS NOT NULL
-GROUP BY a.creative_id, c.date_start;
-\`\`\`
-
----
-
-### 5. Таблица взаимодействий (Medium Priority)
-
-#### ❌ `lead_interactions` - История взаимодействий с лидами
-\`\`\`sql
-CREATE TABLE lead_interactions (
-    id SERIAL PRIMARY KEY,
-    lead_id INTEGER REFERENCES crm_requests(request_id),
-    type VARCHAR(50), -- 'phone_call', 'email', 'consultation', etc.
-    details TEXT,
-    outcome VARCHAR(50),
-    duration INTEGER,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-\`\`\`
-
----
-
-### 6. Дополнительные метрики креативов (Low Priority)
-
-Для полного анализа креативов не хватает:
-- `hook_rate` - процент остановки скролла
-- `thumb_stops` - количество остановок
-- `saves` - сохранения (для Instagram)
-- `shares` - репосты
-- `comments` - комментарии
-- `engagement_rate` - общий engagement
-
----
-
-### 7. Данные о темах креативов (Medium Priority)
-
-#### ❌ Поле `theme` в креативах
-Нужно добавить классификацию:
-- "Кар'єра"
-- "Гроші"
-- "Зміни"
-- "Сертифікати"
-- "Гарантії"
-- "Навчання з нуля"
-- "Емоційна підтримка"
-
-**Можно добавить через ALTER:**
-\`\`\`sql
-ALTER TABLE creatives ADD COLUMN theme VARCHAR(100);
-
--- Заполнить на основе анализа названий/текстов
-UPDATE creatives 
-SET theme = CASE 
-    WHEN name ILIKE '%career%' OR name ILIKE '%кар''єр%' THEN 'Кар''єра'
-    WHEN name ILIKE '%money%' OR name ILIKE '%грош%' OR name ILIKE '%salary%' THEN 'Гроші'
-    WHEN name ILIKE '%change%' OR name ILIKE '%змін%' THEN 'Зміни'
-    WHEN name ILIKE '%certificate%' OR name ILIKE '%сертифікат%' THEN 'Сертифікати'
-    WHEN name ILIKE '%guarantee%' OR name ILIKE '%гарант%' THEN 'Гарантії'
-    WHEN name ILIKE '%zero%' OR name ILIKE '%нуля%' THEN 'Навчання з нуля'
-    ELSE NULL
-END;
-\`\`\`
-
----
-
-## Маппинг по Страницам и Компонентам
-
-### Главная страница `/`
-
-#### Компонент: MetricCard
-**Источники данных:**
-\`\`\`sql
--- Revenue
-SELECT SUM(spend) as total_spend, COUNT(DISTINCT campaign_id) as projects
-FROM staging.fb_ads_campaign_insights
-WHERE date_start >= CURRENT_DATE - 30;
-
--- Team (пример)
-SELECT COUNT(DISTINCT request_manager) as team_size
-FROM staging.crm_requests;
-
--- Conversion
-SELECT 
-    COUNT(CASE WHEN request_status = 'converted' THEN 1 END)::DECIMAL / 
-    COUNT(*)::DECIMAL * 100 as conversion_rate
-FROM staging.crm_requests
-WHERE request_created_at >= CURRENT_DATE - 30;
-\`\`\`
-
-#### Компонент: RealTimeMetrics
-**Источники данных:**
-\`\`\`sql
--- Active sessions (last 15 minutes)
-SELECT COUNT(DISTINCT session_id) as active_sessions
-FROM staging.ga4_events
-WHERE event_timestamp >= NOW() - INTERVAL '15 minutes';
-
--- New leads today
-SELECT COUNT(*) as new_leads
-FROM staging.crm_requests
-WHERE request_created_at >= CURRENT_DATE;
-
--- Revenue today
-SELECT SUM(contract_value) as revenue_today
-FROM staging.crm_requests
-WHERE request_created_at >= CURRENT_DATE 
-  AND request_status = 'converted';
-\`\`\`
-
-#### Компонент: ActiveGoals
-**Источник:** ❌ Нет - нужна таблица `goals`
-
----
-
-### Страница Воронки `/funnel`
-
-#### Компонент: Funnel Visualization
-**Источники данных:**
-\`\`\`sql
-WITH funnel AS (
-    SELECT 
-        -- Impressions
-        SUM(impressions) as impressions,
-        -- Clicks
-        SUM(clicks) as clicks,
-        -- Landing page views (from GA4)
-        (SELECT COUNT(*) FROM staging.ga4_events 
-         WHERE event_name = 'page_view' 
-         AND page_location LIKE '%/courses/%') as landing_views,
-        -- Leads
-        (SELECT COUNT(*) FROM staging.crm_requests 
-         WHERE request_created_at >= :start_date) as leads,
-        -- Calls (нужно добавить в CRM)
-        NULL as calls,
-        -- Consultations (нужно добавить в CRM)
-        NULL as consultations,
-        -- Contracts
-        (SELECT COUNT(*) FROM staging.crm_requests 
-         WHERE request_status = 'converted' 
-         AND request_created_at >= :start_date) as contracts
-    FROM staging.fb_ads_creative_insights
-    WHERE date_start >= :start_date
+
+
+DataAnalytics — ТЗ v3 (prod-ready)
+
+Валюта  — гривна (UAH).  
+
+Глобальные фильтры (шапка)
+	•	Период: date_from, date_to — обязательно.
+	•	Платформы (multi-select): google, meta, email. По умолчанию: google,meta.
+Передаём как CSV в platforms=google,meta. Если параметр не передан или пуст — считаем «все».
+	•	(Опц.) min_spend — минимальный spend для таблицы кампаний. По умолчанию 0.
+
+Технически:
+	•	В SQL используем шаблон:
+AND (%(platforms)s IS NULL OR platform = ANY(%(platforms)s))
+	•	Для CSV на входе парсим в массив текстов (text[]).
+	•	Денежные поля храним/отдаём в decimal/num (без округления на бэке; форматирование — на фронте).
+
+⸻
+
+1) KPI-карточки за период
+
+Что показываем: leads, n_contracts, revenue, spend, cpl, roas
+Источник: dashboards.v5_bi_platform_daily
+
+API
+
+GET /v5/kpi?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD&platforms=google,meta
+
+SQL
+
+SELECT
+  SUM(leads) AS leads,
+  SUM(n_contracts) AS n_contracts,
+  SUM(sum_contracts) AS revenue,
+  SUM(spend) AS spend,
+  CASE WHEN SUM(leads)  > 0 THEN SUM(spend)::numeric        / NULLIF(SUM(leads),0)        END AS cpl,
+  CASE WHEN SUM(spend)  > 0 THEN SUM(sum_contracts)::numeric / NULLIF(SUM(spend),0)        END AS roas
+FROM dashboards.v5_bi_platform_daily
+WHERE dt BETWEEN %(date_from)s::date AND %(date_to)s::date
+  AND (%(platforms)s IS NULL OR platform = ANY(%(platforms)s));
+
+Проверка (твой прогон, 2025-09-10..2025-10-03, platforms=google,meta):
+leads=418, n_contracts=3, revenue=244440.00, spend=32340.88, cpl≈77.3705263158, roas≈7.5582358922
+
+Фильтрация: период, платформы.
+UI-правила: cpl/roas показываем —, если деление на ноль.
+
+⸻
+
+2) Тренды (2 линейных графика)
+
+2.1 Leads по дням
+
+Источник: dashboards.v5_bi_platform_daily
+API: GET /v5/trend/leads?... → массив { dt, leads }
+
+SELECT dt, SUM(leads) AS leads
+FROM dashboards.v5_bi_platform_daily
+WHERE dt BETWEEN %(date_from)s::date AND %(date_to)s::date
+  AND (%(platforms)s IS NULL OR platform = ANY(%(platforms)s))
+GROUP BY dt
+ORDER BY dt;
+
+2.2 Spend по дням
+
+API: GET /v5/trend/spend?... → массив { dt, spend }
+
+SELECT dt, SUM(spend) AS spend
+FROM dashboards.v5_bi_platform_daily
+WHERE dt BETWEEN %(date_from)s::date AND %(date_to)s::date
+  AND (%(platforms)s IS NULL OR platform = ANY(%(platforms)s))
+GROUP BY dt
+ORDER BY dt;
+
+Проверка (твой прогон, 2025-09-10..2025-10-03, google+meta):
+Leads по дням (фрагмент):
+"2025-09-13" 24, "09-14" 33, "09-15" 23, …, "10-01" 4, "10-03" 11
+Spend по дням (фрагмент):
+"2025-09-13" 317.88, "09-14" 789.72, …, "09-29" 3542.75, "10-01" 910.00, "10-03" 22.04
+
+Фильтрация: период, платформы.
+UI-правила:
+	•	Если для даты нет строки — рисуем 0 (zero-fill) в серии.
+	•	Ховер-подсказка: дата, значение, вклад по платформам (по желанию — stacked toggle).
+
+⸻
+
+3) Таблица «Кампании» (агрегат за период)
+
+Колонки: platform, campaign_id, campaign_name, leads, n_contracts, revenue, spend, cpl, roas
+Источник: dashboards.v5_leads_campaign_daily (матвью, агрегаты корректные)
+
+API
+
+GET /v5/campaigns?date_from=...&date_to=...&platforms=...&min_spend=0&limit=500
+
+SQL
+
+SELECT
+  platform, campaign_id, campaign_name,
+  SUM(leads) AS leads, SUM(n_contracts) AS n_contracts,
+  SUM(sum_contracts) AS revenue, SUM(spend) AS spend,
+  CASE WHEN SUM(leads)>0  THEN SUM(spend)::numeric        / NULLIF(SUM(leads),0)        END AS cpl,
+  CASE WHEN SUM(spend)>0  THEN SUM(sum_contracts)::numeric / NULLIF(SUM(spend),0)        END AS roas
+FROM dashboards.v5_leads_campaign_daily
+WHERE dt BETWEEN %(date_from)s::date AND %(date_to)s::date
+  AND (%(platforms)s IS NULL OR platform = ANY(%(platforms)s))
+GROUP BY platform, campaign_id, campaign_name
+HAVING SUM(spend) >= COALESCE(%(min_spend)s::numeric,0)
+ORDER BY leads DESC
+LIMIT COALESCE(%(limit)s, 500);
+
+Проверка (фрагмент твоего вывода):
+	•	google | 20317544053 | Performance Max - ПКО 2025 | 17 | 3 | 244440.00 | 10486.54
+	•	google | 21662576767 | Performance Max - Підлітки  | 11 | 0 | 0.00     | 5981.79
+(бóльшая часть Meta — 0 контрактов за период)
+
+Фильтрация: период, платформы, min_spend.
+UI-правила: сортировка по Leads (по умолчанию), возможность сортировать по любой колонке; пагинация.
+
+⸻
+
+4) Неделя-к-неделе (WoW) по кампаниям
+
+Колонки: leads_cur, leads_prev, leads_diff, leads_diff_pct, spend_cur/prev, spend_diff/% , cpl_cur/prev
+Источник: dashboards.v5_leads_campaign_weekly (готовый view)
+
+API
+
+GET /v5/campaigns/wow?platforms=google,meta&limit=200
+
+SQL
+
+SELECT *
+FROM dashboards.v5_leads_campaign_weekly
+WHERE (%(platforms)s IS NULL OR platform = ANY(%(platforms)s))
+ORDER BY leads_diff DESC
+LIMIT COALESCE(%(limit)s, 200);
+
+Проверка (фрагмент твоего вывода — «cur» неделя):
+	•	google | 21662576767 | Performance Max - Підлітки | leads_cur=3 | spend_cur=864.35 | cpl_cur≈288.1167
+	•	Несколько Meta-кампаний с малыми spend/лидами.
+
+Фильтрация: платформы.
+UI-правила: дефолтная сортировка по leads_diff DESC; подсветка зелёным/красным дельт.
+
+⸻
+
+5) Таблица «UTM-источники» (агрегат за период)
+
+Важно: spend тут по дизайн-решению = 0.
+Колонки: platform, utm_source, leads, n_contracts, revenue, spend
+Источник: dashboards.v5_leads_source_daily_vw
+
+API
+
+GET /v5/utm-sources?date_from=...&date_to=...&platforms=google,meta,email&limit=1000
+
+SQL
+
+SELECT
+  platform, utm_source,
+  SUM(leads) AS leads, SUM(n_contracts) AS n_contracts,
+  SUM(sum_contracts) AS revenue, SUM(spend) AS spend
+FROM dashboards.v5_leads_source_daily_vw
+WHERE dt BETWEEN %(date_from)s::date AND %(date_to)s::date
+  AND (%(platforms)s IS NULL OR platform = ANY(%(platforms)s))
+GROUP BY platform, utm_source
+ORDER BY leads DESC
+LIMIT COALESCE(%(limit)s, 1000);
+
+Проверка (фрагмент твоего вывода):
+	•	google | (unknown) | 877 | 68 | 3570560.00 | 0
+	•	meta   | (unknown) | 795 | 0  | 0.00      | 0
+	•	Далее встречаются ":", google, facebook_mobile_feed, instagram_reels, … — оставляем «как есть», фронт может маппить ':'/(unknown) в —.
+
+Фильтрация: период, платформы.
+UI-правила: spend всегда показываем 0; сортировка по Leads.
+
+⸻
+
+6) Доли (pie/donut)
+
+6.1 По платформам
+
+Источник: dashboards.v5_bi_platform_daily
+API: GET /v5/share/platforms?... → { platform, leads }
+
+SELECT platform, SUM(leads) AS leads
+FROM dashboards.v5_bi_platform_daily
+WHERE dt BETWEEN %(date_from)s::date AND %(date_to)s::date
+GROUP BY platform
+ORDER BY leads DESC;
+
+6.2 Топ-5 кампаний по лидам
+
+Источник: dashboards.v5_leads_campaign_daily
+API: GET /v5/share/top-campaigns?... → { campaign_name, leads }
+
+SELECT campaign_name, SUM(leads) AS leads
+FROM dashboards.v5_leads_campaign_daily
+WHERE dt BETWEEN %(date_from)s::date AND %(date_to)s::date
+GROUP BY campaign_name
+ORDER BY leads DESC
+LIMIT 5;
+
+Фильтрация: период (для кампаний также можно применить platforms, если потребуется — текущая реализация может работать «по всем», но допускается добавить такой параметр).
+
+⸻
+
+7) Справочники (для фильтров)
+
+-- Платформы
+SELECT DISTINCT platform
+FROM dashboards.v5_bi_platform_daily
+ORDER BY platform;
+
+-- Кампании
+SELECT DISTINCT platform, campaign_id, campaign_name
+FROM dashboards.v5_leads_campaign_daily
+ORDER BY platform, campaign_name;
+
+-- UTM-источники
+SELECT DISTINCT platform, utm_source
+FROM dashboards.v5_leads_source_daily_vw
+ORDER BY platform, utm_source;
+
+
+⸻
+
+8) Договоры — новый блок
+
+8.1 Сводка по договорам (best-touch)
+
+Зачем: быстрый зріз по источнику договора за период.
+Источник: dashboards.v6_contracts_ads_detail_mv
+
+API
+
+GET /v6/contracts/summary?date_from=...&date_to=...&platforms=google,meta,email
+
+SQL
+
+SELECT
+  platform_detected AS platform,
+  COUNT(*)          AS n_contracts,
+  SUM(contract_amount) AS revenue
+FROM dashboards.v6_contracts_ads_detail_mv
+WHERE lead_dt BETWEEN %(date_from)s::date AND %(date_to)s::date
+  AND (%(platforms)s IS NULL OR platform_detected = ANY(%(platforms)s))
+GROUP BY platform_detected
+ORDER BY n_contracts DESC;
+
+Проверка (фрагмент твоего вывода):
+	•	unknown | 118 | 4107970.00
+	•	google  |   6 | 244440.00
+(в твоём другом срезе под фильтром google,meta было 3 контракта — это сходится с кампанийной таблицей, где 3 договора пришлись на Google PMax «ПКО 2025».)
+
+Фильтрация: период, платформы.
+UI-правила: donut/pie + таблица под ним.
+
+8.2 Договоры Google — детальная таблица (точный источник)
+
+Зачем: видеть кампанию/группу/ключ/поисковый запрос, gclid/utm, метрики.
+Источник: dashboards.v6_google_contracts_detail (view с уже подмешанными метриками)
+
+Основные колонки:
+contract_id, lead_dt, campaign_id/name, ad_group_id/name, keyword_text, search_term, channel_type, gclid, utm_source/medium/campaign/content/term, contract_amount, is_paid, n_paid_ops, n_reissuance, n_failed, clicks, impressions, spend, cpl, cpc, ctr
+
+API
+
+GET /v6/contracts/google?date_from=...&date_to=...&campaign_id=...&q=...&limit=500
+
+SQL
+
+SELECT
+  contract_id,
+  lead_dt,
+  COALESCE(campaign_id,   ref_campaign_id)    AS campaign_id,
+  COALESCE(campaign_name, ref_campaign_name)  AS campaign_name,
+  COALESCE(ad_group_id,   ref_ad_group_id)    AS ad_group_id,
+  COALESCE(ad_group_name, ref_ad_group_name)  AS ad_group_name,
+  COALESCE(keyword_text,  ref_keyword_text)   AS keyword_text,
+  COALESCE(search_term,   ref_search_term)    AS search_term,
+  COALESCE(channel_type,  ref_channel_type)   AS channel_type,
+  gclid, utm_source, utm_medium, utm_campaign, utm_content, utm_term,
+  contract_amount, is_paid, n_paid_ops, n_reissuance, n_failed,
+  clicks, impressions, spend, cpl, cpc, ctr
+FROM dashboards.v6_google_contracts_detail
+WHERE lead_dt BETWEEN %(date_from)s::date AND %(date_to)s::date
+  AND (%(campaign_id)s IS NULL OR COALESCE(campaign_id, ref_campaign_id) = %(campaign_id)s)
+  AND (%(q)s IS NULL OR (
+        COALESCE(keyword_text, ref_keyword_text) ILIKE '%'||%(q)s||'%' OR
+        COALESCE(search_term,  ref_search_term)  ILIKE '%'||%(q)s||'%'
+      ))
+ORDER BY lead_dt DESC, contract_id DESC
+LIMIT COALESCE(%(limit)s, 500);
+
+Фильтрация: период (обязательно), опционально campaign_id, полнотекстовый q по keyword/search_term.
+UI-правила: выделение кликабельного contract_id → открывает модал «Contract details».
+
+8.3 Карточка договора (fallback)
+
+Логика: сначала ищем в v6_google_contracts_detail; если нет — берём best-touch из v6_contracts_ads_detail_mv.
+
+API
+
+GET /v6/contracts/:contract_id
+
+SQL (сокращённо)
+
+WITH g AS (
+  SELECT 'google' AS platform, ... 
+  FROM dashboards.v6_google_contracts_detail
+  WHERE contract_id = %(contract_id)s
+),
+bt AS (
+  SELECT platform_detected AS platform, ..., gclid, utm_source, utm_medium, utm_campaign, ...
+  FROM dashboards.v6_contracts_ads_detail_mv
+  WHERE contract_id = %(contract_id)s
 )
-SELECT * FROM funnel;
-\`\`\`
-
-**Недостающие данные:**
-- ❌ Этапы: Phone Calls, Consultations
-- ❌ Детальная атрибуция по этапам
-- ❌ Время на каждом этапе (avg_time_in_stage)
-- ❌ Причины выхода (top_exit_reasons)
-
----
-
-### Страница Кампаний `/campaigns`
-
-#### Компонент: CampaignPerformanceTable
-**Источники данных:**
-\`\`\`sql
-SELECT 
-    c.campaign_id,
-    c.campaign_name,
-    c.date_start,
-    SUM(c.impressions) as impressions,
-    SUM(c.clicks) as clicks,
-    SUM(c.spend) as spent,
-    AVG(c.ctr) as ctr,
-    AVG(c.cpc) as cpc,
-    SUM(c.actions_offsite_conversion) as conversions,
-    -- Revenue - нужен джойн с CRM
-    NULL as revenue,
-    -- ROAS
-    NULL as roas
-FROM staging.fb_ads_campaign_insights c
-WHERE c.date_start >= :start_date
-GROUP BY c.campaign_id, c.campaign_name, c.date_start
-ORDER BY spent DESC;
-\`\`\`
-
-**Недостающие данные:**
-- ❌ Связь campaign → product
-- ❌ Связь campaign → branch
-- ❌ Revenue по кампаниям
-- ❌ ROAS по кампаниям
-
----
-
-### Страница Креативов `/creatives`
-
-#### Компонент: Creative Performance Table
-**Источники данных:**
-\`\`\`sql
-SELECT 
-    c.ad_id as creative_id,
-    c.ad_name as name,
-    'image' as type, -- ❌ Нужно определять
-    'Facebook' as platform,
-    c.date_start as date,
-    SUM(c.impressions) as impressions,
-    SUM(c.clicks) as clicks,
-    AVG(c.ctr) as ctr,
-    AVG(c.cpc) as cpc,
-    AVG(c.cpm) as cpm,
-    SUM(c.spend) as spend,
-    SUM(c.actions_offsite_conversion_fb_pixel_purchase) as conversions,
-    -- Revenue - ❌ нужен джойн
-    NULL as revenue,
-    -- ROAS
-    NULL as roas
-FROM staging.fb_ads_creative_insights c
-WHERE c.date_start >= :start_date
-GROUP BY c.ad_id, c.ad_name, c.date_start
-ORDER BY conversions DESC;
-\`\`\`
-
-#### Компонент: CreativeBurnoutIndicator
-**Источники данных:**
-\`\`\`sql
-WITH creative_performance AS (
-    SELECT 
-        ad_id,
-        ad_name,
-        date_start,
-        ctr,
-        cpc,
-        CASE 
-            WHEN date_start = MIN(date_start) OVER (PARTITION BY ad_id) 
-            THEN ctr 
-        END as initial_ctr,
-        CASE 
-            WHEN date_start = MAX(date_start) OVER (PARTITION BY ad_id) 
-            THEN ctr 
-        END as current_ctr,
-        ROW_NUMBER() OVER (PARTITION BY ad_id ORDER BY date_start) as day_number
-    FROM staging.fb_ads_creative_insights
-    WHERE date_start >= CURRENT_DATE - 42
-)
-SELECT 
-    ad_id,
-    ad_name,
-    MAX(initial_ctr) as initial_ctr,
-    MAX(current_ctr) as current_ctr,
-    MAX(day_number) as days_active,
-    -- Burnout score
-    CASE 
-        WHEN MAX(initial_ctr) > 0 
-        THEN (1 - MAX(current_ctr) / MAX(initial_ctr)) * 100
-        ELSE 0 
-    END as burnout_score
-FROM creative_performance
-GROUP BY ad_id, ad_name
-HAVING MAX(day_number) >= 14;
-\`\`\`
-
-**Недостающие данные:**
-- ❌ Тип креатива (video/image/carousel)
-- ❌ Тема креатива
-- ❌ Персонализация (is_personalized)
-- ❌ Текст креатива (title, body)
-
----
-
-### Страница Трафика `/traffic`
-
-#### Компонент: TrafficChart
-**Источники данных:**
-\`\`\`sql
-SELECT 
-    DATE(session_start_timestamp) as date,
-    COUNT(DISTINCT session_id) as sessions,
-    COUNT(DISTINCT user_pseudo_id) as users,
-    -- New users - ❌ нужна логика определения
-    COUNT(DISTINCT CASE WHEN ... THEN user_pseudo_id END) as new_users,
-    AVG(CASE 
-        WHEN session_engaged_time < 10 THEN 100 
-        ELSE 0 
-    END) as bounce_rate,
-    AVG(session_engaged_time) as avg_duration
-FROM staging.ga4_sessions
-WHERE session_start_timestamp >= :start_date
-GROUP BY DATE(session_start_timestamp)
-ORDER BY date;
-\`\`\`
-
-#### Компонент: GeoMap
-**Источники данных:**
-\`\`\`sql
-SELECT 
-    geo_city as city,
-    COUNT(DISTINCT session_id) as sessions,
-    COUNT(DISTINCT user_pseudo_id) as users,
-    -- Engagement rate
-    AVG(CASE 
-        WHEN session_engaged_time >= 10 THEN 100 
-        ELSE 0 
-    END) as engagement_rate
-FROM staging.ga4_sessions
-WHERE session_start_timestamp >= :start_date
-  AND geo_city IS NOT NULL
-GROUP BY geo_city
-ORDER BY sessions DESC
-LIMIT 10;
-\`\`\`
-
-**Недостающие данные:**
-- ❌ New users (нужна логика first_visit)
-- ❌ Conversions по сессиям
-- ❌ Revenue по сессиям
-
----
-
-### Страница Конверсий `/conversions`
-
-#### Компонент: Conversion Events Chart
-**Источники данных:**
-\`\`\`sql
-SELECT 
-    event_name as event,
-    COUNT(*) as conversions,
-    -- Rate - нужен расчет от предыдущего этапа
-    0 as rate,
-    -- Revenue - ❌ нужна связь с CRM
-    0 as revenue
-FROM staging.ga4_events
-WHERE event_timestamp >= :start_date
-  AND event_name IN ('page_view', 'form_submit', 'purchase')
-GROUP BY event_name
-ORDER BY 
-    CASE event_name
-        WHEN 'page_view' THEN 1
-        WHEN 'form_submit' THEN 2
-        WHEN 'purchase' THEN 3
-    END;
-\`\`\`
-
-**Недостающие данные:**
-- ❌ Конверсии по продуктам
-- ❌ Средний чек (avg_order_value)
-- ❌ Цикл продажи (sales_cycle)
-
----
-
-### Страница CRM `/crm`
-
-#### Компонент: Lead Table
-**Источники данных:**
-\`\`\`sql
-SELECT 
-    r.request_id as id,
-    SPLIT_PART(r.request_name, ' ', 1) as first_name,
-    r.request_email as email,
-    r.request_phone as phone,
-    r.request_product as product,
-    r.request_branch as branch,
-    a.utm_source as source,
-    r.request_status as status,
-    r.request_created_at as created_at,
-    -- ❌ Недостающие поля
-    NULL as age,
-    NULL as lead_score,
-    NULL as temperature,
-    NULL as contract_value
-FROM staging.crm_requests r
-LEFT JOIN staging.crm_requests_attribution a 
-    ON r.request_id = a.request_id
-WHERE r.request_created_at >= :start_date
-ORDER BY r.request_created_at DESC;
-\`\`\`
-
-**Недостающие данные:**
-- ❌ Age, gender
-- ❌ Lead score (0-100)
-- ❌ Temperature (hot/warm/cold)
-- ❌ Interactions history
-- ❌ Last contact date
-- ❌ Contract value
-
----
-
-### Страница Платформ `/platforms`
-
-#### Компонент: Facebook Performance
-**Источники данных:** ✅ `fb_ads_campaign_insights`, `fb_ads_creative_insights`
-
-#### Компонент: Google Ads Performance
-**Источники данных:** ❌ Нет данных по Google Ads
-
-**Недостающие данные:**
-- ❌ Google Ads campaigns
-- ❌ Google Ads keywords
-- ❌ Quality Score
-- ❌ Search impression share
-
----
-
-### Страница Целей `/goals`
-
-#### Все три таба (Burnout, Personalization, Themes)
-**Недостающие данные:**
-- ❌ Таблица `goals`
-- ❌ Персонализация креативов (is_personalized)
-- ❌ Темы креативов (theme)
-- ❌ Связь креативов с аудиториями
-
----
-
-## Приоритеты Внедрения
-
-### Priority 1: КРИТИЧНО для запуска (должно быть первым)
-
-1. **Справочники**
-   - ✅ Создать `products` из `crm_requests.request_product`
-   - ✅ Создать `branches` из `crm_requests.request_branch`
-   - ✅ Создать `traffic_sources` из `ga4_sessions.session_source`
-
-2. **Связи**
-   - ✅ Создать `campaigns` из `fb_ads_campaign_insights`
-   - ✅ Создать `creatives` из `fb_ads_creative_insights`
-   - ✅ Связать креативы с продуктами/филиалами через название
-
-3. **Revenue для ROAS**
-   - ✅ Добавить `contract_value` в `crm_requests`
-   - ✅ Создать VIEW для расчета revenue по креативам
-   - ✅ Рассчитать ROAS в витринах
-
----
-
-### Priority 2: ВАЖНО для полноценной работы
-
-4. **CRM Enhancement**
-   - ⚠️ Добавить `age`, `gender`, `lead_score`, `temperature`
-   - ⚠️ Создать `lead_interactions`
-   - ⚠️ Добавить `last_contact_at`
-
-5. **Воронка**
-   - ⚠️ Добавить недостающие этапы (calls, consultations)
-   - ⚠️ Связать GA4 events с CRM через attribution
-   - ⚠️ Рассчитать время на этапах
-
-6. **Типы и темы креативов**
-   - ⚠️ Определить `type` (video/image/carousel)
-   - ⚠️ Классифицировать `theme`
-   - ⚠️ Добавить `is_personalized`
-
----
-
-### Priority 3: ПОЛЕЗНО для углубленной аналитики
-
-7. **Цели и KPI**
-   - ➕ Создать таблицу `goals`
-   - ➕ Материализованные представления для KPI
-
-8. **Google Ads**
-   - ➕ Интеграция Google Ads API
-   - ➕ Keywords data
-   - ➕ Quality Score
-
-9. **Дополнительные метрики**
-   - ➕ Hook rate, thumb stops
-   - ➕ Saves, shares, comments
-   - ➕ Detailed engagement
-
----
-
-## Скрипты для Быстрого Старта
-
-### 1. Создание справочников
-
-\`\`\`sql
--- Products
-CREATE TABLE IF NOT EXISTS products (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL UNIQUE,
-    category VARCHAR(100) DEFAULT 'IT Education',
-    price DECIMAL(10, 2),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-INSERT INTO products (name, price)
-SELECT DISTINCT 
-    request_product,
-    CASE 
-        WHEN request_product ILIKE '%front%' THEN 4800
-        WHEN request_product ILIKE '%qa%' OR request_product ILIKE '%тест%' THEN 4200
-        WHEN request_product ILIKE '%діт%' OR request_product ILIKE '%kid%' THEN 2800
-        WHEN request_product ILIKE '%python%' THEN 4500
-        WHEN request_product ILIKE '%англ%' OR request_product ILIKE '%english%' THEN 3200
-        ELSE 3500
-    END
-FROM staging.crm_requests
-WHERE request_product IS NOT NULL
-ON CONFLICT (name) DO NOTHING;
-
--- Branches
-CREATE TABLE IF NOT EXISTS branches (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL UNIQUE,
-    city VARCHAR(100),
-    region VARCHAR(100),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-INSERT INTO branches (name, city, region)
-SELECT DISTINCT 
-    request_branch,
-    request_city,
-    CASE 
-        WHEN request_city ILIKE '%київ%' THEN 'Київська область'
-        WHEN request_city ILIKE '%харків%' THEN 'Харківська область'
-        WHEN request_city ILIKE '%дніпр%' THEN 'Дніпропетровська область'
-        WHEN request_city ILIKE '%львів%' THEN 'Львівська область'
-        WHEN request_city ILIKE '%одес%' THEN 'Одеська область'
-    END
-FROM staging.crm_requests
-WHERE request_branch IS NOT NULL
-ON CONFLICT (name) DO NOTHING;
-
--- Traffic Sources
-CREATE TABLE IF NOT EXISTS traffic_sources (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL UNIQUE,
-    type VARCHAR(50),
-    platform VARCHAR(50),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-INSERT INTO traffic_sources (name, type, platform)
-SELECT DISTINCT 
-    COALESCE(session_source, '(direct)'),
-    CASE 
-        WHEN session_medium = 'cpc' THEN 'paid'
-        WHEN session_medium = 'organic' THEN 'organic'
-        WHEN session_medium = '(none)' OR session_medium IS NULL THEN 'direct'
-        ELSE 'referral'
-    END,
-    CASE 
-        WHEN session_source ILIKE '%facebook%' OR session_source ILIKE '%fb%' THEN 'Facebook'
-        WHEN session_source ILIKE '%google%' THEN 'Google'
-        WHEN session_source ILIKE '%instagram%' OR session_source ILIKE '%ig%' THEN 'Instagram'
-        WHEN session_source ILIKE '%youtube%' OR session_source ILIKE '%yt%' THEN 'YouTube'
-        ELSE NULL
-    END
-FROM staging.ga4_sessions
-WHERE session_source IS NOT NULL
-ON CONFLICT (name) DO NOTHING;
-\`\`\`
-
----
-
-### 2. Создание кампаний и креативов
-
-\`\`\`sql
--- Campaigns
-CREATE TABLE IF NOT EXISTS campaigns (
-    id SERIAL PRIMARY KEY,
-    external_id VARCHAR(255) UNIQUE,
-    name VARCHAR(255) NOT NULL,
-    source_id INTEGER REFERENCES traffic_sources(id),
-    status VARCHAR(50) DEFAULT 'active',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-INSERT INTO campaigns (external_id, name, source_id, status)
-SELECT DISTINCT 
-    campaign_id,
-    campaign_name,
-    (SELECT id FROM traffic_sources WHERE name = 'Facebook' LIMIT 1),
-    'active'
-FROM staging.fb_ads_campaign_insights
-WHERE campaign_id IS NOT NULL
-ON CONFLICT (external_id) DO NOTHING;
-
--- Creatives
-CREATE TABLE IF NOT EXISTS creatives (
-    id SERIAL PRIMARY KEY,
-    external_id VARCHAR(255) UNIQUE,
-    campaign_id INTEGER REFERENCES campaigns(id),
-    name VARCHAR(255) NOT NULL,
-    type VARCHAR(50) DEFAULT 'image',
-    platform VARCHAR(50) DEFAULT 'Facebook',
-    status VARCHAR(50) DEFAULT 'active',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-INSERT INTO creatives (external_id, campaign_id, name, status)
-SELECT DISTINCT 
-    c.ad_id,
-    camp.id,
-    c.ad_name,
-    'active'
-FROM staging.fb_ads_creative_insights c
-LEFT JOIN staging.fb_ads_campaign_insights fci 
-    ON c.date_start = fci.date_start -- Упрощенная связь
-LEFT JOIN campaigns camp 
-    ON fci.campaign_id = camp.external_id
-WHERE c.ad_id IS NOT NULL
-ON CONFLICT (external_id) DO NOTHING;
-\`\`\`
-
----
-
-### 3. VIEW для быстрого доступа к метрикам
-
-\`\`\`sql
--- View: Креативы с метриками
-CREATE OR REPLACE VIEW v_creative_metrics AS
-SELECT 
-    cr.id as creative_id,
-    cr.name as creative_name,
-    cr.type,
-    cr.platform,
-    c.date_start as date,
-    c.impressions,
-    c.clicks,
-    c.reach,
-    c.frequency,
-    c.ctr,
-    c.cpc,
-    c.cpm,
-    c.spend,
-    COALESCE(c.actions_offsite_conversion_fb_pixel_purchase, 0) as conversions,
-    COALESCE(c.actions_offsite_conversion_fb_pixel_lead, 0) as leads,
-    -- Revenue (джойн с CRM через атрибуцию)
-    COALESCE(rev.revenue, 0) as revenue,
-    -- ROAS
-    CASE 
-        WHEN c.spend > 0 THEN COALESCE(rev.revenue, 0) / c.spend
-        ELSE 0 
-    END as roas,
-    -- Days active
-    CURRENT_DATE - MIN(c.date_start) OVER (PARTITION BY cr.id) as days_active
-FROM creatives cr
-JOIN staging.fb_ads_creative_insights c ON cr.external_id = c.ad_id
-LEFT JOIN (
-    SELECT 
-        a.creative_id,
-        DATE(r.request_created_at) as date,
-        SUM(CASE 
-            WHEN r.request_status = 'converted' THEN p.price
-            ELSE 0 
-        END) as revenue
-    FROM staging.crm_requests_attribution a
-    JOIN staging.crm_requests r ON a.request_id = r.request_id
-    JOIN products p ON r.request_product = p.name
-    GROUP BY a.creative_id, DATE(r.request_created_at)
-) rev ON cr.external_id = rev.creative_id AND c.date_start = rev.date;
-
--- View: Лиды с полной информацией
-CREATE OR REPLACE VIEW v_leads_full AS
-SELECT 
-    r.request_id as id,
-    SPLIT_PART(r.request_name, ' ', 1) as first_name,
-    SUBSTRING(r.request_name FROM POSITION(' ' IN r.request_name) + 1) as last_name,
-    r.request_email as email,
-    r.request_phone as phone,
-    r.request_city as city,
-    p.id as product_id,
-    p.name as product,
-    b.id as branch_id,
-    b.name as branch,
-    ts.id as source_id,
-    ts.name as source,
-    a.utm_campaign,
-    a.utm_content,
-    r.request_status as status,
-    r.request_created_at as created_at,
-    p.price as contract_value
-FROM staging.crm_requests r
-LEFT JOIN staging.crm_requests_attribution a ON r.request_id = a.request_id
-LEFT JOIN products p ON r.request_product = p.name
-LEFT JOIN branches b ON r.request_branch = b.name
-LEFT JOIN traffic_sources ts ON a.utm_source = ts.name;
-\`\`\`
-
----
-
-## Итоговый Чеклист
-
-### ✅ Что уже есть:
-- FB Ads campaigns data
-- FB Ads creatives data
-- GA4 sessions data
-- GA4 events data
-- CRM requests (leads)
-- CRM attribution (UTM)
-
-### ❌ Что критично нужно добавить:
-1. Справочники (products, branches, traffic_sources)
-2. Таблицы связей (campaigns, creatives)
-3. Revenue данные для ROAS
-4. Нормализованные ID вместо текстовых названий
-
-### ⚠️ Что желательно добавить:
-1. Lead scoring & temperature
-2. Lead interactions
-3. Типы и темы креативов
-4. Недостающие этапы воронки
-
-### ➕ Что можно добавить позже:
-1. Google Ads integration
-2. Таблица goals
-3. Дополнительные engagement метрики
-4. A/B тесты креативов
-
-Это обновленная документация на основе реальной структуры вашей базы данных! 🎯
+SELECT * FROM g
+UNION ALL
+SELECT * FROM bt WHERE NOT EXISTS (SELECT 1 FROM g)
+LIMIT 1;
+
+
+⸻
+
+9) Бенто-сетка (раскладка UI)
+	1.	Header-фильтры (sticky): период, платформы (multi), min_spend.
+	2.	KPI-карточки (6 шт.) — в одну строку на десктопе, 2×3 на планшете.
+	3.	Тренды (2 line charts):
+	•	Leads/день (с zero-fill).
+	•	Spend/день.
+Можно рендерить в один ряд (2 колонки) на десктопе / в столбик на мобиле.
+	4.	Pie/Donut «Доля лидов по платформам».
+	5.	Таблица «Кампании».
+	6.	WoW по кампаниям.
+	7.	UTM-источники (индикативно, spend=0).
+	8.	Новые блоки по договорам:
+	•	Donut/таблица «Договоры по источнику (best-touch)».
+	•	Таблица «Договоры Google — точный источник» с поиском и фильтром campaign_id.
+	•	Модал «Contract details» по клику.
+
+Общие UI-правила:
+	•	В пустых значениях показываем —.
+	•	Формат денег — локаль-aware, без округления на бэке.
+	•	Экспорт таблиц в CSV/Excel (по кнопке).
+	•	Пагинация таблиц, дефолтный limit как в API.
+	•	Все виджеты (кроме справочников) пересчитываются от текущих фильтров.
+
+⸻
+
+10) Контрольные срезы (для QA на фикс-окне)
+
+Окно: 2025-09-10 .. 2025-10-03, platforms=google,meta
+	•	KPI: 418 / 3 / 244440.00 / 32340.88 / CPL≈77.370526 / ROAS≈7.55823589
+	•	Примеры трендов:
+	•	Leads: "2025-09-13" 24, "2025-09-14" 33, …, "2025-10-01" 4, "2025-10-03" 11
+	•	Spend: "2025-09-13" 317.88, …, "2025-09-29" 3542.75, "2025-10-01" 910.00, "2025-10-03" 22.04
+	•	Кампании (топ из фрагмента):
+	•	google | 20317544053 | Performance Max - ПКО 2025 | leads=17 | n_contracts=3 | revenue=244440.00 | spend=10486.54
+	•	google | 21662576767 | Performance Max - Підлітки  | leads=11 | n_contracts=0 | revenue=0.00     | spend=5981.79
+	•	WoW (фрагмент, «cur»):
+	•	google | 21662576767 | leads_cur=3 | spend_cur=864.35 | cpl_cur≈288.1167
+	•	UTM (индикативно, spend=0):
+	•	google | (unknown) leads=877 | n_contracts=68 | revenue=3570560.00 | 0
+	•	meta   | (unknown) leads=795 | n_contracts=0  | revenue=0.00      | 0
+	•	Contracts summary (best-touch, фрагмент):
+	•	unknown 118 | revenue=4107970.00
+	•	google    6 | revenue=244440.00
+
+⸻
+
+11) Анти-грабли и совместимость
+	•	Ошибка column b.id_source does not exist — не использовать b.id_source.
+Корректно: джойн с таблицами/вью, где ключ — b.id_source_bigint.
+Пример:
+... ON fl.id_source = b.id_source_bigint::text
+(учтено во всех v6-вью; если есть свои черновики — заменить).
+	•	В v5_leads_source_daily_vw встречаются ':', (unknown) — фронт может маппить на —.
+	•	Пустые делители → NULL (например, cpl, roas), фронт показывает —.
+	•	В трендах пропуски дат не создаются БД — фронт делает zero-fill.
+
+⸻
+
+12) Форматы ответов (схемы)
+
+/v5/kpi
+
+{
+  "leads": 0,
+  "n_contracts": 0,
+  "revenue": 0.0,
+  "spend": 0.0,
+  "cpl": 0.0,
+  "roas": 0.0
+}
+
+/v5/trend/leads / /v5/trend/spend
+
+[ { "dt": "2025-09-13", "leads": 24 } ]
+[ { "dt": "2025-09-13", "spend": 317.88 } ]
+
+/v5/campaigns
+
+[{
+  "platform": "google",
+  "campaign_id": "20317544053",
+  "campaign_name": "Performance Max - ПКО 2025",
+  "leads": 17, "n_contracts": 3,
+  "revenue": 244440.00, "spend": 10486.54,
+  "cpl": 617.972, "roas": 23.323  // примеры; точное значение считает БД
+}]
+
+/v5/campaigns/wow
+
+[{
+  "platform":"google",
+  "campaign_id":"21662576767",
+  "campaign_name":"Performance Max - Підлітки",
+  "leads_cur":3,"leads_prev":...,"leads_diff":...,"leads_diff_pct":...,
+  "spend_cur":864.35,"spend_prev":...,"spend_diff":...,"spend_diff_pct":...,
+  "cpl_cur":288.1167,"cpl_prev":...
+}]
+
+/v5/utm-sources
+
+[{
+  "platform":"google","utm_source":"(unknown)",
+  "leads":877,"n_contracts":68,"revenue":3570560.00,"spend":0
+}]
+
+/v6/contracts/summary
+
+[ { "platform":"unknown","n_contracts":118,"revenue":4107970.00 },
+  { "platform":"google","n_contracts":6,"revenue":244440.00 } ]
+
+/v6/contracts/google
+
+[{
+  "contract_id":"102557",
+  "lead_dt":"2025-09-24",
+  "campaign_id":"20317544053",
+  "campaign_name":"Performance Max - ПКО 2025",
+  "ad_group_id":"...", "ad_group_name":"...",
+  "keyword_text":"...", "search_term":"...",
+  "channel_type":"SEARCH",
+  "gclid":"EAIaIQob...",
+  "utm_source":"google","utm_medium":"cpc","utm_campaign":"...",
+  "contract_amount":85600.00,"is_paid":true,"n_paid_ops":1,"n_reissuance":0,"n_failed":0,
+  "clicks":12,"impressions":1800,"spend":950.00,"cpl":...,"cpc":...,"ctr":...
+}]
+
+/v6/contracts/:contract_id
+
+{
+  "platform":"google|meta|email|unknown",
+  "contract_id":"102557",
+  "lead_dt":"2025-09-24",
+  "campaign_id":"...", "campaign_name":"...",
+  "ad_group_id":"...", "ad_group_name":"...",
+  "keyword_text":"...", "search_term":"...",
+  "channel_type":"SEARCH|null",
+  "gclid":"...", "utm_source":"google", "utm_medium":"cpc", "utm_campaign":"...",
+  "contract_amount":85600.00, "is_paid":true, "n_paid_ops":1, "n_reissuance":0, "n_failed":0,
+  "clicks":null|12, "impressions":null|1800, "spend":null|950.00,
+  "cpl":null|..., "cpc":null|..., "ctr":null|...
+}
+
+
+⸻
+
+13) Производительность и надёжность
+	•	Индексы: v5_bi_platform_daily(dt, platform), v5_leads_campaign_daily(dt, platform, campaign_id), v5_leads_source_daily_vw(dt, platform, utm_source), v6_contracts_ads_detail_mv(lead_dt, platform_detected), v6_google_contracts_detail(lead_dt, contract_id, campaign_id).
+	•	Параметры только именованные (psycopg3).
+	•	Никакого string-concat SQL.
+	•	Лимиты/пагинация — во всех списках.
+
+⸻
+
