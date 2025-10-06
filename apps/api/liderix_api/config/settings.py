@@ -16,7 +16,11 @@ class Settings(BaseSettings):
     API_PREFIX: str = "/api"
 
     # ---- CORS ----
-    CORS_ALLOW_ORIGINS: Union[str, List[str]] = "*"
+    # IMPORTANT: Cannot use "*" with credentials=True, must specify exact origins
+    CORS_ALLOW_ORIGINS: Union[str, List[str]] = os.getenv(
+        "CORS_ALLOW_ORIGINS",
+        "http://localhost:3000,http://localhost:3001,http://localhost:3002"
+    )
     CORS_ALLOW_METHODS: Union[str, List[str]] = ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
     CORS_ALLOW_HEADERS: Union[str, List[str]] = ["*"]
     CORS_ALLOW_CREDENTIALS: bool = True

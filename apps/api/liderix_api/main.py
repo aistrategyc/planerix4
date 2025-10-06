@@ -44,18 +44,25 @@ ALLOWED_ORIGINS = getattr(settings, 'CORS_ALLOW_ORIGINS', DEFAULT_ORIGINS)
 
 # If CORS_ALLOW_ORIGINS is a string, parse it appropriately
 if isinstance(ALLOWED_ORIGINS, str):
-    if ALLOWED_ORIGINS.strip() == "*":
-        ALLOWED_ORIGINS = ["*"]
+    # First try comma-separated format (most common)
+    if "," in ALLOWED_ORIGINS:
+        ALLOWED_ORIGINS = [s.strip() for s in ALLOWED_ORIGINS.split(",") if s.strip()]
+    elif ALLOWED_ORIGINS.strip() == "*":
+        # Wildcard not allowed with credentials - use defaults instead
+        logger.warning("CORS wildcard '*' not allowed with credentials=True, using default origins")
+        ALLOWED_ORIGINS = DEFAULT_ORIGINS
     else:
+        # Try JSON array format
         try:
             import json
             ALLOWED_ORIGINS = json.loads(ALLOWED_ORIGINS)
         except (json.JSONDecodeError, TypeError):
-            # Try comma-separated format
-            ALLOWED_ORIGINS = [s.strip() for s in ALLOWED_ORIGINS.split(",") if s.strip()]
-            if not ALLOWED_ORIGINS:
-                logger.warning(f"Failed to parse CORS_ALLOW_ORIGINS: {ALLOWED_ORIGINS}, using defaults")
-                ALLOWED_ORIGINS = DEFAULT_ORIGINS
+            # Single origin
+            ALLOWED_ORIGINS = [ALLOWED_ORIGINS.strip()]
+
+    if not ALLOWED_ORIGINS:
+        logger.warning(f"Failed to parse CORS_ALLOW_ORIGINS, using defaults")
+        ALLOWED_ORIGINS = DEFAULT_ORIGINS
 
 logger.info(f"CORS allowed origins: {ALLOWED_ORIGINS}")
 

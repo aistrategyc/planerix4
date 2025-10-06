@@ -30,7 +30,8 @@ redis = Redis.from_url(settings.REDIS_URL)
 token_whitelist = TokenWhitelist(redis)
 
 # Security constants
-MAX_REFRESH_ATTEMPTS = 10  # Max refresh attempts per hour
+# Increased for development - adjust for production
+MAX_REFRESH_ATTEMPTS = 100  # Max refresh attempts per hour (increased for dev)
 REFRESH_RATE_WINDOW = 3600  # 1 hour
 
 async def check_refresh_rate_limit(user_id: str, ip: str) -> bool:

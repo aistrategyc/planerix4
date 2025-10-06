@@ -3,7 +3,6 @@
 // + optional Bearer from localStorage (dev).
 
 import axios, { AxiosError, AxiosRequestConfig, InternalAxiosRequestConfig } from "axios"
-import process from 'process'; // Standard Node.js import
 
 // --------------------------------------------------
 // Base URL - разный для сервера и клиента
@@ -12,13 +11,13 @@ import process from 'process'; // Standard Node.js import
 function getApiBaseUrl(): string {
   // На сервере (в Docker) используем INTERNAL_API_URL
   if (typeof window === "undefined") {
-    const url = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"
-    return url.replace(/\/+$/, "") + (url.includes("/api") ? "" : "/api")
+    const url = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001/api"
+    return url.replace(/\/+$/, "") // Remove trailing slash
   }
 
-  // В браузере используем публичный URL
-  const url = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"
-  return url.replace(/\/+$/, "") + (url.includes("/api") ? "" : "/api")
+  // В браузере используем публичный URL (NEXT_PUBLIC_ переменные доступны в браузере)
+  const url = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001/api"
+  return url.replace(/\/+$/, "") // Remove trailing slash
 }
 
 export const API_BASE_URL = getApiBaseUrl()

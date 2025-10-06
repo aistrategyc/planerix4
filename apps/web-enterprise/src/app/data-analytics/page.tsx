@@ -14,9 +14,9 @@ const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"]
 type CompareMode = "auto" | "custom" | "disabled"
 
 export default function DataAnalyticsV4Page() {
-  // Filters
-  const [dateFrom, setDateFrom] = useState("2025-09-01")
-  const [dateTo, setDateTo] = useState("2025-09-30")
+  // Filters - using actual data range from ITstep database
+  const [dateFrom, setDateFrom] = useState("2025-09-10")
+  const [dateTo, setDateTo] = useState("2025-10-03")
   const [platforms, setPlatforms] = useState<string[]>(["google", "meta"])
   const [compareMode, setCompareMode] = useState<CompareMode>("auto")
   const [prevFrom, setPrevFrom] = useState("")
@@ -93,14 +93,18 @@ export default function DataAnalyticsV4Page() {
     }
   }
 
-  // Fetch data only on mount, not on every filter change
+  // Fetch data on mount and when clicking refresh
   useEffect(() => {
+    console.log("[DataAnalytics] Component mounted, fetching initial data")
     fetchData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, []) // Empty array ensures this runs once on mount
 
   const renderDelta = (current: number, prev: number, pct: number | null, isReverse = false) => {
-    if (prev === 0) return <span className="text-gray-400 text-sm">New</span>
+    // If no previous data, show "No comparison data" instead of "New"
+    if (prev === 0 || prev === null || prev === undefined) {
+      return <span className="text-gray-400 text-xs">No prev data</span>
+    }
 
     const diff = current - prev
     const isPositive = isReverse ? diff < 0 : diff > 0
@@ -204,6 +208,13 @@ export default function DataAnalyticsV4Page() {
               </div>
             </div>
           )}
+
+          {/* Apply Filters Button */}
+          <div className="mt-4 pt-4 border-t">
+            <Button onClick={fetchData} disabled={loading} className="w-full md:w-auto">
+              {loading ? "Loading..." : "Apply Filters"}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -304,17 +315,23 @@ export default function DataAnalyticsV4Page() {
             <CardTitle>Leads Trend Compare</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={leadsTrendCompare}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="dt" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="leads_cur" stroke="#3b82f6" strokeWidth={2} name="Current" />
-                <Line type="monotone" dataKey="leads_prev_shifted" stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 5" name="Previous" />
-              </LineChart>
-            </ResponsiveContainer>
+            {leadsTrendCompare.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={leadsTrendCompare}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="dt" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="leads_cur" stroke="#3b82f6" strokeWidth={2} name="Current" />
+                  <Line type="monotone" dataKey="leads_prev_shifted" stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 5" name="Previous" />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-gray-400">
+                No trend data available
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -323,17 +340,23 @@ export default function DataAnalyticsV4Page() {
             <CardTitle>Spend Trend Compare</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={spendTrendCompare}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="dt" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="spend_cur" stroke="#10b981" strokeWidth={2} name="Current" />
-                <Line type="monotone" dataKey="spend_prev_shifted" stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 5" name="Previous" />
-              </LineChart>
-            </ResponsiveContainer>
+            {spendTrendCompare.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={spendTrendCompare}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="dt" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="spend_cur" stroke="#10b981" strokeWidth={2} name="Current" />
+                  <Line type="monotone" dataKey="spend_prev_shifted" stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 5" name="Previous" />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-gray-400">
+                No trend data available
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -421,46 +444,52 @@ export default function DataAnalyticsV4Page() {
           <CardTitle>Budget Recommendations (Top 10)</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left p-2">Action</th>
-                  <th className="text-left p-2">Platform</th>
-                  <th className="text-left p-2">Campaign</th>
-                  <th className="text-right p-2">Leads</th>
-                  <th className="text-right p-2">Spend</th>
-                  <th className="text-right p-2">CPL</th>
-                  <th className="text-right p-2">ROAS</th>
-                  <th className="text-right p-2">Δ Leads</th>
-                </tr>
-              </thead>
-              <tbody>
-                {budgetRecommendations.map((reco: any, idx: number) => (
-                  <tr key={idx} className="border-b hover:bg-gray-50">
-                    <td className="p-2">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        reco.action === "scale" ? "bg-green-100 text-green-700" :
-                        reco.action === "pause" ? "bg-red-100 text-red-700" :
-                        "bg-yellow-100 text-yellow-700"
-                      }`}>
-                        {reco.action.toUpperCase()}
-                      </span>
-                    </td>
-                    <td className="p-2">{reco.platform}</td>
-                    <td className="p-2 max-w-xs truncate">{reco.campaign_name}</td>
-                    <td className="text-right p-2">{reco.leads_cur}</td>
-                    <td className="text-right p-2">₴{reco.spend_cur.toFixed(0)}</td>
-                    <td className="text-right p-2">{reco.cpl_cur ? `₴${reco.cpl_cur.toFixed(0)}` : "—"}</td>
-                    <td className="text-right p-2">{reco.roas_cur ? reco.roas_cur.toFixed(2) : "—"}</td>
-                    <td className={`text-right p-2 ${reco.leads_diff >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      {reco.leads_diff >= 0 ? "+" : ""}{reco.leads_diff}
-                    </td>
+          {budgetRecommendations.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-2">Action</th>
+                    <th className="text-left p-2">Platform</th>
+                    <th className="text-left p-2">Campaign</th>
+                    <th className="text-right p-2">Leads</th>
+                    <th className="text-right p-2">Spend</th>
+                    <th className="text-right p-2">CPL</th>
+                    <th className="text-right p-2">ROAS</th>
+                    <th className="text-right p-2">Δ Leads</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {budgetRecommendations.map((reco: any, idx: number) => (
+                    <tr key={idx} className="border-b hover:bg-gray-50">
+                      <td className="p-2">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          reco.action === "scale" ? "bg-green-100 text-green-700" :
+                          reco.action === "pause" ? "bg-red-100 text-red-700" :
+                          "bg-yellow-100 text-yellow-700"
+                        }`}>
+                          {reco.action.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="p-2">{reco.platform}</td>
+                      <td className="p-2 max-w-xs truncate">{reco.campaign_name}</td>
+                      <td className="text-right p-2">{reco.leads_cur}</td>
+                      <td className="text-right p-2">₴{reco.spend_cur.toFixed(0)}</td>
+                      <td className="text-right p-2">{reco.cpl_cur ? `₴${reco.cpl_cur.toFixed(0)}` : "—"}</td>
+                      <td className="text-right p-2">{reco.roas_cur ? reco.roas_cur.toFixed(2) : "—"}</td>
+                      <td className={`text-right p-2 ${reco.leads_diff >= 0 ? "text-green-600" : "text-red-600"}`}>
+                        {reco.leads_diff >= 0 ? "+" : ""}{reco.leads_diff}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="py-8 text-center text-gray-400">
+              No recommendations available
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -471,24 +500,30 @@ export default function DataAnalyticsV4Page() {
             <CardTitle>Platform Share Compare</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={platformShareCompare}
-                  dataKey="cur_leads"
-                  nameKey="platform"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={100}
-                  label={(entry) => `${entry.platform}: ${entry.share_cur_pct?.toFixed(1)}%`}
-                >
-                  {platformShareCompare.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+            {platformShareCompare.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={platformShareCompare}
+                    dataKey="cur_leads"
+                    nameKey="platform"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={100}
+                    label={(entry) => `${entry.platform}: ${entry.share_cur_pct?.toFixed(1)}%`}
+                  >
+                    {platformShareCompare.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-gray-400">
+                No platform share data available
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -497,28 +532,34 @@ export default function DataAnalyticsV4Page() {
             <CardTitle>Share Details</CardTitle>
           </CardHeader>
           <CardContent>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left p-2">Platform</th>
-                  <th className="text-right p-2">Current %</th>
-                  <th className="text-right p-2">Previous %</th>
-                  <th className="text-right p-2">Δ p.p.</th>
-                </tr>
-              </thead>
-              <tbody>
-                {platformShareCompare.map((share, idx) => (
-                  <tr key={idx} className="border-b">
-                    <td className="p-2 font-medium">{share.platform}</td>
-                    <td className="text-right p-2">{share.share_cur_pct?.toFixed(1) || "—"}%</td>
-                    <td className="text-right p-2">{share.share_prev_pct?.toFixed(1) || "—"}%</td>
-                    <td className={`text-right p-2 ${(share.share_diff_pp || 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      {share.share_diff_pp !== null ? `${share.share_diff_pp > 0 ? "+" : ""}${share.share_diff_pp.toFixed(1)}` : "—"}
-                    </td>
+            {platformShareCompare.length > 0 ? (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-2">Platform</th>
+                    <th className="text-right p-2">Current %</th>
+                    <th className="text-right p-2">Previous %</th>
+                    <th className="text-right p-2">Δ p.p.</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {platformShareCompare.map((share, idx) => (
+                    <tr key={idx} className="border-b">
+                      <td className="p-2 font-medium">{share.platform}</td>
+                      <td className="text-right p-2">{share.share_cur_pct?.toFixed(1) || "—"}%</td>
+                      <td className="text-right p-2">{share.share_prev_pct?.toFixed(1) || "—"}%</td>
+                      <td className={`text-right p-2 ${(share.share_diff_pp || 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
+                        {share.share_diff_pp !== null ? `${share.share_diff_pp > 0 ? "+" : ""}${share.share_diff_pp.toFixed(1)}` : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="py-8 text-center text-gray-400">
+                No platform share data available
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -529,38 +570,44 @@ export default function DataAnalyticsV4Page() {
           <CardTitle>Campaigns Period-over-Period (Top 20)</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left p-2">Platform</th>
-                  <th className="text-left p-2">Campaign</th>
-                  <th className="text-right p-2">Leads Cur</th>
-                  <th className="text-right p-2">Leads Prev</th>
-                  <th className="text-right p-2">Δ %</th>
-                  <th className="text-right p-2">ROAS Cur</th>
-                  <th className="text-right p-2">CPL Cur</th>
-                  <th className="text-right p-2">Spend Cur</th>
-                </tr>
-              </thead>
-              <tbody>
-                {campaignsCompare.map((campaign, idx) => (
-                  <tr key={idx} className="border-b hover:bg-gray-50">
-                    <td className="p-2">{campaign.platform}</td>
-                    <td className="p-2 max-w-xs truncate">{campaign.campaign_name}</td>
-                    <td className="text-right p-2 font-medium">{campaign.leads_cur}</td>
-                    <td className="text-right p-2 text-gray-500">{campaign.leads_prev}</td>
-                    <td className={`text-right p-2 ${(campaign.leads_diff_pct || 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      {campaign.leads_diff_pct ? `${campaign.leads_diff_pct.toFixed(1)}%` : "—"}
-                    </td>
-                    <td className="text-right p-2">{campaign.roas_cur ? campaign.roas_cur.toFixed(2) : "—"}</td>
-                    <td className="text-right p-2">{campaign.cpl_cur ? `₴${campaign.cpl_cur.toFixed(0)}` : "—"}</td>
-                    <td className="text-right p-2">₴{campaign.spend_cur.toFixed(0)}</td>
+          {campaignsCompare.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-2">Platform</th>
+                    <th className="text-left p-2">Campaign</th>
+                    <th className="text-right p-2">Leads Cur</th>
+                    <th className="text-right p-2">Leads Prev</th>
+                    <th className="text-right p-2">Δ %</th>
+                    <th className="text-right p-2">ROAS Cur</th>
+                    <th className="text-right p-2">CPL Cur</th>
+                    <th className="text-right p-2">Spend Cur</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {campaignsCompare.map((campaign, idx) => (
+                    <tr key={idx} className="border-b hover:bg-gray-50">
+                      <td className="p-2">{campaign.platform}</td>
+                      <td className="p-2 max-w-xs truncate">{campaign.campaign_name}</td>
+                      <td className="text-right p-2 font-medium">{campaign.leads_cur}</td>
+                      <td className="text-right p-2 text-gray-500">{campaign.leads_prev}</td>
+                      <td className={`text-right p-2 ${(campaign.leads_diff_pct || 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
+                        {campaign.leads_diff_pct ? `${campaign.leads_diff_pct.toFixed(1)}%` : "—"}
+                      </td>
+                      <td className="text-right p-2">{campaign.roas_cur ? campaign.roas_cur.toFixed(2) : "—"}</td>
+                      <td className="text-right p-2">{campaign.cpl_cur ? `₴${campaign.cpl_cur.toFixed(0)}` : "—"}</td>
+                      <td className="text-right p-2">₴{campaign.spend_cur.toFixed(0)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="py-8 text-center text-gray-400">
+              No campaigns data available
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

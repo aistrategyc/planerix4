@@ -13,8 +13,6 @@ import {
   PieChart,
   Calendar,
   BrainCircuit,
-  Settings,
-  HelpCircle,
   TrendingUp,
 } from 'lucide-react';
 
@@ -39,10 +37,7 @@ const MAIN: NavItem[] = [
   { href: '/ai', label: 'AI', icon: BrainCircuit },
 ];
 
-const FOOTER: NavItem[] = [
-  { href: '/settings', label: 'Settings', icon: Settings },
-  { href: '/help', label: 'Help', icon: HelpCircle },
-];
+const FOOTER: NavItem[] = [];
 
 export default function Sidebar() {
   const pathname = usePathname();
