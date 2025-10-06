@@ -46,7 +46,8 @@ export default function DataAnalyticsV4Page() {
         ...(compareMode === "custom" && prevFrom && prevTo ? { prev_from: prevFrom, prev_to: prevTo } : {}),
       }
 
-      const [kpi, leadsTrend, spendTrend, campaigns, share, movers, reco] = await Promise.all([
+      // Use allSettled to allow independent widget failures
+      const results = await Promise.allSettled([
         dataAnalyticsApi.getKPICompare(compareParams),
         dataAnalyticsApi.getLeadsTrendCompare(compareParams),
         dataAnalyticsApi.getSpendTrendCompare(compareParams),
@@ -56,13 +57,23 @@ export default function DataAnalyticsV4Page() {
         dataAnalyticsApi.getBudgetRecommendations({ ...compareParams, limit: 10, target_roas: 5, kill_roas: 1, min_leads: 5 }),
       ])
 
-      setKpiCompare(kpi)
-      setLeadsTrendCompare(leadsTrend.data || [])
-      setSpendTrendCompare(spendTrend.data || [])
-      setCampaignsCompare(campaigns.data || [])
-      setPlatformShareCompare(share.data || [])
-      setTopMovers(movers)
-      setBudgetRecommendations(reco.data || [])
+      // Set data for successful widgets, keep empty state for failed ones
+      if (results[0].status === "fulfilled") setKpiCompare(results[0].value)
+      if (results[1].status === "fulfilled") setLeadsTrendCompare(results[1].value.data || [])
+      if (results[2].status === "fulfilled") setSpendTrendCompare(results[2].value.data || [])
+      if (results[3].status === "fulfilled") setCampaignsCompare(results[3].value.data || [])
+      if (results[4].status === "fulfilled") setPlatformShareCompare(results[4].value.data || [])
+      if (results[5].status === "fulfilled") setTopMovers(results[5].value)
+      if (results[6].status === "fulfilled") setBudgetRecommendations(results[6].value.data || [])
+
+      // Log failed widgets for debugging
+      const failedWidgets = results
+        .map((r, i) => ({ index: i, result: r }))
+        .filter(({ result }) => result.status === "rejected")
+
+      if (failedWidgets.length > 0) {
+        console.warn("Some widgets failed to load:", failedWidgets)
+      }
     } catch (err: any) {
       setError(err.message || "Failed to fetch data")
     } finally {
@@ -70,9 +81,11 @@ export default function DataAnalyticsV4Page() {
     }
   }
 
+  // Fetch data only on mount, not on every filter change
   useEffect(() => {
     fetchData()
-  }, [dateFrom, dateTo, platforms, compareMode, prevFrom, prevTo, minSpend])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const renderDelta = (current: number, prev: number, pct: number | null, isReverse = false) => {
     if (prev === 0) return <span className="text-gray-400 text-sm">New</span>
