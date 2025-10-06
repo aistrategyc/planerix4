@@ -305,3 +305,100 @@ export const getTopCampaigns = async (date_from: string, date_to: string, limit:
     .sort((a: any, b: any) => (b.roas || 0) - (a.roas || 0))
     .slice(0, limit)
 }
+
+// ============================================
+// ✅ NEW ENDPOINTS (Oct 6, 2025)
+// ============================================
+
+export interface ScatterMatrixItem {
+  platform: string
+  campaign_id: string
+  campaign_name: string
+  leads: number
+  spend: number
+  revenue: number
+  n_contracts: number
+  cpl: number | null
+  roas: number | null
+}
+
+export interface AnomalyItem {
+  platform: string
+  campaign_id: string
+  campaign_name: string
+  leads: number
+  spend: number
+  current_cpl: number | null
+  baseline_cpl: number | null
+  baseline_leads: number | null
+  anomaly_type: "spike_cpl" | "drop_leads" | "spike_spend" | "normal"
+  severity: "high" | "medium" | "low"
+}
+
+export interface PaidSplitPlatformItem {
+  platform: string
+  paid_leads: number
+  organic_leads: number
+  total_leads: number
+  paid_pct: number
+  organic_pct: number
+}
+
+export interface PaidSplitCampaignItem {
+  platform: string
+  campaign_id: string
+  campaign_name: string
+  source_type: "paid" | "organic"
+  leads: number
+  spend: number
+}
+
+// 9. Scatter Matrix (NEW - v5/campaigns/scatter-matrix)
+export const getScatterMatrix = async (filters: DataAnalyticsFilters): Promise<ScatterMatrixItem[]> => {
+  const response = await apiClient.get("/data-analytics/v5/campaigns/scatter-matrix", {
+    params: {
+      date_from: filters.date_from,
+      date_to: filters.date_to,
+      platform: filters.platforms,
+      min_leads: 5,
+      min_spend: filters.min_spend || 100,
+    },
+  })
+  return response.data.data || []
+}
+
+// 10. Campaign Anomalies (NEW - v5/campaigns/anomalies)
+export const getAnomalies = async (filters: DataAnalyticsFilters): Promise<AnomalyItem[]> => {
+  const response = await apiClient.get("/data-analytics/v5/campaigns/anomalies", {
+    params: {
+      date_from: filters.date_from,
+      date_to: filters.date_to,
+      platform: filters.platforms,
+    },
+  })
+  return response.data.data || []
+}
+
+// 11. Paid Split - Platforms (NEW - v6/leads/paid-split/platforms)
+export const getPaidSplitPlatforms = async (
+  date_from: string,
+  date_to: string
+): Promise<PaidSplitPlatformItem[]> => {
+  const response = await apiClient.get("/data-analytics/v6/leads/paid-split/platforms", {
+    params: { date_from, date_to },
+  })
+  return response.data.data || []
+}
+
+// 12. Paid Split - Campaigns (NEW - v6/leads/paid-split/campaigns)
+export const getPaidSplitCampaigns = async (
+  date_from: string,
+  date_to: string,
+  platform: string,
+  limit: number = 20
+): Promise<PaidSplitCampaignItem[]> => {
+  const response = await apiClient.get("/data-analytics/v6/leads/paid-split/campaigns", {
+    params: { date_from, date_to, platform, limit },
+  })
+  return response.data.data || []
+}
