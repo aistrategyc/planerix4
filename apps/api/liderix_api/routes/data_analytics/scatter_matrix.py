@@ -29,35 +29,28 @@ async def get_scatter_matrix(
     Data source: dashboards.v5_leads_campaign_daily
     """
 
-    # Build platform filter
-    if platform and platform.lower() in ["google", "meta"]:
-        platform_filter = "AND platform = :platform"
-        has_platform_filter = True
-    else:
-        platform_filter = ""
-        has_platform_filter = False
-
-    query = text(f"""
+    # Build query with proper parameter binding
+    query = text("""
         SELECT
             platform,
             campaign_id,
             campaign_name,
             SUM(leads) as leads,
             SUM(spend) as spend,
-            SUM(revenue) as revenue,
+            SUM(sum_contracts) as revenue,
             SUM(n_contracts) as n_contracts,
             CASE
                 WHEN SUM(leads) > 0 THEN SUM(spend) / SUM(leads)
                 ELSE NULL
             END as cpl,
             CASE
-                WHEN SUM(spend) > 0 THEN SUM(revenue) / SUM(spend)
+                WHEN SUM(spend) > 0 THEN SUM(sum_contracts) / SUM(spend)
                 ELSE NULL
             END as roas
         FROM dashboards.v5_leads_campaign_daily
         WHERE dt >= :date_from
           AND dt <= :date_to
-          {platform_filter}
+          AND (:platform = '' OR platform = :platform)
         GROUP BY platform, campaign_id, campaign_name
         HAVING SUM(leads) >= :min_leads
            AND SUM(spend) >= :min_spend
@@ -72,9 +65,8 @@ async def get_scatter_matrix(
         "date_to": date_to,
         "min_leads": min_leads,
         "min_spend": min_spend,
+        "platform": platform.lower() if platform and platform.lower() in ["google", "meta"] else "",
     }
-    if has_platform_filter:
-        params["platform"] = platform.lower()
 
     result = await session.execute(query, params)
     rows = result.mappings().all()

@@ -29,20 +29,15 @@ async def get_campaign_anomalies(
     Data source: dashboards.v5_leads_campaign_daily (calculated on-the-fly)
     """
 
-    # Build platform filter
-    if platform and platform.lower() in ["google", "meta"]:
-        platform_filter = "AND platform = :platform"
-        has_platform_filter = True
-    else:
-        platform_filter = ""
-        has_platform_filter = False
-
     # Calculate baseline (previous period)
     date_diff = (date_to - date_from).days
     baseline_from = date_from - timedelta(days=date_diff)
     baseline_to = date_from - timedelta(days=1)
 
-    query = text(f"""
+    # Set platform param (None means all platforms)
+    platform_param = platform.lower() if platform and platform.lower() in ["google", "meta"] else None
+
+    query = text("""
         WITH current_period AS (
             SELECT
                 platform,
@@ -52,7 +47,8 @@ async def get_campaign_anomalies(
                 SUM(spend) as spend,
                 CASE WHEN SUM(leads) > 0 THEN SUM(spend) / SUM(leads) ELSE NULL END as cpl
             FROM dashboards.v5_leads_campaign_daily
-            WHERE dt >= :date_from AND dt <= :date_to {platform_filter}
+            WHERE dt >= :date_from AND dt <= :date_to
+              AND (:platform = '' OR platform = :platform)
             GROUP BY platform, campaign_id, campaign_name
             HAVING SUM(leads) > 0
         ),
@@ -72,7 +68,8 @@ async def get_campaign_anomalies(
                     leads as daily_leads,
                     CASE WHEN leads > 0 THEN spend / leads ELSE NULL END as daily_cpl
                 FROM dashboards.v5_leads_campaign_daily
-                WHERE dt >= :baseline_from AND dt <= :baseline_to {platform_filter}
+                WHERE dt >= :baseline_from AND dt <= :baseline_to
+                  AND (:platform = '' OR platform = :platform)
             ) daily
             WHERE daily_cpl IS NOT NULL
             GROUP BY platform, campaign_id
@@ -120,9 +117,8 @@ async def get_campaign_anomalies(
         "date_to": date_to,
         "baseline_from": baseline_from,
         "baseline_to": baseline_to,
+        "platform": platform_param if platform_param else "",
     }
-    if has_platform_filter:
-        params["platform"] = platform.lower()
 
     result = await session.execute(query, params)
     rows = result.mappings().all()

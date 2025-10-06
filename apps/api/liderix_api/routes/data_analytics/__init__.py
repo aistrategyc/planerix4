@@ -11,8 +11,8 @@ from . import kpi, trends, campaigns, utm_sources, share
 # Import v5 advanced endpoints
 from . import scatter_matrix, anomalies, paid_split
 
-# Import v4 compare endpoints
-from . import kpi_compare, trends_compare, campaigns_compare, share_compare, top_movers, budget_recommendations
+# Import v4 compare endpoints (already exist from previous sessions)
+from . import trends_compare, campaigns_compare, share_compare, top_movers, budget_recommendations
 
 router = APIRouter()
 
@@ -27,12 +27,11 @@ router.include_router(share.router, prefix="/v5/share", tags=["Data Analytics v5
 router.include_router(scatter_matrix.router, prefix="/v5/campaigns", tags=["Data Analytics v5 - Advanced"])
 router.include_router(anomalies.router, prefix="/v5/campaigns", tags=["Data Analytics v5 - Advanced"])
 
-# Include v4 compare endpoints
-router.include_router(kpi_compare.router, prefix="/v5", tags=["Data Analytics v5 - Compare"])
+# Include v4 compare endpoints (already exist from previous sessions)
 router.include_router(trends_compare.router, prefix="/v5", tags=["Data Analytics v5 - Compare"])
-router.include_router(campaigns_compare.router, prefix="/v5", tags=["Data Analytics v5 - Compare"])
-router.include_router(share_compare.router, prefix="/v5", tags=["Data Analytics v5 - Compare"])
-router.include_router(top_movers.router, prefix="/v5", tags=["Data Analytics v5 - Top Movers"])
+router.include_router(campaigns_compare.router, prefix="/v5/campaigns", tags=["Data Analytics v5 - Compare"])
+router.include_router(share_compare.router, prefix="/v5/share", tags=["Data Analytics v5 - Compare"])
+router.include_router(top_movers.router, prefix="/v5/campaigns", tags=["Data Analytics v5 - Top Movers"])
 
 # Include v6 recommendations and paid split
 router.include_router(budget_recommendations.router, prefix="/v6", tags=["Data Analytics v6 - Recommendations"])

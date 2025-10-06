@@ -4,8 +4,8 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
-import { TrendingUp, DollarSign, Users, FileText, Target, RefreshCcw, AlertCircle } from "lucide-react"
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, ScatterChart, Scatter, ZAxis, BarChart, Bar } from "recharts"
+import { TrendingUp, DollarSign, Users, FileText, Target, RefreshCcw, AlertCircle, AlertTriangle, ArrowUpRight, ArrowDownRight } from "lucide-react"
 import * as dataAnalyticsApi from "@/lib/api/data-analytics"
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"]
@@ -16,7 +16,7 @@ export default function DataAnalyticsPage() {
   const [dateTo, setDateTo] = useState("2025-09-30")
   const [selectedPlatform, setSelectedPlatform] = useState<string>("")
 
-  // Data states (8 working endpoints)
+  // Data states (11 working endpoints)
   const [kpi, setKpi] = useState<any>(null)
   const [leadsTrend, setLeadsTrend] = useState<any[]>([])
   const [spendTrend, setSpendTrend] = useState<any[]>([])
@@ -25,6 +25,10 @@ export default function DataAnalyticsPage() {
   const [utmSources, setUtmSources] = useState<any[]>([])
   const [wowCampaigns, setWowCampaigns] = useState<any[]>([])
   const [budgetReco, setBudgetReco] = useState<any[]>([])
+  // NEW: Oct 6, 2025
+  const [scatterMatrix, setScatterMatrix] = useState<any[]>([])
+  const [anomalies, setAnomalies] = useState<any[]>([])
+  const [paidSplit, setPaidSplit] = useState<any[]>([])
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -40,7 +44,7 @@ export default function DataAnalyticsPage() {
         limit: 50,
       }
 
-      // Use Promise.allSettled for independent failures
+      // Use Promise.allSettled for independent failures (11 endpoints)
       const results = await Promise.allSettled([
         dataAnalyticsApi.getKPICards(filters),
         dataAnalyticsApi.getLeadsTrend(filters),
@@ -50,6 +54,10 @@ export default function DataAnalyticsPage() {
         dataAnalyticsApi.getUTMSources(filters),
         dataAnalyticsApi.getWoWCampaigns(filters),
         dataAnalyticsApi.getBudgetRecommendationsLegacy(dateFrom, dateTo, 10),
+        // NEW: Oct 6, 2025
+        dataAnalyticsApi.getScatterMatrix(filters),
+        dataAnalyticsApi.getAnomalies(filters),
+        dataAnalyticsApi.getPaidSplitPlatforms(dateFrom, dateTo),
       ])
 
       // Set data for successful requests
@@ -61,6 +69,10 @@ export default function DataAnalyticsPage() {
       if (results[5].status === "fulfilled") setUtmSources(results[5].value)
       if (results[6].status === "fulfilled") setWowCampaigns(results[6].value)
       if (results[7].status === "fulfilled") setBudgetReco(results[7].value)
+      // NEW
+      if (results[8].status === "fulfilled") setScatterMatrix(results[8].value)
+      if (results[9].status === "fulfilled") setAnomalies(results[9].value)
+      if (results[10].status === "fulfilled") setPaidSplit(results[10].value)
 
       // Log failures
       const failed = results.filter((r) => r.status === "rejected")
@@ -523,6 +535,210 @@ export default function DataAnalyticsPage() {
           ) : (
             <div className="py-8 text-center text-gray-400">
               No UTM sources data available
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 🆕 Scatter Matrix (✅ v5/campaigns/scatter-matrix) */}
+      <Card className="col-span-full">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Target className="h-5 w-5" />
+            Campaign Performance Matrix (CPL vs ROAS)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {scatterMatrix.length > 0 ? (
+            <ResponsiveContainer width="100%" height={400}>
+              <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  type="number"
+                  dataKey="cpl"
+                  name="CPL"
+                  label={{ value: "Cost Per Lead (₴)", position: "bottom" }}
+                  domain={["auto", "auto"]}
+                />
+                <YAxis
+                  type="number"
+                  dataKey="roas"
+                  name="ROAS"
+                  label={{ value: "Return on Ad Spend", angle: -90, position: "left" }}
+                  domain={["auto", "auto"]}
+                />
+                <ZAxis type="number" dataKey="spend" range={[50, 400]} name="Spend" />
+                <Tooltip
+                  cursor={{ strokeDasharray: "3 3" }}
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      const data = payload[0].payload
+                      return (
+                        <div className="bg-white p-3 border rounded shadow-lg">
+                          <p className="font-semibold">{data.campaign_name}</p>
+                          <p className="text-sm">Platform: {data.platform}</p>
+                          <p className="text-sm">CPL: ₴{data.cpl?.toFixed(2) || "N/A"}</p>
+                          <p className="text-sm">ROAS: {data.roas?.toFixed(2) || "N/A"}</p>
+                          <p className="text-sm">Spend: ₴{(data.spend / 1000).toFixed(1)}k</p>
+                          <p className="text-sm">Leads: {data.leads}</p>
+                        </div>
+                      )
+                    }
+                    return null
+                  }}
+                />
+                <Legend />
+                <Scatter
+                  name="Google"
+                  data={scatterMatrix.filter((d: any) => d.platform === "google")}
+                  fill="#4285f4"
+                />
+                <Scatter
+                  name="Meta"
+                  data={scatterMatrix.filter((d: any) => d.platform === "meta")}
+                  fill="#1877f2"
+                />
+              </ScatterChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="py-8 text-center text-gray-400">
+              No scatter matrix data available
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 🆕 Anomalies (✅ v5/campaigns/anomalies) */}
+      <Card className="col-span-full">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-orange-500" />
+            Campaign Anomalies
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {anomalies.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {anomalies.slice(0, 6).map((anomaly: any, idx: number) => {
+                const severityColors = {
+                  high: "border-red-500 bg-red-50",
+                  medium: "border-orange-500 bg-orange-50",
+                  low: "border-yellow-500 bg-yellow-50",
+                }
+                const typeIcons = {
+                  spike_cpl: <ArrowUpRight className="h-4 w-4 text-red-500" />,
+                  drop_leads: <ArrowDownRight className="h-4 w-4 text-red-500" />,
+                  spike_spend: <ArrowUpRight className="h-4 w-4 text-orange-500" />,
+                }
+                return (
+                  <div
+                    key={idx}
+                    className={`border-2 rounded-lg p-4 ${severityColors[anomaly.severity as keyof typeof severityColors] || "border-gray-300"}`}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        {typeIcons[anomaly.anomaly_type as keyof typeof typeIcons]}
+                        <span className="text-xs font-semibold uppercase text-gray-600">
+                          {anomaly.anomaly_type.replace("_", " ")}
+                        </span>
+                      </div>
+                      <span className={`text-xs px-2 py-1 rounded font-semibold ${
+                        anomaly.severity === "high" ? "bg-red-200 text-red-800" :
+                        anomaly.severity === "medium" ? "bg-orange-200 text-orange-800" :
+                        "bg-yellow-200 text-yellow-800"
+                      }`}>
+                        {anomaly.severity}
+                      </span>
+                    </div>
+                    <p className="font-semibold text-sm mb-1 truncate" title={anomaly.campaign_name}>
+                      {anomaly.campaign_name}
+                    </p>
+                    <p className="text-xs text-gray-600 mb-2">{anomaly.platform}</p>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <p className="text-gray-500">Current CPL</p>
+                        <p className="font-semibold">₴{anomaly.current_cpl?.toFixed(2) || "N/A"}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">Baseline CPL</p>
+                        <p className="font-semibold">₴{anomaly.baseline_cpl?.toFixed(2) || "N/A"}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">Leads</p>
+                        <p className="font-semibold">{anomaly.leads}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">Spend</p>
+                        <p className="font-semibold">₴{(anomaly.spend / 1000).toFixed(1)}k</p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="py-8 text-center text-gray-400">
+              No anomalies detected
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 🆕 Paid vs Organic Split (✅ v6/leads/paid-split/platforms) */}
+      <Card className="col-span-full lg:col-span-2">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Target className="h-5 w-5" />
+            Paid vs Organic Traffic Split
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {paidSplit.length > 0 ? (
+            <div className="space-y-6">
+              {/* Bar Chart */}
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={paidSplit}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="platform" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="paid_leads" name="Paid Leads" fill="#3b82f6" stackId="a" />
+                  <Bar dataKey="organic_leads" name="Organic Leads" fill="#10b981" stackId="a" />
+                </BarChart>
+              </ResponsiveContainer>
+
+              {/* Details Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-2">Platform</th>
+                      <th className="text-right p-2">Paid</th>
+                      <th className="text-right p-2">Organic</th>
+                      <th className="text-right p-2">Total</th>
+                      <th className="text-right p-2">Paid %</th>
+                      <th className="text-right p-2">Organic %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paidSplit.map((split: any, idx: number) => (
+                      <tr key={idx} className="border-b hover:bg-gray-50">
+                        <td className="p-2 capitalize font-semibold">{split.platform}</td>
+                        <td className="text-right p-2 text-blue-600 font-semibold">{split.paid_leads}</td>
+                        <td className="text-right p-2 text-green-600 font-semibold">{split.organic_leads}</td>
+                        <td className="text-right p-2 font-semibold">{split.total_leads}</td>
+                        <td className="text-right p-2">{split.paid_pct.toFixed(1)}%</td>
+                        <td className="text-right p-2">{split.organic_pct.toFixed(1)}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div className="py-8 text-center text-gray-400">
+              No paid/organic split data available
             </div>
           )}
         </CardContent>
