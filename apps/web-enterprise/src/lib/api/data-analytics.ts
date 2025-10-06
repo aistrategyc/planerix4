@@ -3,7 +3,7 @@
  * ITstep client analytics with Period-over-Period comparison
  */
 
-import { apiClient } from "./config"
+import { api as apiClient } from "./config"
 
 interface CompareParams {
   date_from: string
