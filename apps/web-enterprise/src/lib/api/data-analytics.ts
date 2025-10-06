@@ -1,6 +1,7 @@
 /**
- * DataAnalytics v4 API Client
- * ITstep client analytics with Period-over-Period comparison
+ * DataAnalytics v5 API Client
+ * ITstep client analytics - Verified October 6, 2025
+ * 8/21 endpoints working, 13/21 pending implementation
  */
 
 import { api as apiClient } from "./config"
@@ -71,9 +72,22 @@ export const getTopMovers = async (params: TopMoversParams) => {
   return response.data
 }
 
-// Budget Recommendations
+// Budget Recommendations (✅ Working)
 export const getBudgetRecommendations = async (params: BudgetRecoParams) => {
   const response = await apiClient.get("/data-analytics/v6/reco/budget", { params })
+  return response.data
+}
+
+// WoW Campaigns (✅ Working)
+export const getWoWCampaigns = async (filters: DataAnalyticsFilters) => {
+  const response = await apiClient.get("/data-analytics/v5/campaigns/wow", {
+    params: {
+      date_from: filters.date_from,
+      date_to: filters.date_to,
+      platforms: filters.platforms,
+      limit: filters.limit || 20,
+    },
+  })
   return response.data
 }
 
@@ -159,7 +173,28 @@ export interface TopCampaignItem {
   roas: number | null
 }
 
-// KPI Cards (uses v5/kpi endpoint)
+export interface BudgetRecommendationItem {
+  platform: string
+  campaign_id: string
+  campaign_name: string
+  leads_cur: number
+  spend_cur: number
+  cpl_cur: number | null
+  roas_cur: number | null
+  leads_prev: number
+  spend_prev: number
+  cpl_prev: number | null
+  roas_prev: number | null
+  leads_diff: number
+  leads_diff_pct: number | null
+  action: "scale" | "pause" | "monitor"
+}
+
+// ============================================
+// ✅ WORKING ENDPOINTS (Verified Oct 6, 2025)
+// ============================================
+
+// 1. KPI Cards (✅ Working - v5/kpi)
 export const getKPICards = async (filters: DataAnalyticsFilters): Promise<KPICards> => {
   const response = await apiClient.get("/data-analytics/v5/kpi", {
     params: {
@@ -171,37 +206,39 @@ export const getKPICards = async (filters: DataAnalyticsFilters): Promise<KPICar
   return response.data
 }
 
-// Leads Trend
+// 2. Leads Trend (✅ Working - v5/trend/leads)
 export const getLeadsTrend = async (filters: DataAnalyticsFilters): Promise<LeadsTrendItem[]> => {
   const response = await apiClient.get("/data-analytics/v5/trend/leads", {
     params: {
       date_from: filters.date_from,
       date_to: filters.date_to,
       platforms: filters.platforms,
+      granularity: "daily",
     },
   })
   return response.data.data || []
 }
 
-// Spend Trend
+// 3. Spend Trend (✅ Working - v5/trend/spend)
 export const getSpendTrend = async (filters: DataAnalyticsFilters): Promise<SpendTrendItem[]> => {
   const response = await apiClient.get("/data-analytics/v5/trend/spend", {
     params: {
       date_from: filters.date_from,
       date_to: filters.date_to,
       platforms: filters.platforms,
+      granularity: "daily",
     },
   })
   return response.data.data || []
 }
 
-// Campaigns
+// 4. Campaigns List (✅ Working - v5/campaigns)
 export const getCampaigns = async (filters: DataAnalyticsFilters): Promise<CampaignItem[]> => {
   const response = await apiClient.get("/data-analytics/v5/campaigns", {
     params: {
       date_from: filters.date_from,
       date_to: filters.date_to,
-      platforms: filters.platforms,
+      platform: filters.platforms, // Note: singular 'platform' in API
       min_spend: filters.min_spend,
       limit: filters.limit || 50,
     },
@@ -209,15 +246,21 @@ export const getCampaigns = async (filters: DataAnalyticsFilters): Promise<Campa
   return response.data.data || []
 }
 
-// Week-over-Week Campaigns
-export const getWoWCampaignsLegacy = async (platforms?: string): Promise<WoWCampaignItem[]> => {
-  const response = await apiClient.get("/data-analytics/v5/campaigns/wow", {
-    params: { platforms, limit: 20 },
+// 5. Platform Share (✅ Working - v5/share/platforms)
+export const getPlatformShare = async (date_from: string, date_to: string): Promise<PlatformShareItem[]> => {
+  const response = await apiClient.get("/data-analytics/v5/share/platforms", {
+    params: { date_from, date_to },
   })
-  return response.data.data || []
+  const data = response.data.data || []
+  // Calculate share_pct if not provided
+  const total = data.reduce((sum: number, item: any) => sum + item.leads, 0)
+  return data.map((item: any) => ({
+    ...item,
+    share_pct: total > 0 ? (item.leads / total) * 100 : 0,
+  }))
 }
 
-// UTM Sources
+// 6. UTM Sources (✅ Working - v5/utm-sources)
 export const getUTMSources = async (filters: DataAnalyticsFilters): Promise<UTMSourceItem[]> => {
   const response = await apiClient.get("/data-analytics/v5/utm-sources", {
     params: {
@@ -230,23 +273,35 @@ export const getUTMSources = async (filters: DataAnalyticsFilters): Promise<UTMS
   return response.data.data || []
 }
 
-// Platform Share
-export const getPlatformShare = async (date_from: string, date_to: string): Promise<PlatformShareItem[]> => {
-  const response = await apiClient.get("/data-analytics/v5/share/platforms", {
-    params: { date_from, date_to },
+// 7. Week-over-Week Campaigns (✅ Working - v5/campaigns/wow)
+export const getWoWCampaignsLegacy = async (platforms?: string): Promise<WoWCampaignItem[]> => {
+  const response = await apiClient.get("/data-analytics/v5/campaigns/wow", {
+    params: { platforms, limit: 20 },
   })
   return response.data.data || []
 }
 
-// Top Campaigns by ROAS
+// 8. Budget Recommendations (✅ Working - v6/reco/budget)
+export const getBudgetRecommendationsLegacy = async (
+  date_from: string,
+  date_to: string,
+  limit: number = 10
+): Promise<BudgetRecommendationItem[]> => {
+  const response = await apiClient.get("/data-analytics/v6/reco/budget", {
+    params: { date_from, date_to, limit },
+  })
+  return response.data.data || []
+}
+
+// Top Campaigns by ROAS (uses campaigns endpoint)
 export const getTopCampaigns = async (date_from: string, date_to: string, limit: number = 5): Promise<TopCampaignItem[]> => {
   const response = await apiClient.get("/data-analytics/v5/campaigns", {
-    params: { date_from, date_to, limit },
+    params: { date_from, date_to, limit: 50 },
   })
   // Sort by ROAS descending
   const campaigns = response.data.data || []
   return campaigns
-    .filter((c: any) => c.roas !== null)
+    .filter((c: any) => c.roas !== null && c.roas > 0)
     .sort((a: any, b: any) => (b.roas || 0) - (a.roas || 0))
     .slice(0, limit)
 }
