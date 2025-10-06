@@ -112,3 +112,177 @@ export const getWoWCampaigns = async (params: { platforms?: string; limit?: numb
   const response = await apiClient.get("/data-analytics/v5/campaigns/wow", { params })
   return response.data
 }
+
+// ============================================
+// Legacy v3 compatibility wrappers for useDataAnalytics hook
+// ============================================
+
+export interface DataAnalyticsFilters {
+  date_from: string
+  date_to: string
+  platforms?: string
+  min_spend?: number
+  limit?: number
+}
+
+export interface KPICards {
+  leads: number
+  n_contracts: number
+  revenue: number
+  spend: number
+  cpl: number | null
+  roas: number | null
+}
+
+export interface LeadsTrendItem {
+  dt: string
+  leads: number
+}
+
+export interface SpendTrendItem {
+  dt: string
+  spend: number
+}
+
+export interface CampaignItem {
+  platform: string
+  campaign_id: string
+  campaign_name: string
+  leads: number
+  n_contracts: number
+  revenue: number
+  spend: number
+  cpl: number | null
+  roas: number | null
+}
+
+export interface WoWCampaignItem {
+  platform: string
+  campaign_id: string
+  campaign_name: string
+  leads_cur: number
+  leads_prev: number
+  leads_diff: number
+  leads_diff_pct: number | null
+  spend_cur: number
+  spend_prev: number
+  spend_diff: number
+  spend_diff_pct: number | null
+  cpl_cur: number | null
+  cpl_prev: number | null
+}
+
+export interface UTMSourceItem {
+  platform: string
+  utm_source: string
+  leads: number
+  n_contracts: number
+  revenue: number
+  spend: number
+}
+
+export interface PlatformShareItem {
+  platform: string
+  leads: number
+  share_pct: number
+}
+
+export interface TopCampaignItem {
+  platform: string
+  campaign_id: string
+  campaign_name: string
+  leads: number
+  roas: number | null
+}
+
+// KPI Cards (uses v5/kpi endpoint)
+export const getKPICards = async (filters: DataAnalyticsFilters): Promise<KPICards> => {
+  const response = await apiClient.get("/data-analytics/v5/kpi", {
+    params: {
+      date_from: filters.date_from,
+      date_to: filters.date_to,
+      platforms: filters.platforms,
+    },
+  })
+  return response.data
+}
+
+// Leads Trend
+export const getLeadsTrend = async (filters: DataAnalyticsFilters): Promise<LeadsTrendItem[]> => {
+  const response = await apiClient.get("/data-analytics/v5/trend/leads", {
+    params: {
+      date_from: filters.date_from,
+      date_to: filters.date_to,
+      platforms: filters.platforms,
+    },
+  })
+  return response.data.data || []
+}
+
+// Spend Trend
+export const getSpendTrend = async (filters: DataAnalyticsFilters): Promise<SpendTrendItem[]> => {
+  const response = await apiClient.get("/data-analytics/v5/trend/spend", {
+    params: {
+      date_from: filters.date_from,
+      date_to: filters.date_to,
+      platforms: filters.platforms,
+    },
+  })
+  return response.data.data || []
+}
+
+// Campaigns
+export const getCampaigns = async (filters: DataAnalyticsFilters): Promise<CampaignItem[]> => {
+  const response = await apiClient.get("/data-analytics/v5/campaigns", {
+    params: {
+      date_from: filters.date_from,
+      date_to: filters.date_to,
+      platforms: filters.platforms,
+      min_spend: filters.min_spend,
+      limit: filters.limit || 50,
+    },
+  })
+  return response.data.data || []
+}
+
+// Week-over-Week Campaigns
+export const getWoWCampaignsLegacy = async (platforms?: string): Promise<WoWCampaignItem[]> => {
+  const response = await apiClient.get("/data-analytics/v5/campaigns/wow", {
+    params: { platforms, limit: 20 },
+  })
+  return response.data.data || []
+}
+
+// UTM Sources
+export const getUTMSources = async (filters: DataAnalyticsFilters): Promise<UTMSourceItem[]> => {
+  const response = await apiClient.get("/data-analytics/v5/utm-sources", {
+    params: {
+      date_from: filters.date_from,
+      date_to: filters.date_to,
+      platforms: filters.platforms,
+      limit: filters.limit || 10,
+    },
+  })
+  return response.data.data || []
+}
+
+// Platform Share
+export const getPlatformShare = async (date_from: string, date_to: string): Promise<PlatformShareItem[]> => {
+  const response = await apiClient.get("/data-analytics/v5/share/platforms", {
+    params: { date_from, date_to },
+  })
+  return response.data.data || []
+}
+
+// Top Campaigns by ROAS
+export const getTopCampaigns = async (date_from: string, date_to: string, limit: number = 5): Promise<TopCampaignItem[]> => {
+  const response = await apiClient.get("/data-analytics/v5/campaigns", {
+    params: { date_from, date_to, limit },
+  })
+  // Sort by ROAS descending
+  const campaigns = response.data.data || []
+  return campaigns
+    .filter((c: any) => c.roas !== null)
+    .sort((a: any, b: any) => (b.roas || 0) - (a.roas || 0))
+    .slice(0, limit)
+}

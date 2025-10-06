@@ -9,7 +9,7 @@ import {
   getLeadsTrend,
   getSpendTrend,
   getCampaigns,
-  getWoWCampaigns,
+  getWoWCampaignsLegacy,
   getUTMSources,
   getPlatformShare,
   getTopCampaigns,
@@ -126,7 +126,7 @@ export function useDataAnalytics() {
           partialErrors.campaigns = e.message
           return []
         }),
-        getWoWCampaigns(filters.platforms).catch((e) => {
+        getWoWCampaignsLegacy(filters.platforms).catch((e) => {
           partialErrors.wowCampaigns = e.message
           return []
         }),
