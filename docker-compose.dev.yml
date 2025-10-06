@@ -70,13 +70,13 @@ services:
       context: ./apps/web-enterprise
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8001}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8001/api}
         NEXT_PUBLIC_API_PREFIX: ${NEXT_PUBLIC_API_PREFIX:-/api}
         NEXT_PUBLIC_AI_AGENT_WEBHOOK_URL: ${NEXT_PUBLIC_AI_AGENT_WEBHOOK_URL:-http://localhost:8001/webhook}
     restart: unless-stopped
     environment:
-      - INTERNAL_API_URL=http://backend:8001
-      - NEXT_PUBLIC_API_URL=http://localhost:8001
+      - INTERNAL_API_URL=http://backend:8001/api
+      - NEXT_PUBLIC_API_URL=http://localhost:8001/api
     env_file:
       - ./apps/web-enterprise/.env.local
     depends_on:

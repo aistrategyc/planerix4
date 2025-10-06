@@ -7,23 +7,18 @@ import process from 'process'; // Standard Node.js import
 
 // --------------------------------------------------
 // Base URL - разный для сервера и клиента
+// IMPORTANT: Next.js inlines NEXT_PUBLIC_* at BUILD time
 // --------------------------------------------------
 function getApiBaseUrl(): string {
   // На сервере (в Docker) используем INTERNAL_API_URL
   if (typeof window === "undefined") {
-    return (
-      process.env.INTERNAL_API_URL ||
-      process.env.NEXT_PUBLIC_API_URL ||
-      "http://localhost:8001/api"
-    ).replace(/\/+$/, "")
+    const url = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"
+    return url.replace(/\/+$/, "") + (url.includes("/api") ? "" : "/api")
   }
 
   // В браузере используем публичный URL
-  return (
-    process.env.NEXT_PUBLIC_API_BASE_URL ||
-    process.env.NEXT_PUBLIC_API_URL ||
-    "http://localhost:8001/api"
-  ).replace(/\/+$/, "")
+  const url = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001"
+  return url.replace(/\/+$/, "") + (url.includes("/api") ? "" : "/api")
 }
 
 export const API_BASE_URL = getApiBaseUrl()

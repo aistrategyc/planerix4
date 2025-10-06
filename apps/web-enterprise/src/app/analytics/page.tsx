@@ -24,7 +24,7 @@ import {
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts"
 import { cn } from "@/lib/utils"
 import { DateRangeFilter } from "@/components/analytics/DateRangeFilter"
-import { useAnalyticsDateRange } from "@/hooks/useAnalyticsDateRange"
+import { useDynamicDateRange } from "@/hooks/useDynamicDateRange"
 
 // Import analytics hooks
 import {
@@ -102,8 +102,15 @@ function LoadingSkeleton() {
 export default function AnalyticsPage() {
   const [activeTab, setActiveTab] = useState("overview")
 
-  // Date range management with calendar filter - use period with actual data
-  const { dateRange, apiDateRange, updateDateRange } = useAnalyticsDateRange(25)
+  // Date range management with calendar filter - dynamically load from database
+  const {
+    dateRange,
+    apiDateRange,
+    updateDateRange,
+    refreshDateRange,
+    isLoading: dateRangeLoading,
+    isUsingDatabaseDates
+  } = useDynamicDateRange(7) // Default to last 7 days of available data
   const { filters } = useAnalyticsFilters(apiDateRange)
 
   // Only essential data hooks
@@ -147,6 +154,11 @@ export default function AnalyticsPage() {
           <h1 className="text-3xl font-bold tracking-tight">📈 Аналитика</h1>
           <p className="text-muted-foreground">
             Ключевые показатели маркетинговых кампаний ITstep
+            {isUsingDatabaseDates && (
+              <span className="text-green-600 text-sm ml-2">
+                • Данные обновляются ежедневно
+              </span>
+            )}
           </p>
         </div>
 
@@ -155,10 +167,31 @@ export default function AnalyticsPage() {
             value={dateRange}
             onChange={updateDateRange}
           />
-          <Badge variant="outline" className="flex items-center">
-            <Activity className="h-3 w-3 mr-1" />
-            Live Data
-          </Badge>
+          {dateRangeLoading ? (
+            <Badge variant="outline" className="flex items-center">
+              <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+              Загрузка...
+            </Badge>
+          ) : isUsingDatabaseDates ? (
+            <Badge variant="outline" className="flex items-center text-green-700 border-green-200">
+              <Activity className="h-3 w-3 mr-1" />
+              Актуальные данные
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="flex items-center text-orange-700 border-orange-200">
+              <AlertTriangle className="h-3 w-3 mr-1" />
+              Резервные данные
+            </Badge>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={refreshDateRange}
+            disabled={dateRangeLoading}
+          >
+            <RefreshCw className={`h-3 w-3 mr-1 ${dateRangeLoading ? 'animate-spin' : ''}`} />
+            Обновить
+          </Button>
         </div>
       </div>
 

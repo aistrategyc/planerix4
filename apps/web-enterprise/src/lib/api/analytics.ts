@@ -114,15 +114,50 @@ export interface AnalyticsFilters {
 
 export class AnalyticsAPI {
   /**
-   * Generic method for analytics requests
+   * Generic method for analytics requests with improved error handling
    */
   static async fetchAnalytics<T = any>(endpoint: string, params?: any): Promise<T> {
     try {
-      const response = await api.get(endpoint, { params })
+      // Add timeout to prevent hanging requests
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+
+      const response = await api.get(endpoint, {
+        params,
+        signal: controller.signal
+      })
+
+      clearTimeout(timeoutId)
       return response.data
     } catch (error: any) {
-      console.error("Analytics fetch error:", error)
-      throw new Error(error.response?.data?.message || error.message || "Failed to fetch analytics")
+      // Log full error for debugging but don't expose sensitive details
+      console.error(`Analytics API Error [${endpoint}]:`, {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        message: error.message,
+        params: params,
+        timestamp: new Date().toISOString()
+      })
+
+      // Handle specific error types
+      if (error.name === 'AbortError') {
+        throw new Error('Request timeout - please try again')
+      }
+
+      if (error.response?.status === 404) {
+        throw new Error(`Analytics endpoint not found: ${endpoint}`)
+      }
+
+      if (error.response?.status >= 500) {
+        throw new Error('Server error - please try again later')
+      }
+
+      if (error.response?.status === 429) {
+        throw new Error('Too many requests - please wait before trying again')
+      }
+
+      const errorMessage = error.response?.data?.message || error.message || "Failed to fetch analytics data"
+      throw new Error(errorMessage)
     }
   }
 

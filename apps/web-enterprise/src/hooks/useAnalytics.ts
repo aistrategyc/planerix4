@@ -16,6 +16,19 @@ import {
   AnalyticsFilters
 } from '@/lib/api/analytics'
 
+// Request management constants
+const DEFAULT_RETRY_DELAY = 1000 // 1 second
+const MAX_RETRIES = 3
+const STALE_TIME_SHORT = 2 * 60 * 1000 // 2 minutes
+const STALE_TIME_MEDIUM = 5 * 60 * 1000 // 5 minutes
+const STALE_TIME_LONG = 10 * 60 * 1000 // 10 minutes
+const REFETCH_INTERVAL_REALTIME = 60 * 1000 // 1 minute instead of 30 seconds
+
+// Exponential backoff retry function
+const exponentialBackoff = (attempt: number) => {
+  return Math.min(DEFAULT_RETRY_DELAY * Math.pow(2, attempt), 10000) // Max 10 seconds
+}
+
 // ==================== QUERY KEYS ====================
 
 export const analyticsKeys = {
@@ -48,102 +61,152 @@ export const analyticsKeys = {
 // ==================== CUSTOM HOOKS ====================
 
 /**
- * Hook for dashboard overview data
+ * Hook for dashboard overview data with retry logic
  */
 export function useDashboardOverview(dateRange: DateRange) {
   return useQuery({
     queryKey: analyticsKeys.dashboard(dateRange),
     queryFn: () => AnalyticsAPI.getDashboardOverview(dateRange),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: STALE_TIME_MEDIUM,
+    cacheTime: STALE_TIME_LONG,
+    retry: MAX_RETRIES,
+    retryDelay: exponentialBackoff,
     enabled: Boolean(dateRange.start_date && dateRange.end_date),
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: true,
   })
 }
 
 /**
- * Hook for real-time metrics (updates every 30 seconds)
+ * Hook for real-time metrics (updates every minute with retry logic)
  */
 export function useRealTimeMetrics() {
   return useQuery({
     queryKey: analyticsKeys.realtime(),
     queryFn: () => AnalyticsAPI.getRealTimeMetrics(),
-    refetchInterval: 30 * 1000, // 30 seconds
-    staleTime: 30 * 1000,
+    refetchInterval: REFETCH_INTERVAL_REALTIME,
+    staleTime: STALE_TIME_SHORT,
+    cacheTime: STALE_TIME_MEDIUM,
+    retry: 2, // Less retries for frequent updates
+    retryDelay: exponentialBackoff,
+    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    refetchOnReconnect: true,
+    // Pause refetch when page is not visible
+    refetchIntervalInBackground: false,
   })
 }
 
 /**
- * Hook for KPI metrics
+ * Hook for KPI metrics with retry logic
  */
 export function useKPIs(dateRange: DateRange) {
   return useQuery({
     queryKey: analyticsKeys.kpis(dateRange),
     queryFn: () => AnalyticsAPI.getKPIs(dateRange),
-    staleTime: 5 * 60 * 1000,
+    staleTime: STALE_TIME_MEDIUM,
+    cacheTime: STALE_TIME_LONG,
+    retry: MAX_RETRIES,
+    retryDelay: exponentialBackoff,
     enabled: Boolean(dateRange.start_date && dateRange.end_date),
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: true,
   })
 }
 
 /**
- * Hook for platform performance
+ * Hook for platform performance with retry logic
  */
 export function usePlatformPerformance(dateRange: DateRange) {
   return useQuery({
     queryKey: analyticsKeys.platforms(dateRange),
     queryFn: () => AnalyticsAPI.getPlatformPerformance(dateRange),
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: STALE_TIME_LONG,
+    cacheTime: STALE_TIME_LONG * 2,
+    retry: MAX_RETRIES,
+    retryDelay: exponentialBackoff,
     enabled: Boolean(dateRange.start_date && dateRange.end_date),
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: true,
   })
 }
 
 // ==================== SALES HOOKS ====================
 
 /**
- * Hook for revenue trend data
+ * Hook for revenue trend data with retry logic
  */
 export function useRevenueTrend(dateRange: DateRange) {
   return useQuery({
     queryKey: analyticsKeys.revenueTrend(dateRange),
     queryFn: () => AnalyticsAPI.getRevenueTrend(dateRange),
-    staleTime: 10 * 60 * 1000,
+    staleTime: STALE_TIME_LONG,
+    cacheTime: STALE_TIME_LONG * 2,
+    retry: MAX_RETRIES,
+    retryDelay: exponentialBackoff,
     enabled: Boolean(dateRange.start_date && dateRange.end_date),
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: true,
   })
 }
 
 /**
- * Hook for sales by products
+ * Hook for sales by products with retry logic
  */
 export function useSalesByProducts(dateRange: DateRange) {
   return useQuery({
     queryKey: analyticsKeys.salesByProducts(dateRange),
     queryFn: () => AnalyticsAPI.getSalesByProducts(dateRange),
-    staleTime: 15 * 60 * 1000,
+    staleTime: STALE_TIME_LONG,
+    cacheTime: STALE_TIME_LONG * 2,
+    retry: MAX_RETRIES,
+    retryDelay: exponentialBackoff,
     enabled: Boolean(dateRange.start_date && dateRange.end_date),
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: true,
   })
 }
 
 /**
- * Hook for conversion funnel
+ * Hook for conversion funnel with retry logic
  */
 export function useConversionFunnel(dateRange: DateRange) {
   return useQuery({
     queryKey: analyticsKeys.conversionFunnel(dateRange),
     queryFn: () => AnalyticsAPI.getConversionFunnel(dateRange),
-    staleTime: 10 * 60 * 1000,
+    staleTime: STALE_TIME_LONG,
+    cacheTime: STALE_TIME_LONG * 2,
+    retry: MAX_RETRIES,
+    retryDelay: exponentialBackoff,
     enabled: Boolean(dateRange.start_date && dateRange.end_date),
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: true,
   })
 }
 
 // ==================== CAMPAIGNS HOOKS ====================
 
 /**
- * Hook for campaign performance with filters
+ * Hook for campaign performance with filters and retry logic
  */
 export function useCampaignPerformance(filters: AnalyticsFilters) {
   return useQuery({
     queryKey: analyticsKeys.campaigns(filters),
     queryFn: () => AnalyticsAPI.getCampaignPerformance(filters),
-    staleTime: 10 * 60 * 1000,
+    staleTime: STALE_TIME_LONG,
+    cacheTime: STALE_TIME_LONG * 2,
+    retry: MAX_RETRIES,
+    retryDelay: exponentialBackoff,
     enabled: Boolean(filters.start_date && filters.end_date),
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: true,
   })
 }
 
@@ -186,14 +249,20 @@ export function useRollingPerformance(days: number = 7) {
 // ==================== CREATIVES HOOKS ====================
 
 /**
- * Hook for creative performance
+ * Hook for creative performance with retry logic
  */
 export function useCreativePerformance(filters: AnalyticsFilters) {
   return useQuery({
     queryKey: analyticsKeys.creatives(filters),
     queryFn: () => AnalyticsAPI.getCreativePerformance(filters),
-    staleTime: 10 * 60 * 1000,
+    staleTime: STALE_TIME_LONG,
+    cacheTime: STALE_TIME_LONG * 2,
+    retry: MAX_RETRIES,
+    retryDelay: exponentialBackoff,
     enabled: Boolean(filters.start_date && filters.end_date),
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: true,
   })
 }
 

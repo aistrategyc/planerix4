@@ -1,6 +1,6 @@
 """Enhanced OKR/KPI system with advanced features
 
-Revision ID: 2025_09_30-1314_enhanced_okr_kpi_system
+Revision ID: 2025_09_30_1314_enhanced_okr_kpi_system
 Revises: backend_audit_fixes_2025_09_29
 Create Date: 2025-09-30T13:14:00.000000
 
@@ -13,7 +13,7 @@ Enhanced OKR and KPI models with:
 - Marketing analytics date parsing fixes
 """
 
-revision = '2025_09_30-1314_enhanced_okr_kpi_system'
+revision = '2025_09_30_1314_enhanced_okr_kpi_system'
 down_revision = 'backend_audit_fixes_2025_09_29'
 branch_labels = None
 depends_on = None
