@@ -2,9 +2,27 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/app/(auth)/hooks/useAuth";
-import { CompanyAPI } from "@/lib/api/company";
-import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import { useAuth } from "@/contexts/auth-context";
+import { useCompany, useCompanyTeam, useDepartments } from "@/app/company/hooks/useCompany";
+import {
+  Activity,
+  ArrowUpRight,
+  Calendar,
+  Target,
+  TrendingDown,
+  TrendingUp,
+  Users,
+  Brain,
+  AlertCircle,
+  ChevronRight,
+  FileText,
+} from "lucide-react";
 
 export default function HomePage() {
   const router = useRouter();

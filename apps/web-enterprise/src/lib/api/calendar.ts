@@ -92,7 +92,7 @@ export class CalendarAPI {
     const events: CalendarEvent[] = []
 
     try {
-      const tasksResponse = await api.get('tasks/')
+      const tasksResponse = await api.get('/tasks/')
       const tasks: Task[] = tasksResponse.data
 
       const taskEvents: CalendarEvent[] = tasks
@@ -120,7 +120,7 @@ export class CalendarAPI {
     }
 
     try {
-      const okrsResponse = await api.get('okrs/')
+      const okrsResponse = await api.get('/okrs')
       const okrs: OKREvent[] = okrsResponse.data
 
       const okrEvents: CalendarEvent[] = okrs
@@ -145,7 +145,7 @@ export class CalendarAPI {
     }
 
     try {
-      const projectsResponse = await api.get('projects/')
+      const projectsResponse = await api.get('/projects')
       const projects = projectsResponse.data
 
       const milestoneEvents: CalendarEvent[] = projects
@@ -180,7 +180,7 @@ export class CalendarAPI {
 
   static async createEvent(eventData: CreateEventRequest): Promise<CalendarEvent> {
     if (eventData.type === EventType.TASK) {
-      const taskResponse = await api.post('tasks/', {
+      const taskResponse = await api.post('/tasks/', {
         title: eventData.title,
         description: eventData.description,
         priority: eventData.priority || TaskPriority.MEDIUM,
@@ -215,7 +215,7 @@ export class CalendarAPI {
     const [type, id] = eventId.split('-')
 
     if (type === 'task') {
-      const taskResponse = await api.patch(`tasks/${id}`, {
+      const taskResponse = await api.patch(`/tasks/${id}`, {
         title: updates.title,
         description: updates.description,
         priority: updates.priority,
@@ -248,7 +248,7 @@ export class CalendarAPI {
     const [type, id] = eventId.split('-')
 
     if (type === 'task') {
-      await api.delete(`tasks/${id}`)
+      await api.delete(`/tasks/${id}`)
       return
     }
 
@@ -263,7 +263,7 @@ export class CalendarAPI {
                         status === EventStatus.IN_PROGRESS ? TaskStatus.IN_PROGRESS :
                         TaskStatus.TODO
 
-      await api.patch(`tasks/${id}/status`, { status: taskStatus })
+      await api.patch(`/tasks/${id}/status`, { status: taskStatus })
       return
     }
 

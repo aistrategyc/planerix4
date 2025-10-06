@@ -1,8 +1,9 @@
-// lib/api/onboarding.ts
+// lib/onboarding.ts
 
 import { api } from './config'
-import type { 
-  OrganizationCreatePayload, 
+import { apiCall } from './utils'
+import type {
+  OrganizationCreatePayload,
   OrganizationResponse,
   DepartmentCreatePayload,
   DepartmentResponse,
@@ -15,88 +16,98 @@ export class OnboardingAPI {
    * Создать организацию
    */
   static async createOrganization(payload: OrganizationCreatePayload): Promise<OrganizationResponse> {
-    try {
-      const response = await api.post('/orgs', payload)
-      return response.data
-    } catch (error: any) {
-      console.error('Create organization error:', error)
-      throw error
-    }
+    return apiCall<OrganizationResponse>(
+      api.post('/orgs', payload),
+      { extractType: 'single', errorContext: 'Create organization' }
+    )
   }
 
   /**
    * Создать департамент
    */
   static async createDepartment(
-    orgId: string, 
+    orgId: string,
     payload: DepartmentCreatePayload
   ): Promise<DepartmentResponse> {
-    try {
-      const response = await api.post(`/orgs/${orgId}/departments`, payload)
-      return response.data
-    } catch (error: any) {
-      console.error('Create department error:', error)
-      throw error
-    }
+    return apiCall<DepartmentResponse>(
+      api.post(`/orgs/${orgId}/departments`, payload),
+      { extractType: 'single', errorContext: 'Create department' }
+    )
   }
 
   /**
-   * Массовое приглашение пользователей
+   * Массовое приглашение пользователей (через invitations)
+   * Используем правильный endpoint для приглашений по email
    */
   static async bulkInvite(
-    orgId: string, 
+    orgId: string,
     invites: InviteItem[]
   ): Promise<BulkInviteResponse> {
-    try {
-      const payload = {
-        memberships: invites.map(invite => ({
-          user_id: invite.email, // предполагаем, что бэкенд принимает email
-          role: invite.role,
-          department_id: invite.department_id
-        }))
-      }
-      
-      const response = await api.post(`/orgs/${orgId}/memberships/bulk`, payload)
-      return response.data
-    } catch (error: any) {
-      console.error('Bulk invite error:', error)
-      throw error
+    const results = {
+      created: [] as any[],
+      errors: [] as any[],
+      updated: [] as any[],
+      total: invites.length
     }
+
+    for (let i = 0; i < invites.length; i++) {
+      const invite = invites[i]
+      try {
+        const payload = {
+          email: invite.email,
+          role: invite.role || 'member',
+          department_id: invite.department_id || null
+        }
+
+        const response = await apiCall<any>(
+          api.post(`/orgs/${orgId}/memberships/bulk-invite`, payload),
+          { extractType: 'single', errorContext: 'Create invitation' }
+        )
+
+        results.created.push({
+          invitation_id: response.id,
+          email: invite.email,
+          role: invite.role || 'member'
+        })
+      } catch (error: any) {
+        results.errors.push({
+          index: i,
+          email: invite.email,
+          error: error.message || 'Unknown error'
+        })
+      }
+    }
+
+    return results
   }
 
   /**
    * Создать отдельное приглашение
    */
   static async createInvite(
-    orgId: string, 
+    orgId: string,
     invite: InviteItem
   ): Promise<any> {
-    try {
-      const payload = {
-        user_id: invite.email, // или используйте специальный эндпоинт для email
-        role: invite.role,
-        department_id: invite.department_id
-      }
-      
-      const response = await api.post(`/orgs/${orgId}/memberships`, payload)
-      return response.data
-    } catch (error: any) {
-      console.error('Create invite error:', error)
-      throw error
+    const payload = {
+      invited_email: invite.email,
+      role: invite.role || 'member',
+      department_id: invite.department_id || null
     }
+
+    return apiCall<any>(
+      api.post(`/orgs/${orgId}/memberships/bulk-invite`, payload),
+      { extractType: 'single', errorContext: 'Create invite' }
+    )
   }
 
   /**
    * Получить список организаций пользователя
    */
   static async getUserOrganizations(): Promise<OrganizationResponse[]> {
-    try {
-      const response = await api.get('/orgs')
-      return response.data
-    } catch (error: any) {
-      console.error('Get user organizations error:', error)
-      throw error
-    }
+    return apiCall<OrganizationResponse[]>(
+      api.get('/orgs'),
+      { extractType: 'list', errorContext: 'Get user organizations' }
+    )
   }
 
   /**
@@ -104,14 +115,15 @@ export class OnboardingAPI {
    */
   static async checkSlugAvailability(slug: string): Promise<{ available: boolean }> {
     try {
-      const response = await api.get(`/orgs/check-slug/${slug}`)
-      return response.data
+      return await apiCall<{ available: boolean }>(
+        api.get(`/orgs/check-slug/${slug}`),
+        { extractType: 'single', errorContext: 'Check slug availability' }
+      )
     } catch (error: any) {
       // Если эндпоинт не существует, считаем доступным
-      if (error.response?.status === 404) {
+      if (error.message?.includes('404') || error.response?.status === 404) {
         return { available: true }
       }
-      console.error('Check slug availability error:', error)
       throw error
     }
   }
@@ -120,55 +132,53 @@ export class OnboardingAPI {
    * Получить организацию по ID
    */
   static async getOrganization(orgId: string): Promise<OrganizationResponse> {
-    try {
-      const response = await api.get(`/orgs/${orgId}`)
-      return response.data
-    } catch (error: any) {
-      console.error('Get organization error:', error)
-      throw error
-    }
+    return apiCall<OrganizationResponse>(
+      api.get(`/orgs/${orgId}`),
+      { extractType: 'single', errorContext: 'Get organization' }
+    )
   }
 
   /**
    * Обновить организацию
    */
   static async updateOrganization(
-    orgId: string, 
+    orgId: string,
     payload: Partial<OrganizationCreatePayload>
   ): Promise<OrganizationResponse> {
-    try {
-      const response = await api.patch(`/orgs/${orgId}`, payload)
-      return response.data
-    } catch (error: any) {
-      console.error('Update organization error:', error)
-      throw error
-    }
+    return apiCall<OrganizationResponse>(
+      api.patch(`/orgs/${orgId}`, payload),
+      { extractType: 'single', errorContext: 'Update organization' }
+    )
   }
 
   /**
    * Получить департаменты организации
    */
   static async getDepartments(orgId: string): Promise<DepartmentResponse[]> {
-    try {
-      const response = await api.get(`/orgs/${orgId}/departments`)
-      return response.data.items || response.data
-    } catch (error: any) {
-      console.error('Get departments error:', error)
-      throw error
-    }
+    return apiCall<DepartmentResponse[]>(
+      api.get(`/orgs/${orgId}/departments`),
+      { extractType: 'list', errorContext: 'Get departments' }
+    )
   }
 
   /**
    * Получить участников организации
    */
   static async getMembers(orgId: string): Promise<any[]> {
-    try {
-      const response = await api.get(`/orgs/${orgId}/memberships`)
-      return response.data.items || response.data
-    } catch (error: any) {
-      console.error('Get members error:', error)
-      throw error
-    }
+    return apiCall<any[]>(
+      api.get(`/orgs/${orgId}/memberships`),
+      { extractType: 'list', errorContext: 'Get members' }
+    )
+  }
+
+  /**
+   * Получить приглашения организации
+   */
+  static async getInvitations(orgId: string): Promise<any[]> {
+    return apiCall<any[]>(
+      api.get(`/orgs/${orgId}/memberships/bulk-invite`),
+      { extractType: 'list', errorContext: 'Get invitations' }
+    )
   }
 }
 

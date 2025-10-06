@@ -12,9 +12,9 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle, Loader2 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
-import { useAuth } from "@/app/(auth)/hooks/useAuth"
+import { useAuth } from "@/contexts/auth-context"
 
-// ✅ СХЕМА ВАЛИДАЦИИ
+// ✅ СХЕМА ВАЛИДАЦИИ С first_name и last_name
 const registerSchema = z.object({
   email: z.string().email({ message: "Введите корректный email" }),
   password: z
@@ -25,6 +25,8 @@ const registerSchema = z.object({
     .regex(/[0-9]/, { message: "Пароль должен содержать цифру" })
     .regex(/[!@#$%^&*(),.?":{}|<>]/, { message: "Пароль должен содержать спецсимвол" }),
   username: z.string().min(3, { message: "Введите имя пользователя" }),
+  first_name: z.string().min(1, { message: "Введите имя" }),
+  last_name: z.string().min(1, { message: "Введите фамилию" }),
   terms_accepted: z.boolean().refine((val) => val === true, {
     message: "Необходимо принять условия использования",
   }),
@@ -50,6 +52,8 @@ export default function RegisterPage() {
       email: "",
       password: "",
       username: "",
+      first_name: "",
+      last_name: "",
       terms_accepted: false,
     },
   })
@@ -64,7 +68,7 @@ export default function RegisterPage() {
     if (apiError) setApiError(null)
     clearError()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watch("email"), watch("password"), watch("username"), watch("terms_accepted")])
+  }, [watch("email"), watch("password"), watch("username"), watch("first_name"), watch("last_name"), watch("terms_accepted")])
 
   const onSubmit = async (data: RegisterForm) => {
     if (isSubmitting) return
@@ -72,29 +76,11 @@ export default function RegisterPage() {
     setApiError(null)
 
     try {
-      await doRegister({
-        email: data.email,
-        password: data.password,
-        username: data.username,
-        terms_accepted: data.terms_accepted,
-      })
+      await doRegister(data)
       // navigation happens inside useAuth.register (to /verify-email)
-    } catch (err: any) {
-      const msg = (() => {
-        if (!err) return "Произошла ошибка при регистрации"
-        if (typeof err === "string") return err
-        if (err?.message) return err.message
-        if (err?.detail) {
-          if (Array.isArray(err.detail)) {
-            return err.detail
-              .map((e: any) => `${(e.loc || []).join(".")}: ${e.msg}`)
-              .join("\n")
-          }
-          if (typeof err.detail === "string") return err.detail
-        }
-        return "Произошла ошибка при регистрации"
-      })()
-      setApiError(msg)
+    } catch {
+      // useAuth already handles the error and sets authError
+      // No need to extract error message here
     } finally {
       setIsSubmitting(false)
     }
@@ -110,10 +96,10 @@ export default function RegisterPage() {
 
         <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            {(apiError || authError) && (
+            {(authError) && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{apiError || authError}</AlertDescription>
+                <AlertDescription>{authError}</AlertDescription>
               </Alert>
             )}
 
@@ -123,13 +109,41 @@ export default function RegisterPage() {
                 <Label htmlFor="username">Имя пользователя</Label>
                 <Input
                   id="username"
-                  placeholder="Ваше имя"
+                  placeholder="username"
                   {...register("username")}
                   className={errors.username ? "border-destructive" : ""}
                 />
                 {errors.username && (
                   <p className="text-sm text-destructive">{errors.username.message}</p>
                 )}
+              </div>
+
+              {/* Имя и Фамилия */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="first_name">Имя</Label>
+                  <Input
+                    id="first_name"
+                    placeholder="Иван"
+                    {...register("first_name")}
+                    className={errors.first_name ? "border-destructive" : ""}
+                  />
+                  {errors.first_name && (
+                    <p className="text-sm text-destructive">{errors.first_name.message}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="last_name">Фамилия</Label>
+                  <Input
+                    id="last_name"
+                    placeholder="Иванов"
+                    {...register("last_name")}
+                    className={errors.last_name ? "border-destructive" : ""}
+                  />
+                  {errors.last_name && (
+                    <p className="text-sm text-destructive">{errors.last_name.message}</p>
+                  )}
+                </div>
               </div>
 
               {/* Email */}
@@ -177,11 +191,11 @@ export default function RegisterPage() {
                     className="mt-1"
                   />
                   <Label htmlFor="terms" className="text-sm leading-5 cursor-pointer">
-                    Я принимаю{' '}
+                    Я принимаю{" "}
                     <Link href="/terms" className="text-primary hover:underline" target="_blank">
                       условия использования
-                    </Link>{' '}
-                    и{' '}
+                    </Link>{" "}
+                    и{" "}
                     <Link href="/privacy" className="text-primary hover:underline" target="_blank">
                       политику конфиденциальности
                     </Link>
@@ -202,7 +216,7 @@ export default function RegisterPage() {
 
         <div className="text-center">
           <p className="text-sm text-muted-foreground">
-            Уже есть аккаунт?{' '}
+            Уже есть аккаунт?{" "}
             <Link href="/login" className="text-primary hover:text-primary/80 font-medium transition-colors">
               Войти
             </Link>

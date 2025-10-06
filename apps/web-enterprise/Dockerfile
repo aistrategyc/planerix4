@@ -25,12 +25,16 @@ ARG NEXT_PUBLIC_AI_AGENT_WEBHOOK_URL
 ARG RESEND_API_KEY
 ARG RESEND_FROM
 ARG CONTACT_TO
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_API_PREFIX
 
 # Делаем их доступными на этапе сборки Next
 ENV NEXT_PUBLIC_AI_AGENT_WEBHOOK_URL=${NEXT_PUBLIC_AI_AGENT_WEBHOOK_URL}
 ENV RESEND_API_KEY=${RESEND_API_KEY}
 ENV RESEND_FROM=${RESEND_FROM}
 ENV CONTACT_TO=${CONTACT_TO}
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_API_PREFIX=${NEXT_PUBLIC_API_PREFIX}
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -49,8 +53,8 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=3000
-RUN apk add --no-cache libc6-compat
+ENV PORT=3001
+RUN apk add --no-cache libc6-compat curl
 
 # Безопасный пользователь
 RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
@@ -61,6 +65,6 @@ COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
 
 USER nextjs
-EXPOSE 3000
+EXPOSE 3001
 
 CMD ["node", "server.js"]

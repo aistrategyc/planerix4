@@ -3,10 +3,9 @@ import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
 import { cn } from "@/lib/utils"
 import { Providers } from "./providers"
-import { AuthProvider } from "@/app/(auth)/hooks/useAuth"
-import Header from "@/components/ui/header"
-import Sidebar from "@/components/ui/sidebar"
+import { AuthProvider } from "@/contexts/auth-context"
 import { ToastProvider } from "@/components/ui/use-toast"
+import { AppLayout } from "@/components/layout/AppLayout"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -42,7 +41,7 @@ export default function RootLayout({
         <Providers>
           <AuthProvider>
             <ToastProvider>
-              <ConditionalLayout>{children}</ConditionalLayout>
+              <AppLayout>{children}</AppLayout>
             </ToastProvider>
           </AuthProvider>
         </Providers>
@@ -51,16 +50,3 @@ export default function RootLayout({
   )
 }
 
-function ConditionalLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <>
-      <Header />
-      <div className="relative flex min-h-screen">
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto px-6 py-6 md:px-10 md:py-8 pt-20 bg-white/80 backdrop-blur-sm">
-          {children}
-        </main>
-      </div>
-    </>
-  )
-}

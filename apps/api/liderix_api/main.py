@@ -23,19 +23,48 @@ app = FastAPI(
     version=settings.PROJECT_VERSION,
     docs_url="/docs",
     redoc_url="/redoc",
+    openapi_url="/api/openapi.json"
 )
 
 # -----------------------------------------------------------------------------
-# CORS — strict, production-ready
+# CORS — production-ready with environment configuration
 # -----------------------------------------------------------------------------
-ALLOWED_ORIGINS = [
+# Default localhost origins for development
+DEFAULT_ORIGINS = [
     "http://localhost:3000",
-    "http://localhost:3001",
+    "http://localhost:3001", 
     "http://localhost:3002",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:3001",
     "http://127.0.0.1:3002",
 ]
+
+# Use environment CORS_ALLOW_ORIGINS if available, otherwise fallback to defaults
+ALLOWED_ORIGINS = getattr(settings, 'CORS_ALLOW_ORIGINS', DEFAULT_ORIGINS)
+
+# If CORS_ALLOW_ORIGINS is a string, parse it appropriately
+if isinstance(ALLOWED_ORIGINS, str):
+    # First try comma-separated format (most common)
+    if "," in ALLOWED_ORIGINS:
+        ALLOWED_ORIGINS = [s.strip() for s in ALLOWED_ORIGINS.split(",") if s.strip()]
+    elif ALLOWED_ORIGINS.strip() == "*":
+        # Wildcard not allowed with credentials - use defaults instead
+        logger.warning("CORS wildcard '*' not allowed with credentials=True, using default origins")
+        ALLOWED_ORIGINS = DEFAULT_ORIGINS
+    else:
+        # Try JSON array format
+        try:
+            import json
+            ALLOWED_ORIGINS = json.loads(ALLOWED_ORIGINS)
+        except (json.JSONDecodeError, TypeError):
+            # Single origin
+            ALLOWED_ORIGINS = [ALLOWED_ORIGINS.strip()]
+
+    if not ALLOWED_ORIGINS:
+        logger.warning(f"Failed to parse CORS_ALLOW_ORIGINS, using defaults")
+        ALLOWED_ORIGINS = DEFAULT_ORIGINS
+
+logger.info(f"CORS allowed origins: {ALLOWED_ORIGINS}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -89,44 +118,11 @@ async def get_liderix_session() -> AsyncGenerator[AsyncSession, None]:
                 pass  # Игнорируем ошибки закрытия
 
 # -----------------------------------------------------------------------------
-# БД: клиентская (ITSTEP) - с улучшенной обработкой
+# БД: клиентская (ITSTEP) - используем из db.py для единообразия
 # -----------------------------------------------------------------------------
-engine_itstep: Optional[AsyncEngine] = None
-SessionItstep: Optional[sessionmaker] = None
+from liderix_api.db import get_itstep_session, itstep_engine
 
-if settings.ITSTEP_DB_URL:
-    try:
-        engine_itstep = create_async_engine(
-            settings.ITSTEP_DB_URL,
-            echo=False,
-            pool_pre_ping=True,
-            pool_size=getattr(settings, "CLIENT_DB_POOL_SIZE", 3),
-            max_overflow=getattr(settings, "CLIENT_DB_MAX_OVERFLOW", 5),
-            pool_timeout=20,
-            pool_recycle=3600,
-        )
-        SessionItstep = sessionmaker(engine_itstep, class_=AsyncSession, expire_on_commit=False)
-        logger.info("Client DB (ITSTEP) engine created successfully")
-    except Exception as e:
-        logger.error(f"Failed to create client database engine: {e}")
-        engine_itstep = None
-        SessionItstep = None
-else:
-    logger.warning("ITSTEP_DB_URL is not set — client analytics routes will return 503.")
-
-async def get_itstep_session() -> AsyncGenerator[AsyncSession, None]:
-    if SessionItstep is None:
-        raise HTTPException(status_code=503, detail="Client DB is not configured")
-    
-    async with SessionItstep() as session:
-        try:
-            yield session
-        except Exception as e:
-            logger.error(f"Client database session error: {e}")
-            await session.rollback()
-            raise
-        finally:
-            await session.close()
+logger.info("Using ITSTEP DB configuration from db.py module")
 
 # -----------------------------------------------------------------------------
 # Middleware: Suppress audit logs for auth errors
@@ -183,9 +179,9 @@ async def on_startup():
             await asyncio.sleep(2)
     
     # Warmup client DB (не критично)
-    if engine_itstep is not None:
+    if itstep_engine is not None:
         try:
-            async with engine_itstep.begin() as conn:
+            async with itstep_engine.begin() as conn:
                 await conn.run_sync(lambda *_: None)
             logger.info("Client DB (ITSTEP) connection is warm.")
         except Exception as e:
@@ -205,9 +201,9 @@ async def on_shutdown():
     except Exception as e:
         logger.warning(f"Dispose primary DB error: {e}")
     
-    if engine_itstep is not None:
+    if itstep_engine is not None:
         try:
-            await engine_itstep.dispose()
+            await itstep_engine.dispose()
             logger.info("Client DB connections disposed.")
         except Exception as e:
             logger.warning(f"Dispose client DB error: {e}")
@@ -243,9 +239,9 @@ async def readiness():
         overall_status = "degraded"
     
     # Проверка клиентской БД
-    if engine_itstep is not None:
+    if itstep_engine is not None:
         try:
-            async with engine_itstep.begin() as conn:
+            async with itstep_engine.begin() as conn:
                 await conn.run_sync(lambda *_: None)
             checks["client_db"] = {"status": "healthy", "type": "postgresql"}
         except Exception as e:
@@ -272,10 +268,20 @@ from liderix_api.routes import (
     projects as projects_router,
     tasks as tasks_router,
     okrs as okrs_router,
-    kpis as kpis_router,
+    # kpis as kpis_router,  # DISABLED
     auth as auth_router,
     analytics as analytics_router,
 )
+
+# --- клиентские (ITstep БД) ---
+from liderix_api.routes import data_analytics as data_analytics_router
+
+# Import test analytics endpoint
+try:
+    from liderix_api.test_analytics_endpoint import router as test_analytics_router
+    TEST_ANALYTICS_AVAILABLE = True
+except ImportError:
+    TEST_ANALYTICS_AVAILABLE = False
 
 # Подключение роутеров
 app.include_router(users_router.router, prefix=PREFIX, tags=["Users"])
@@ -283,79 +289,64 @@ app.include_router(client_router.router, prefix=PREFIX, tags=["Clients"])
 app.include_router(projects_router.router, prefix=PREFIX, tags=["Projects"])
 app.include_router(tasks_router.router, prefix=PREFIX, tags=["Tasks"])
 app.include_router(okrs_router.router, prefix=PREFIX, tags=["OKRs"])
-app.include_router(kpis_router.router, prefix=PREFIX, tags=["KPIs"])
+# app.include_router(kpis_router.router, prefix=PREFIX, tags=["KPIs"]) # DISABLED: KPI model issues
 app.include_router(auth_router.router, prefix=PREFIX, tags=["Auth"])
-app.include_router(analytics_router.router, prefix=PREFIX, tags=["Analytics"])
+app.include_router(analytics_router.router, prefix=f"{PREFIX}/analytics", tags=["Analytics"])
 
-# -----------------------------------------------------------------------------
-# Улучшенная аутентификация с fallback
-# -----------------------------------------------------------------------------
-_bearer = HTTPBearer(auto_error=False)
+# Add test analytics router if available
+if TEST_ANALYTICS_AVAILABLE:
+    app.include_router(test_analytics_router, prefix=PREFIX, tags=["Test Analytics"])
 
-def _get_jwt_secret_and_opts():
-    """Получение JWT настроек с fallback"""
-    secret = (
-        getattr(settings, "ACCESS_TOKEN_SECRET", None)
-        or getattr(settings, "JWT_SECRET", None)
-        or getattr(settings, "SECRET_KEY", None)
-    )
-    alg = getattr(settings, "JWT_ALGORITHM", "HS256")
-    aud = getattr(settings, "JWT_AUDIENCE", None)
-    iss = getattr(settings, "JWT_ISSUER", None)
-    return secret, alg, aud, iss
+# Data Analytics router (ITstep client data)
+app.include_router(
+    data_analytics_router.router,
+    prefix=f"{PREFIX}/data-analytics",
+    tags=["Data Analytics"],
+)
 
-async def _get_current_user_from_bearer(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-):
-    """
-    Безопасная аутентификация через JWT токен
-    Удален fallback для production безопасности
-    """
-    if not credentials:
-        logger.error("No authorization header provided")
-        raise HTTPException(
-            status_code=401, 
-            detail="Authorization header required",
-            headers={"WWW-Authenticate": "Bearer"}
-        )
+# Direct test endpoints for ITstep analytics
+@app.get("/api/test-itstep/health")
+async def test_itstep_health():
+    """Direct test endpoint for ITstep analytics"""
+    return {
+        "status": "healthy",
+        "service": "ITstep Direct Analytics",
+        "database_url_configured": bool(os.getenv("ITSTEP_DB_URL")),
+        "timestamp": "2025-09-29"
+    }
 
-    token = credentials.credentials
-    secret, alg, aud, iss = _get_jwt_secret_and_opts()
+@app.get("/api/test-itstep/connection")
+async def test_itstep_connection():
+    """Direct test connection to ITstep database"""
+    import asyncpg
 
-    if not secret:
-        logger.error("JWT secret is not configured")
-        raise HTTPException(
-            status_code=500, 
-            detail="Server configuration error"
-        )
+    ITSTEP_DB_URL = os.getenv("ITSTEP_DB_URL", "postgresql+asyncpg://bi_app:Resurgam65!@92.242.60.211:5432/itstep_final")
 
     try:
-        options = {"verify_aud": False if not aud else True}
-        payload = jwt.decode(
-            token,
-            secret,
-            algorithms=[alg],
-            audience=aud,
-            issuer=iss,
-            options=options,
-        )
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
-    except jwt.InvalidTokenError as e:
-        logger.warning(f"Invalid token: {e}")
-        raise HTTPException(status_code=401, detail="Invalid token")
+        # Convert URL for asyncpg
+        db_url = ITSTEP_DB_URL.replace("postgresql+asyncpg://", "postgresql://")
+        conn = await asyncpg.connect(db_url)
 
-    # Создаем минимальный user объект
-    class _MiniUser:
-        def __init__(self, payload):
-            self.id = payload.get("user_id") or payload.get("sub")
-            self.email = payload.get("email")
-            self.full_name = payload.get("name") or payload.get("username")
-            self.is_active = True
-            self.roles = payload.get("roles", [])
+        # Test query
+        result = await conn.fetchrow("SELECT version() as db_version, current_database() as db_name")
+        await conn.close()
 
-    return _MiniUser(payload)
+        return {
+            "status": "success",
+            "message": "ITstep database connection successful",
+            "database": result["db_name"] if result else "unknown",
+            "version": result["db_version"] if result else "unknown"
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Connection failed: {str(e)}",
+            "database_url": ITSTEP_DB_URL.replace("Resurgam65!", "***") # Hide password
+        }
 
+# -----------------------------------------------------------------------------
+# Улучшенная аутентификация без fallback
+# -----------------------------------------------------------------------------
 # Импорт основной аутентификации
 try:
     from liderix_api.routes.auth.deps import get_current_user as _get_current_user
@@ -363,34 +354,37 @@ except ImportError:
     try:
         from liderix_api.routes.auth.utils import get_current_user as _get_current_user
     except ImportError:
-        _get_current_user = None
-        logger.warning("No primary auth dependency found, using fallback only")
+        try:
+            from liderix_api.services.auth import get_current_user as _get_current_user
+        except ImportError:
+            _get_current_user = None
+            logger.error("No auth dependency found - auth required endpoints will fail")
 
 async def _composite_current_user(request: Request):
-    """Композитная аутентификация: основная + fallback"""
-    if _get_current_user:
-        try:
-            # Проверяем сигнатуру функции
-            sig = inspect.signature(_get_current_user)
-            if 'request' in sig.parameters:
-                return await _get_current_user(request)
-            else:
-                # Если это dependency, создаем временный объект
-                return await _get_current_user()
-        except HTTPException:
-            raise  # Перебрасываем HTTP исключения как есть
-        except Exception as e:
-            logger.warning(f"Primary auth failed, using fallback: {e}")
-            # Fallback к header-based auth
-            bearer_creds = await _bearer(request)
-            return await _get_current_user_from_bearer(bearer_creds)
+    """Строгая аутентификация для production"""
+    if not _get_current_user:
+        raise HTTPException(
+            status_code=500, 
+            detail="Authentication system not configured"
+        )
     
-    # Только fallback
-    bearer_creds = await _bearer(request)
-    return await _get_current_user_from_bearer(bearer_creds)
+    try:
+        # Проверяем сигнатуру функции
+        sig = inspect.signature(_get_current_user)
+        if 'request' in sig.parameters:
+            return await _get_current_user(request)
+        else:
+            # Если это dependency, создаем временный объект
+            return await _get_current_user()
+    except Exception as e:
+        logger.warning(f"Authentication failed: {e}")
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required"
+        )
 
 # -----------------------------------------------------------------------------
-# /users/me endpoint
+# /users/me endpoint - строгая аутентификация
 # -----------------------------------------------------------------------------
 try:
     from pydantic import BaseModel as _BaseModel
@@ -411,46 +405,29 @@ class _UserMeResponse(_BaseModel):
 
 @app.get(f"{PREFIX}/users/me", tags=["Users"], response_model=_UserMeResponse, name="users:me")
 async def get_me(request: Request):
-    """Получение информации о текущем пользователе - для тестирования без токена"""
-    try:
-        # Пытаемся получить пользователя через auth
-        current_user = await _composite_current_user(request)
-        return {
-            "id": str(getattr(current_user, "id", "")),
-            "email": getattr(current_user, "email", ""),
-            "username": getattr(current_user, "username", None),
-            "full_name": (
-                getattr(current_user, "full_name", None) 
-                or getattr(current_user, "name", None)
-            ),
-            "is_active": getattr(current_user, "is_active", True),
-            "is_verified": getattr(current_user, "is_verified", True),
-            "avatar_url": getattr(current_user, "avatar_url", None),
-            "created_at": str(getattr(current_user, "created_at", "")) if getattr(current_user, "created_at", None) else None,
-            "updated_at": str(getattr(current_user, "updated_at", "")) if getattr(current_user, "updated_at", None) else None,
-            "last_login_at": str(getattr(current_user, "last_login_at", "")) if getattr(current_user, "last_login_at", None) else None,
-        }
-    except Exception as e:
-        logger.warning(f"Auth failed for /users/me, returning test user: {e}")
-        # Возвращаем тестового пользователя для разработки
-        return {
-            "id": "test-dev-user",
-            "email": "dev@test.com",
-            "username": "devuser",
-            "full_name": "Development User",
-            "is_active": True,
-            "is_verified": True,
-            "avatar_url": None,
-            "created_at": "2024-01-01T00:00:00Z",
-            "updated_at": None,
-            "last_login_at": None,
-        }
+    """Получение информации о текущем пользователе"""
+    current_user = await _composite_current_user(request)
+    return {
+        "id": str(getattr(current_user, "id", "")),
+        "email": getattr(current_user, "email", ""),
+        "username": getattr(current_user, "username", None),
+        "full_name": (
+            getattr(current_user, "full_name", None) 
+            or getattr(current_user, "name", None)
+        ),
+        "is_active": getattr(current_user, "is_active", True),
+        "is_verified": getattr(current_user, "is_verified", True),
+        "avatar_url": getattr(current_user, "avatar_url", None),
+        "created_at": str(getattr(current_user, "created_at", "")) if getattr(current_user, "created_at", None) else None,
+        "updated_at": str(getattr(current_user, "updated_at", "")) if getattr(current_user, "updated_at", None) else None,
+        "last_login_at": str(getattr(current_user, "last_login_at", "")) if getattr(current_user, "last_login_at", None) else None,
+    }
 
 # -----------------------------------------------------------------------------
 # Клиентские роутеры с правильными зависимостями
 # -----------------------------------------------------------------------------
 from liderix_api.routes.dashboard import overview as dashboard_router
-from liderix_api.routes.analytics import sales as sales_router
+# from liderix_api.routes.analytics import sales as sales_router  # DISABLED - conflicts with main analytics router
 
 app.include_router(
     dashboard_router.router,
@@ -459,12 +436,13 @@ app.include_router(
     dependencies=[Depends(get_itstep_session)],
 )
 
-app.include_router(
-    sales_router.router,
-    prefix=f"{PREFIX}/analytics/sales",
-    tags=["Client Analytics"],
-    dependencies=[Depends(get_itstep_session)],
-)
+# DISABLED: Conflicting with main analytics router at /api/analytics
+# app.include_router(
+#     sales_router.router,
+#     prefix=f"{PREFIX}/analytics/sales",
+#     tags=["Client Analytics"],
+#     dependencies=[Depends(get_itstep_session)],
+# )
 
 # --- Опциональные модули ---
 # AI инсайты
@@ -494,27 +472,6 @@ try:
     logger.info("Organization structure routes loaded successfully")
 except ImportError as e:
     logger.warning(f"Org-structure routes not loaded: {e}")
-
-# -----------------------------------------------------------------------------
-# Временные тестовые эндпоинты для отладки
-# -----------------------------------------------------------------------------
-@app.get(f"{PREFIX}/test", tags=["Test"])
-async def test_endpoint():
-    """Тестовый эндпоинт для проверки CORS"""
-    return {"message": "Test successful", "cors": "working"}
-
-@app.post(f"{PREFIX}/auth/test-login", tags=["Test"])
-async def test_login():
-    """Тестовый логин для отладки"""
-    return {
-        "access_token": "test-token",
-        "token_type": "bearer",
-        "user": {
-            "id": "test-user",
-            "email": "test@example.com",
-            "full_name": "Test User"
-        }
-    }
 
 # -----------------------------------------------------------------------------
 # Error handlers для стандартизации ответов

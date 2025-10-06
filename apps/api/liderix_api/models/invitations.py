@@ -8,7 +8,7 @@ from typing import Optional
 from sqlalchemy import (
     Column,
     String,
-    Enum,
+    Enum as SQLEnum,
     DateTime,
     UniqueConstraint,
     Index,
@@ -59,7 +59,7 @@ class Invitation(Base, OrgFKMixin, TimestampMixin, SoftDeleteMixin):
     id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
 
     invited_email = Column(String(320), nullable=False, index=True)
-    role = Column(Enum(MembershipRole, name="membershiprole", native_enum=True), nullable=False)
+    role = Column(SQLEnum(MembershipRole, name="membershiprole", native_enum=True), nullable=False)
 
     department_id = Column(
         PG_UUID(as_uuid=True),
@@ -79,7 +79,7 @@ class Invitation(Base, OrgFKMixin, TimestampMixin, SoftDeleteMixin):
     )
 
     status = Column(
-        Enum(InvitationStatus, name="invitationstatus", native_enum=True),
+        SQLEnum(InvitationStatus, name="invitationstatus", native_enum=True),
         default=InvitationStatus.PENDING,
         nullable=False,
     )

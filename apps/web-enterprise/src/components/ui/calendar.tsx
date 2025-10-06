@@ -17,8 +17,12 @@ interface CalendarProps {
 export function Calendar({ mode = "single", value, onChange, numberOfMonths = 1, className, disabled }: CalendarProps) {
   const handleChange = (item: any) => {
     if (mode === "range") {
-      const range = item.selection
-      onChange?.({ from: range.startDate, to: range.endDate })
+      const range = item.selection || item
+      const startDate = range?.startDate || range?.from
+      const endDate = range?.endDate || range?.to
+      if (startDate && endDate) {
+        onChange?.({ from: startDate, to: endDate })
+      }
     } else {
       onChange?.(item)
     }
@@ -71,3 +75,6 @@ export function Calendar({ mode = "single", value, onChange, numberOfMonths = 1,
     </div>
   )
 }
+
+// Export as CalendarComponent для обратной совместимости
+export const CalendarComponent = Calendar

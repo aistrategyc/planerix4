@@ -65,7 +65,7 @@ def create_access_token(payload: Dict[str, Any]) -> str:
     if "sub" not in payload:
         raise ValueError("Payload must include 'sub'")
     claims = {**_base_claims(settings.ACCESS_TTL_SEC), **payload, "typ": "access"}
-    return jwt.encode(claims, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    return jwt.encode(claims, settings.SECRET_KEY or "temporary_secret", algorithm=settings.JWT_ALGORITHM)
 
 def create_refresh_token(payload: Dict[str, Any]) -> str:
     """

@@ -13,8 +13,7 @@ import {
   PieChart,
   Calendar,
   BrainCircuit,
-  Settings,
-  HelpCircle,
+  TrendingUp,
 } from 'lucide-react';
 
 type NavItem = {
@@ -26,21 +25,19 @@ type NavItem = {
 
 const MAIN: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: Home },
-  { href: '/okr', label: 'OKR', icon: Target },
   { href: '/tasks', label: 'Tasks', icon: ListChecks },
+  { href: '/okr', label: 'OKR', icon: Target },
   { href: '/crm', label: 'CRM', icon: BarChart },
   { href: '/marketing', label: 'Marketing', icon: Megaphone, badge: 'New' },
   { href: '/ads', label: 'Ads', icon: Megaphone },
   { href: '/teams', label: 'Teams', icon: Users },
   { href: '/analytics', label: 'Analytics', icon: PieChart },
+  { href: '/data-analytics', label: 'DataAnalytics', icon: TrendingUp },
   { href: '/calendar', label: 'Calendar', icon: Calendar },
   { href: '/ai', label: 'AI', icon: BrainCircuit },
 ];
 
-const FOOTER: NavItem[] = [
-  { href: '/settings', label: 'Settings', icon: Settings },
-  { href: '/help', label: 'Help', icon: HelpCircle },
-];
+const FOOTER: NavItem[] = [];
 
 export default function Sidebar() {
   const pathname = usePathname();

@@ -9,7 +9,7 @@ ENV POETRY_CACHE_DIR='/var/cache/pypoetry'
 ENV PYTHONUNBUFFERED=1
 ENV FASTAPI_ENV=production
 
-RUN apt-get update && apt-get install -y --no-install-recommends build-essential libpq-dev && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential libpq-dev curl curl && rm -rf /var/lib/apt/lists/*
 
 # 1) Копируем только мета-файлы проекта
 COPY pyproject.toml poetry.lock /app/

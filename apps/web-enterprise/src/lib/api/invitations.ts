@@ -1,6 +1,6 @@
 import { api as axios } from "./config"; // твой базовый инстанс (BASE=/api)
 
-export type MembershipRole = "OWNER" | "ADMIN" | "MEMBER" | "VIEWER";
+export type MembershipRole = "owner" | "admin" | "member" | "viewer";
 
 export interface InvitationCreate {
   invited_email: string;
@@ -18,7 +18,7 @@ export interface InvitationRead {
   token: string;
   expires_at?: string | null;
   invited_by_id?: string | null;
-  status: "PENDING" | "ACCEPTED" | "REJECTED" | "EXPIRED";
+  status: "pending" | "accepted" | "rejected" | "expired";
   created_at: string;
   updated_at: string;
 }

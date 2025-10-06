@@ -1,35 +1,78 @@
-
-/** @type {import('next').NextConfig} */
+/** @type {import("next").NextConfig} */
 const nextConfig = {
-  output: 'standalone',
-  reactStrictMode: true,
-  // 🌟 Пропускаем все ошибки ESLint во время сборки
+  output: "standalone",
   eslint: {
+    // Ignore during builds for now - we'll fix linting issues later
     ignoreDuringBuilds: true,
   },
-  // TypeScript errors пропускаем на время сборки для быстрого деплоя
   typescript: {
+    // Ignore type errors during builds for now
     ignoreBuildErrors: true,
   },
+
+  // Experimental features for better performance
+  experimental: {
+    serverComponentsExternalPackages: ['axios'],
+  },
+
   async rewrites() {
-    // Используем переменную окружения для API URL
-    const apiUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
-    
+    // КРИТИЧЕСКИ ВАЖНО: Разные настройки для dev и prod
+    if (process.env.NODE_ENV === 'development') {
+      // В dev режиме НЕ перенаправляем, используем локальный backend
+      return []
+    }
+
+    // В production перенаправляем на prod API используя env переменные
+    const apiDomain = process.env.NEXT_PUBLIC_API_DOMAIN || process.env.API_DOMAIN || 'api.planerix.com'
+
     return [
       {
         source: "/api/:path*",
-        destination: `${apiUrl}/api/:path*`,
-      },
-    ];
+        destination: `https://${apiDomain}/api/:path*`
+      }
+    ]
   },
-  // Оптимизация для продакшн
-  experimental: {
-    optimizePackageImports: ['@radix-ui/react-icons', 'lucide-react'],
-  },
-  // Сжатие
-  compress: true,
-  // Кэширование
-  swcMinify: true,
-};
 
-module.exports = nextConfig;
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Frame-Options',
+            value: 'SAMEORIGIN',
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
+          },
+        ],
+      },
+    ]
+  },
+
+  // Optimize images
+  images: {
+    formats: ['image/avif', 'image/webp'],
+    minimumCacheTTL: 60,
+  },
+
+  // Webpack optimization
+  webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
+    if (!dev && !isServer) {
+      // Production optimizations
+      config.optimization.splitChunks.cacheGroups.commons = {
+        name: 'commons',
+        chunks: 'all',
+        minChunks: 2,
+      }
+    }
+    return config
+  },
+}
+
+module.exports = nextConfig

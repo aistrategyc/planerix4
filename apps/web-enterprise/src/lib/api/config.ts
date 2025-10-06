@@ -5,13 +5,22 @@
 import axios, { AxiosError, AxiosRequestConfig, InternalAxiosRequestConfig } from "axios"
 
 // --------------------------------------------------
-// Base URL
+// Base URL - разный для сервера и клиента
+// IMPORTANT: Next.js inlines NEXT_PUBLIC_* at BUILD time
 // --------------------------------------------------
-export const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:8001/api"
-).replace(/\/+$/, "")
+function getApiBaseUrl(): string {
+  // На сервере (в Docker) используем INTERNAL_API_URL
+  if (typeof window === "undefined") {
+    const url = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001/api"
+    return url.replace(/\/+$/, "") // Remove trailing slash
+  }
+
+  // В браузере используем публичный URL (NEXT_PUBLIC_ переменные доступны в браузере)
+  const url = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001/api"
+  return url.replace(/\/+$/, "") // Remove trailing slash
+}
+
+export const API_BASE_URL = getApiBaseUrl()
 
 // --------------------------------------------------
 // Token helpers (dev only; в prod полагаемся на httpOnly refresh cookie)
@@ -114,7 +123,7 @@ async function doRefresh(): Promise<string | null> {
 // Response: единый обработчик 401 + повтор запроса
 // --------------------------------------------------
 api.interceptors.response.use(
-  (res) => res,
+  (res: any) => res, // Explicitly type 'res' as 'any'
   async (error: AxiosError) => {
     const original = (error.config || {}) as AxiosRequestConfig & { _retry?: boolean }
     const status = error.response?.status

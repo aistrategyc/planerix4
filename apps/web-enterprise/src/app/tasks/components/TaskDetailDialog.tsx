@@ -48,7 +48,7 @@ export function TaskDetailDialog({
         title: task.title,
         description: task.description,
         priority: task.priority,
-        task_type: task.task_type,
+        task_type: task.type,
         status: task.status,
         assignee_id: task.assignee_id,
         project_id: task.project_id,

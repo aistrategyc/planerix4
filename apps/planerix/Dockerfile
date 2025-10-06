@@ -14,6 +14,10 @@ RUN corepack enable && corepack prepare pnpm@9.1.0 --activate
 
 # Копируем lockfile и устанавливаем deps
 COPY package.json pnpm-lock.yaml ./
+
+# гарантируем наличие public
+RUN mkdir -p /app/public
+
 RUN pnpm install --frozen-lockfile
 
 ############################
@@ -26,11 +30,15 @@ RUN apk add --no-cache libc6-compat
 RUN corepack enable && corepack prepare pnpm@9.1.0 --activate
 
 # Подхватываем аргументы окружения из docker-compose
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_API_PREFIX
 ARG RESEND_API_KEY
 ARG RESEND_FROM
 ARG CONTACT_TO
 
 # Делаем их доступными на этапе билда
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_PREFIX=$NEXT_PUBLIC_API_PREFIX
 ENV RESEND_API_KEY=$RESEND_API_KEY
 ENV RESEND_FROM=$RESEND_FROM
 ENV CONTACT_TO=$CONTACT_TO

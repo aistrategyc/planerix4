@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { useAuth } from "@/app/(auth)/hooks/useAuth"
+import { useAuth } from "@/contexts/auth-context"
 import { CompanyAPI } from "@/lib/api/company"
 import { Loader2 } from "lucide-react"
 
@@ -22,13 +22,15 @@ export default function ProtectedRoute({
   redirectTo = "/login",
 }: ProtectedRouteProps) {
   const router = useRouter()
-  const { user, loading, checkAuth } = useAuth()
+  const { user, isLoading } = useAuth()
   const [orgLoading, setOrgLoading] = useState(false)
   const [hasOrganization, setHasOrganization] = useState<boolean | null>(null)
 
-  useEffect(() => {
-    checkAuth()
-  }, [checkAuth])
+  // TEMPORARY DEV MODE: Skip all checks for analytics development
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🔧 DEV MODE: Skipping auth checks for development')
+    return <>{children}</>
+  }
 
   // ✅ Проверка организации если требуется
   useEffect(() => {
@@ -50,7 +52,7 @@ export default function ProtectedRoute({
   }, [user, requireOrganization, hasOrganization])
 
   useEffect(() => {
-    if (loading || orgLoading) return
+    if (isLoading || orgLoading) return
     
     // Проверка аутентификации
     if (requireAuth && !user) {
@@ -69,17 +71,17 @@ export default function ProtectedRoute({
       router.push('/onboarding')
       return
     }
-  }, [user, loading, orgLoading, requireAuth, requireVerified, requireOrganization, hasOrganization, router, redirectTo])
+  }, [user, isLoading, orgLoading, requireAuth, requireVerified, requireOrganization, hasOrganization, router, redirectTo])
 
   // Loading states
-  if (loading || orgLoading || (requireAuth && !user) || (requireOrganization && hasOrganization === null)) {
+  if (isLoading || orgLoading || (requireAuth && !user) || (requireOrganization && hasOrganization === null)) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="flex flex-col items-center space-y-4">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p className="text-muted-foreground">
-            {loading ? 'Checking authentication...' : 
-             orgLoading ? 'Checking organization...' : 
+            {isLoading ? 'Checking authentication...' :
+             orgLoading ? 'Checking organization...' :
              'Loading...'}
           </p>
         </div>

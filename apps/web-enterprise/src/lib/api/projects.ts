@@ -1,45 +1,57 @@
-// src/lib/api/projects.ts
-import { api } from '@/lib/api/config'
+import { api } from './config'
 
-// ✅ Соответствует backend schemas/projects.py
-export enum ProjectStatus {
-  DRAFT = "draft",
-  ACTIVE = "active",
-  ON_HOLD = "on_hold",
-  COMPLETED = "completed",
-  CANCELLED = "cancelled",
-}
+export const ProjectStatus = {
+  ACTIVE: 'active' as const,
+  INACTIVE: 'inactive' as const,
+  COMPLETED: 'completed' as const,
+  ON_HOLD: 'on_hold' as const,
+  DRAFT: 'draft' as const,
+  CANCELLED: 'cancelled' as const
+} as const
 
-export enum ProjectPriority {
-  LOW = "low",
-  MEDIUM = "medium",
-  HIGH = "high",
-  URGENT = "urgent",
-}
+export const ProjectPriority = {
+  LOW: 'low' as const,
+  MEDIUM: 'medium' as const,
+  HIGH: 'high' as const,
+  CRITICAL: 'critical' as const,
+  URGENT: 'urgent' as const
+} as const
 
-export enum ProjectMemberRole {
-  OWNER = "owner",
-  ADMIN = "admin",
-  MEMBER = "member",
-  VIEWER = "viewer",
-}
+export type ProjectStatus = (typeof ProjectStatus)[keyof typeof ProjectStatus]
+export type ProjectPriority = (typeof ProjectPriority)[keyof typeof ProjectPriority]
 
-export interface ProjectBase {
+export interface Project {
+  id: string
   name: string
   description?: string
+  status: ProjectStatus
+  priority: ProjectPriority
   start_date?: string
   end_date?: string
-  meta_data?: Record<string, any>
+  budget?: number
+  progress: number
+  manager_id: string
+  team_members?: string[]
+  tags?: string[]
+  is_public: boolean
+  created_at: string
+  updated_at: string
+  user_id: string
 }
 
-export interface ProjectCreate extends ProjectBase {
-  org_id?: string
+export interface ProjectCreate {
+  name: string
+  description?: string
   status?: ProjectStatus
   priority?: ProjectPriority
+  start_date?: string
+  end_date?: string
   budget?: number
-  is_public?: boolean
-  tags?: string[]
+  manager_id?: string
   member_ids?: string[]
+  team_members?: string[]
+  tags?: string[]
+  is_public?: boolean
 }
 
 export interface ProjectUpdate {
@@ -50,123 +62,58 @@ export interface ProjectUpdate {
   start_date?: string
   end_date?: string
   budget?: number
-  is_public?: boolean
+  progress?: number
+  manager_id?: string
+  member_ids?: string[]
+  team_members?: string[]
   tags?: string[]
-  meta_data?: Record<string, any>
-}
-
-export interface Project extends ProjectBase {
-  id: string
-  org_id?: string
-  owner_id: string
-  status: ProjectStatus
-  priority?: ProjectPriority
-  budget?: number
   is_public?: boolean
-  tags?: string[]
-  created_at: string
-  updated_at: string
-  completed_at?: string
 }
 
-export interface ProjectMember {
-  id: string
-  project_id: string
-  user_id: string
-  role: string
-  joined_at?: string
-  created_at: string
-  user?: Record<string, any>
-}
-
-export interface ProjectWithDetails extends Project {
-  members: ProjectMember[]
-  tasks: any[]
-  member_count: number
-  task_count: number
-  completed_tasks: number
-}
-
-export interface ProjectListResponse {
+interface ProjectsListResponse {
   items: Project[]
   total: number
   page: number
   page_size: number
-  has_next: boolean
-  has_prev: boolean
+  pages: number
 }
 
-export interface ProjectMemberAdd {
-  user_ids: string[]
-  role?: string
-}
-
-// Projects API methods
 export class ProjectsAPI {
-  static async getProjects(params?: { 
-    page?: number
-    page_size?: number
-    status?: ProjectStatus
-    priority?: ProjectPriority
-  }): Promise<ProjectListResponse> {
-    const searchParams = new URLSearchParams()
-    if (params?.page) searchParams.append('page', String(params.page))
-    if (params?.page_size) searchParams.append('page_size', String(params.page_size))
-    if (params?.status) searchParams.append('status', params.status)
-    if (params?.priority) searchParams.append('priority', params.priority)
-    
-    const query = searchParams.toString()
-    const url = query ? `projects/?${query}` : 'projects/'
-    
-    const { data } = await api.get(url)
-    return data
+  static async list(params?: any): Promise<ProjectsListResponse> {
+    const response = await api.get<ProjectsListResponse>('/projects', { params })
+    return response.data
   }
 
-  static async getProject(projectId: string): Promise<ProjectWithDetails> {
-    const { data } = await api.get(`projects/${projectId}`)
-    return data
+  static async get(id: string): Promise<Project> {
+    const response = await api.get<Project>(`/projects/${id}`)
+    return response.data
   }
 
-  static async createProject(projectData: ProjectCreate): Promise<Project> {
-    const { data } = await api.post('projects/', projectData)
-    return data
+  static async create(data: ProjectCreate): Promise<Project> {
+    const response = await api.post<Project>('/projects', {
+      ...data,
+      progress: 0,
+      status: data.status || 'active',
+      priority: data.priority || 'medium',
+      is_public: data.is_public || false
+    })
+    return response.data
   }
 
-  static async updateProject(projectId: string, projectData: ProjectUpdate): Promise<Project> {
-    const { data } = await api.patch(`projects/${projectId}`, projectData)
-    return data
+  static async update(id: string, data: ProjectUpdate): Promise<Project> {
+    const response = await api.put<Project>(`/projects/${id}`, data)
+    return response.data
   }
 
-  static async deleteProject(projectId: string): Promise<void> {
-    await api.delete(`projects/${projectId}`)
+  static async delete(id: string): Promise<void> {
+    await api.delete(`/projects/${id}`)
   }
 
-  static async updateProjectStatus(projectId: string, status: ProjectStatus, reason?: string): Promise<Project> {
-    const { data } = await api.patch(`projects/${projectId}/status`, { status, reason })
-    return data
+  static async updateProgress(id: string, progress: number): Promise<Project> {
+    return this.update(id, { progress })
   }
 
-  // Project members
-  static async getProjectMembers(projectId: string): Promise<ProjectMember[]> {
-    const { data } = await api.get(`projects/${projectId}/members`)
-    return data?.items || data || []
-  }
-
-  static async addProjectMembers(projectId: string, memberData: ProjectMemberAdd): Promise<void> {
-    await api.post(`projects/${projectId}/members`, memberData)
-  }
-
-  static async updateProjectMemberRole(projectId: string, userId: string, role: ProjectMemberRole): Promise<void> {
-    await api.patch(`projects/${projectId}/members/${userId}`, { role })
-  }
-
-  static async removeProjectMember(projectId: string, userId: string): Promise<void> {
-    await api.delete(`projects/${projectId}/members/${userId}`)
-  }
-
-  // Project tasks
-  static async getProjectTasks(projectId: string): Promise<any[]> {
-    const { data } = await api.get(`projects/${projectId}/tasks`)
-    return data?.items || data || []
+  static async updateStatus(id: string, status: Project['status']): Promise<Project> {
+    return this.update(id, { status })
   }
 }

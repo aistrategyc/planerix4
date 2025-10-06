@@ -1,0 +1,476 @@
+
+
+⸻
+ Валюта — гривна (UAH).
+ 
+DataAnalytics — ТЗ v4 (сравнения, «муверы», рекомендации)
+
+0) Глобальные фильтры (шапка)
+	•	Период: date_from, date_to — обязательно.
+	•	Платформы (multi): google, meta, email (по умолчанию: google,meta).
+	•	min_spend (опц.): фильтр таблиц по минимальному spend (по умолчанию 0).
+	•	compare_mode (опц.): auto|disabled|custom.
+	•	auto — предыдущий период такой же длины, сразу перед текущим.
+	•	custom — фронт передаёт prev_from, prev_to.
+	•	disabled — без сравнений.
+	•	target_roas / target_cpl / min_leads (опц.) — пороги для рекомендаций (дефолты ниже).
+
+Тех. соглашения:
+	•	CSV платформ → массив text[] на бэке.
+	•	Везде именованные параметры (psycopg3).
+	•	Денежные поля — decimal, формат на фронте.
+	•	Пустые делители → NULL (на UI показываем —).
+
+⸻
+
+1) KPI: текущий vs предыдущий (PoP)
+
+Источник: dashboards.v5_bi_platform_daily
+
+API
+
+GET /v5/kpi/compare?date_from=...&date_to=...&platforms=...&compare_mode=auto|custom&prev_from=...&prev_to=...
+
+SQL (универсальный шаблон сравнения)
+
+WITH bounds AS (
+  SELECT %(date_from)s::date AS df, %(date_to)s::date AS dt
+),
+win AS (
+  SELECT df, dt, (dt - df + 1) AS days FROM bounds
+),
+cur AS (
+  SELECT
+    SUM(leads) AS leads,
+    SUM(n_contracts) AS n_contracts,
+    SUM(sum_contracts) AS revenue,
+    SUM(spend) AS spend
+  FROM dashboards.v5_bi_platform_daily d
+  WHERE d.dt BETWEEN (SELECT df FROM bounds) AND (SELECT dt FROM bounds)
+    AND (%(platforms)s IS NULL OR d.platform = ANY(%(platforms)s))
+),
+prev AS (
+  SELECT
+    SUM(leads) AS leads,
+    SUM(n_contracts) AS n_contracts,
+    SUM(sum_contracts) AS revenue,
+    SUM(spend) AS spend
+  FROM dashboards.v5_bi_platform_daily d
+  WHERE d.dt BETWEEN
+        COALESCE(%(prev_from)s::date, (SELECT df - days FROM win))
+    AND COALESCE(%(prev_to)s::date,   (SELECT df - 1    FROM win))
+    AND (%(platforms)s IS NULL OR d.platform = ANY(%(platforms)s))
+)
+SELECT
+  cur.leads      AS leads_cur,
+  prev.leads     AS leads_prev,
+  (cur.leads - prev.leads) AS leads_diff,
+  CASE WHEN prev.leads>0 THEN (cur.leads - prev.leads)::numeric*100/prev.leads END AS leads_diff_pct,
+
+  cur.n_contracts AS n_contracts_cur,
+  prev.n_contracts AS n_contracts_prev,
+
+  cur.revenue AS revenue_cur,
+  prev.revenue AS revenue_prev,
+  (cur.revenue - prev.revenue) AS revenue_diff,
+  CASE WHEN prev.revenue>0 THEN (cur.revenue - prev.revenue)::numeric*100/prev.revenue END AS revenue_diff_pct,
+
+  cur.spend AS spend_cur,
+  prev.spend AS spend_prev,
+  (cur.spend - prev.spend) AS spend_diff,
+  CASE WHEN prev.spend>0 THEN (cur.spend - prev.spend)::numeric*100/prev.spend END AS spend_diff_pct,
+
+  CASE WHEN cur.leads>0 THEN cur.spend::numeric/NULLIF(cur.leads,0) END AS cpl_cur,
+  CASE WHEN prev.leads>0 THEN prev.spend::numeric/NULLIF(prev.leads,0) END AS cpl_prev,
+
+  CASE WHEN cur.spend>0 THEN cur.revenue::numeric/NULLIF(cur.spend,0) END AS roas_cur,
+  CASE WHEN prev.spend>0 THEN prev.revenue::numeric/NULLIF(prev.spend,0) END AS roas_prev
+FROM cur, prev;
+
+JSON
+
+{
+  "leads_cur":0,"leads_prev":0,"leads_diff":0,"leads_diff_pct":0.0,
+  "n_contracts_cur":0,"n_contracts_prev":0,
+  "revenue_cur":0.0,"revenue_prev":0.0,"revenue_diff":0.0,"revenue_diff_pct":0.0,
+  "spend_cur":0.0,"spend_prev":0.0,"spend_diff":0.0,"spend_diff_pct":0.0,
+  "cpl_cur":null,"cpl_prev":null,"roas_cur":null,"roas_prev":null
+}
+
+UI: 6 карточек × 2 строки: «текущее», под ним «Δ и %». Цвет: зел/красн.
+
+⸻
+
+2) Тренды: текущий vs предыдущий (оверлей)
+
+Источник: dashboards.v5_bi_platform_daily
+
+API
+
+GET /v5/trend/leads/compare?...     → [{dt, leads_cur, leads_prev_shifted}]
+GET /v5/trend/spend/compare?...     → [{dt, spend_cur, spend_prev_shifted}]
+
+SQL (leads; для spend заменить поле)
+
+WITH bounds AS (
+  SELECT %(date_from)s::date AS df, %(date_to)s::date AS dt
+),
+win AS (
+  SELECT df, dt, (dt - df + 1) AS days FROM bounds
+),
+cur AS (
+  SELECT d.dt, SUM(d.leads) AS val
+  FROM dashboards.v5_bi_platform_daily d
+  WHERE d.dt BETWEEN (SELECT df FROM bounds) AND (SELECT dt FROM bounds)
+    AND (%(platforms)s IS NULL OR d.platform = ANY(%(platforms)s))
+  GROUP BY d.dt
+),
+prev AS (
+  SELECT d.dt + (SELECT days FROM win) AS dt_align, SUM(d.leads) AS val
+  FROM dashboards.v5_bi_platform_daily d
+  WHERE d.dt BETWEEN
+        COALESCE(%(prev_from)s::date, (SELECT df - days FROM win))
+    AND COALESCE(%(prev_to)s::date,   (SELECT df - 1    FROM win))
+    AND (%(platforms)s IS NULL OR d.platform = ANY(%(platforms)s))
+  GROUP BY 1
+)
+SELECT c.dt,
+       COALESCE(c.val,0) AS leads_cur,
+       COALESCE(p.val,0) AS leads_prev_shifted
+FROM (SELECT generate_series((SELECT df FROM bounds),(SELECT dt FROM bounds), '1 day')::date AS dt) calendar
+LEFT JOIN cur  c ON c.dt = calendar.dt
+LEFT JOIN prev p ON p.dt_align = calendar.dt
+ORDER BY dt;
+
+UI: 2 линии, тултип: текущее / прошлое. Zero-fill соблюдаем.
+
+⸻
+
+3) Кампании: сравнение периода (PoP + эффективность)
+
+Источник: dashboards.v5_leads_campaign_daily
+
+API
+
+GET /v5/campaigns/compare?date_from=...&date_to=...&platforms=...&min_spend=0&limit=500
+
+SQL
+
+WITH bounds AS (
+  SELECT %(date_from)s::date AS df, %(date_to)s::date AS dt
+),
+win AS (
+  SELECT df, dt, (dt - df + 1) AS days FROM bounds
+),
+cur AS (
+  SELECT
+    platform, campaign_id, campaign_name,
+    SUM(leads) AS leads_cur,
+    SUM(n_contracts) AS n_contracts_cur,
+    SUM(sum_contracts) AS revenue_cur,
+    SUM(spend) AS spend_cur
+  FROM dashboards.v5_leads_campaign_daily
+  WHERE dt BETWEEN (SELECT df FROM bounds) AND (SELECT dt FROM bounds)
+    AND (%(platforms)s IS NULL OR platform = ANY(%(platforms)s))
+  GROUP BY 1,2,3
+),
+prev AS (
+  SELECT
+    platform, campaign_id, campaign_name,
+    SUM(leads) AS leads_prev,
+    SUM(n_contracts) AS n_contracts_prev,
+    SUM(sum_contracts) AS revenue_prev,
+    SUM(spend) AS spend_prev
+  FROM dashboards.v5_leads_campaign_daily
+  WHERE dt BETWEEN
+        COALESCE(%(prev_from)s::date, (SELECT df - days FROM win))
+    AND COALESCE(%(prev_to)s::date,   (SELECT df - 1    FROM win))
+    AND (%(platforms)s IS NULL OR platform = ANY(%(platforms)s))
+  GROUP BY 1,2,3
+)
+SELECT
+  COALESCE(c.platform,p.platform) AS platform,
+  COALESCE(c.campaign_id,p.campaign_id) AS campaign_id,
+  COALESCE(c.campaign_name,p.campaign_name) AS campaign_name,
+
+  COALESCE(c.leads_cur,0) AS leads_cur,
+  COALESCE(p.leads_prev,0) AS leads_prev,
+  (COALESCE(c.leads_cur,0)-COALESCE(p.leads_prev,0)) AS leads_diff,
+  CASE WHEN COALESCE(p.leads_prev,0)>0
+       THEN (COALESCE(c.leads_cur,0)-p.leads_prev)::numeric*100/p.leads_prev END AS leads_diff_pct,
+
+  COALESCE(c.n_contracts_cur,0) AS n_contracts_cur,
+  COALESCE(p.n_contracts_prev,0) AS n_contracts_prev,
+
+  COALESCE(c.revenue_cur,0) AS revenue_cur,
+  COALESCE(p.revenue_prev,0) AS revenue_prev,
+
+  COALESCE(c.spend_cur,0) AS spend_cur,
+  COALESCE(p.spend_prev,0) AS spend_prev,
+
+  CASE WHEN COALESCE(c.leads_cur,0)>0
+    THEN c.spend_cur::numeric/NULLIF(c.leads_cur,0) END AS cpl_cur,
+  CASE WHEN COALESCE(p.leads_prev,0)>0
+    THEN p.spend_prev::numeric/NULLIF(p.leads_prev,0) END AS cpl_prev,
+
+  CASE WHEN COALESCE(c.spend_cur,0)>0
+    THEN c.revenue_cur::numeric/NULLIF(c.spend_cur,0) END AS roas_cur,
+  CASE WHEN COALESCE(p.spend_prev,0)>0
+    THEN p.revenue_prev::numeric/NULLIF(p.spend_prev,0) END AS roas_prev
+FROM cur c
+FULL JOIN prev p USING (platform, campaign_id, campaign_name)
+WHERE COALESCE(c.spend_cur,0) >= COALESCE(%(min_spend)s::numeric,0)
+   OR COALESCE(p.spend_prev,0) >= COALESCE(%(min_spend)s::numeric,0)
+ORDER BY leads_cur DESC
+LIMIT COALESCE(%(limit)s, 500);
+
+UI: сортировка по leads_diff / roas_cur / spend_cur. Чипы-метки: ↑ / ↓.
+
+⸻
+
+4) «Муверы» (Winners/Losers) — для быстрых решений маркетологов
+
+Источник: результат /v5/campaigns/compare
+
+API
+
+GET /v5/campaigns/top-movers?date_from=...&date_to=...&platforms=...&min_spend=0&n=10
+
+Логика (на бэке, простая):
+	•	Winners (scale): roas_cur >= target_roas OR cpl_cur <= target_cpl, при этом leads_cur >= min_leads, leads_diff >= 0.
+	•	Losers (pause): (roas_cur < kill_roas OR leads_cur = 0) AND spend_cur >= min_spend.
+	•	Watch: остальное.
+
+Параметры (дефолты): target_roas=3.0, kill_roas=0.8, target_cpl=NULL (если не задан — не используем), min_leads=5.
+
+JSON (пример):
+
+{
+  "winners":[{"platform":"google","campaign_id":"20317544053","campaign_name":"PMax ПКО 2025","leads_cur":17,"roas_cur":23.3,"spend_cur":10486.54}],
+  "losers":[{"platform":"meta","campaign_id":"...","leads_cur":0,"roas_cur":null,"spend_cur":587.42}],
+  "watch":[...]
+}
+
+UI (бенто): 3 карточки-таблицы: Winners / Watch / Losers. Быстрые «рекомендованные действия» (scale / pause / test-new-creative).
+
+⸻
+
+5) Доли по платформам: с дельтой (p.p.)
+
+Источник: dashboards.v5_bi_platform_daily
+
+API
+
+GET /v5/share/platforms/compare?date_from=...&date_to=...&platforms=...
+
+SQL (доли и Δ п.п.)
+
+WITH bounds AS (
+  SELECT %(date_from)s::date AS df, %(date_to)s::date AS dt
+),
+win AS (
+  SELECT df, dt, (dt - df + 1) AS days FROM bounds
+),
+cur AS (
+  SELECT platform, SUM(leads) AS leads FROM dashboards.v5_bi_platform_daily
+  WHERE dt BETWEEN (SELECT df FROM bounds) AND (SELECT dt FROM bounds)
+  GROUP BY platform
+),
+prev AS (
+  SELECT platform, SUM(leads) AS leads FROM dashboards.v5_bi_platform_daily
+  WHERE dt BETWEEN
+        COALESCE(%(prev_from)s::date, (SELECT df - days FROM win))
+    AND COALESCE(%(prev_to)s::date,   (SELECT df - 1    FROM win))
+  GROUP BY platform
+),
+tot AS (
+  SELECT (SELECT SUM(leads) FROM cur) AS cur_total,
+         (SELECT SUM(leads) FROM prev) AS prev_total
+)
+SELECT
+  p AS platform,
+  cur_leads,
+  prev_leads,
+  CASE WHEN cur_total>0 THEN cur_leads::numeric*100/cur_total END AS share_cur_pct,
+  CASE WHEN prev_total>0 THEN prev_leads::numeric*100/prev_total END AS share_prev_pct,
+  CASE WHEN cur_total>0 AND prev_total>0
+       THEN (cur_leads::numeric*100/cur_total) - (prev_leads::numeric*100/prev_total) END AS share_diff_pp
+FROM (
+  SELECT COALESCE(c.platform, p.platform) AS p,
+         COALESCE(c.leads,0) AS cur_leads,
+         COALESCE(p.leads,0) AS prev_leads
+  FROM cur c FULL JOIN prev p USING(platform)
+), tot;
+
+UI: Donut + таблица: Share Cur / Prev / Δ p.p.
+
+⸻
+
+6) UTM-источники (агрегат) + фильтры
+
+Источник: dashboards.v5_leads_source_daily_vw (по дизайну spend=0)
+
+API
+
+GET /v5/utm-sources?date_from=...&date_to=...&platforms=...&limit=1000
+
+SQL (как в v3; без изменений) — сортировка по Leads.
+UI: добавляем быстрый поиск по utm_source. Значения ":"/(unknown) маппим на —.
+
+⸻
+
+7) WoW (готовый view) — остаётся как «неделя к неделе»
+
+Источник: dashboards.v5_leads_campaign_weekly
+API/SQL — из v3 (без изменений).
+UI: сортировка по leads_diff DESC, подсветка.
+
+⸻
+
+8) Договоры (best-touch и точный источник по Google)
+
+8.1 Сводка договоров по источнику (best-touch)
+
+Источник: dashboards.v6_contracts_ads_detail_mv
+
+API
+
+GET /v6/contracts/summary?date_from=...&date_to=...&platforms=...
+
+SQL — как в v3 (агрегат по platform_detected).
+UI: Donut + таблица (n_contracts, revenue).
+
+8.2 Детали договоров Google (точный источник)
+
+Источник: dashboards.v6_google_contracts_detail (подтверждён)
+
+API
+
+GET /v6/contracts/google?date_from=...&date_to=...&campaign_id=...&q=...&limit=500
+
+SQL — как в v3 (COALESCE-поля + фильтры по campaign_id и полнотекст q по keyword/search_term).
+UI: таблица + модал «Contract details».
+
+Примечание: никаких джойнов по b.id_source — не используем. Где нужен ключ, применяется готовый v6_* view.
+
+⸻
+
+9) (Новая) Матрица эффективности кампаний
+
+Идея: визуально баланс «объём ↔ эффективность».
+	•	Scatter: X = CPL_cur (меньше — лучше), Y = Leads_cur (больше — лучше), Size = Spend_cur, Цвет = платформа.
+	•	Пороговые линии: вертикаль при target_cpl (если задан), горизонталь при min_leads.
+Данные: из /v5/campaigns/compare.
+UI: 4 квадранта: Scale / Watch / Test / Pause.
+
+⸻
+
+10) Рекомендации по бюджету (rule-based)
+
+API
+
+GET /v6/reco/budget?date_from=...&date_to=...&platforms=...&min_spend=0&target_roas=3&kill_roas=0.8&target_cpl=&min_leads=5&limit=200
+
+SQL (на основе /v5/campaigns/compare)
+
+WITH cmp AS (
+  -- вставьте сюда SELECT из пункта 3 без LIMIT (или подзапросом)
+  SELECT * FROM (...) campaigns_compare
+)
+SELECT
+  platform, campaign_id, campaign_name,
+  leads_cur, spend_cur, cpl_cur, roas_cur,
+  leads_prev, spend_prev, cpl_prev, roas_prev,
+  leads_diff, leads_diff_pct,
+  CASE
+    WHEN spend_cur >= COALESCE(%(min_spend)s::numeric,0)
+     AND (
+       (%(target_roas)s IS NOT NULL AND roas_cur >= %(target_roas)s::numeric)
+       OR (%(target_cpl)s IS NOT NULL AND cpl_cur IS NOT NULL AND cpl_cur <= %(target_cpl)s::numeric)
+     )
+     AND leads_cur >= COALESCE(%(min_leads)s,0)
+     AND COALESCE(leads_diff,0) >= 0
+    THEN 'scale'
+    WHEN spend_cur >= COALESCE(%(min_spend)s::numeric,0)
+     AND (
+       ( %(kill_roas)s IS NOT NULL AND (roas_cur IS NULL OR roas_cur < %(kill_roas)s::numeric) )
+       OR leads_cur = 0
+     )
+    THEN 'pause'
+    ELSE 'watch'
+  END AS action
+FROM cmp
+ORDER BY
+  CASE action WHEN 'scale' THEN 1 WHEN 'watch' THEN 2 ELSE 3 END,
+  roas_cur DESC NULLS LAST, leads_cur DESC
+LIMIT COALESCE(%(limit)s,200);
+
+UI: чипы действий + краткая подсказка «почему» (какое правило сработало).
+
+⸻
+
+11) Страница «Lead / Contract Details» (минимально достоверная)
+
+Чтобы не «выдумывать» данные, даём то, что подтверждено:
+
+Страница: LeadContracts
+	•	Фильтры: период, платформа, campaign_id (для Google), полнотекст q (keyword/search_term).
+	•	Блок 1: Donut по v6_contracts_ads_detail_mv (best-touch).
+	•	Блок 2: Таблица «Google Contracts (точный источник)» по v6_google_contracts_detail.
+	•	Блок 3: (плейсхолдер) «Meta leads — появится после подтверждения view v6_meta_leads_detail» (скрываем по фиче-флагу).
+
+⸻
+
+12) Бенто-сетка (страница DataAnalytics)
+	1.	Sticky шапка фильтров (период, платформы, min_spend, compare_mode).
+	2.	KPI Compare (6 × 2 строки).
+	3.	Тренды Compare: Leads/день, Spend/день (2 колонки).
+	4.	Share по платформам (Δ п.п.) — donut + таблица.
+	5.	Кампании Compare (таблица) — PoP поля, сортировки, поиск.
+	6.	Матрица эффективности (scatter) — быстрая навигация по кампаниям.
+	7.	Top Movers / Recommendations — 3 карточки (Scale / Watch / Pause).
+	8.	WoW по кампаниям — как есть (доп. ракурс).
+	9.	UTM-источники — индикативно (spend=0).
+	10.	Contracts Summary (best-touch) + Google Contracts Detail (линк на страницу LeadContracts).
+
+⸻
+
+13) Справочники (без изменений)
+	•	Платформы — из v5_bi_platform_daily.
+	•	Кампании — из v5_leads_campaign_daily.
+	•	UTM — из v5_leads_source_daily_vw.
+
+⸻
+
+14) Перформанс и надёжность
+	•	Индексы (как в v3) + рассмотреть покрывающие по (platform, dt) и (platform, campaign_id, dt).
+	•	Все тяжёлые сравнения — через CTE, без кросс-джойнов на сырые логи.
+	•	Лимиты и пагинация везде.
+	•	Ответы кешировать по ключу параметров (TTL 1–5 мин) для трендов/кампаний.
+
+⸻
+
+15) Анти-грабли
+	•	Никаких ссылок на b.id_source — использовать только подтверждённые view v5_/v6_.
+	•	В utm возможны ":"/(unknown) — UI нормализует в —.
+	•	Отсутствующие значения (делители ноль) → NULL → на UI —.
+	•	В compare-режиме «auto» прошлый период = та же длина, сразу перед текущим; в «custom» — строго по prev_from/prev_to.
+
+⸻
+
+16) Мини-OpenAPI (контуры)
+
+GET /v5/kpi/compare
+GET /v5/trend/leads/compare
+GET /v5/trend/spend/compare
+GET /v5/share/platforms/compare
+GET /v5/campaigns/compare
+GET /v5/campaigns/top-movers
+GET /v5/campaigns/wow
+GET /v5/utm-sources
+GET /v6/contracts/summary
+GET /v6/contracts/google
+GET /v6/reco/budget
+
+
+⸻

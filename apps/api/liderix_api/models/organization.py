@@ -6,7 +6,7 @@ from sqlalchemy import (
     Column,
     String,
     Text,
-    Enum,
+    Enum as SQLEnum,
     ForeignKey,
     DateTime,
     Integer,
@@ -19,24 +19,7 @@ from sqlalchemy.sql import func
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 from sqlalchemy.orm import relationship
 from liderix_api.db import Base
-
-# =========================
-# Mixins
-# =========================
-class TimestampMixin:
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
-
-class SoftDeleteMixin:
-    is_deleted = Column(Boolean, default=False, nullable=False)
-    deleted_at = Column(DateTime(timezone=True), nullable=True)
-
-class OrgFKMixin:
-    org_id = Column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("organizations.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True)
+from .mixins import TimestampMixin, SoftDeleteMixin, OrgFKMixin
 
 # =========================
 # Core: Organization
@@ -51,8 +34,8 @@ class Organization(Base, TimestampMixin, SoftDeleteMixin):
     slug = Column(String(80), unique=True, nullable=False, index=True)
     description = Column(Text, nullable=True)
     address = Column(JSONB, nullable=True)
-    industry = Column(Enum("retail", "it", "marketing", "education", "other", name="industry_type"), nullable=True)
-    size = Column(Enum("small", "medium", name="company_size"), default="small", nullable=True)
+    industry = Column(SQLEnum("retail", "it", "marketing", "education", "other", name="industry_type"), nullable=True)
+    size = Column(SQLEnum("small", "medium", name="company_size"), default="small", nullable=True)
     custom_fields = Column(JSONB, nullable=True)
     preferences = Column(JSONB, nullable=True)
     
@@ -76,16 +59,17 @@ class Organization(Base, TimestampMixin, SoftDeleteMixin):
         lazy="selectin",
         overlaps="organization",
     )
-    kpis = relationship(
-        "KPI",
-        cascade="all, delete-orphan",
-        lazy="selectin",
-        overlaps="organization",
-    )
+    # kpis = relationship(
+    #     "KPI",
+    #     cascade="all, delete-orphan",
+    #     lazy="selectin",
+    #     overlaps="organization",
+    # )  # DISABLED: No FK relationship in current KPI model
     objectives = relationship(
         "Objective",
         cascade="all, delete-orphan",
         lazy="selectin",
+        back_populates="organization",
         overlaps="organization",
     )
     tasks = relationship(
@@ -216,10 +200,10 @@ class DataSource(Base, OrgFKMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "data_sources"
     
     id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4, nullable=False)
-    type = Column(Enum("facebook_ads", "google_ads", "tiktok_ads", "ga4", "telegram_bot", "custom", name="data_source_type"), nullable=False)
+    type = Column(SQLEnum("facebook_ads", "google_ads", "tiktok_ads", "ga4", "telegram_bot", "custom", name="data_source_type"), nullable=False)
     name = Column(String(120), nullable=True)
     config = Column(JSONB, nullable=True)
-    status = Column(Enum("disconnected", "connected", "error", name="data_source_status"), default="disconnected", nullable=False)
+    status = Column(SQLEnum("disconnected", "connected", "error", name="data_source_status"), default="disconnected", nullable=False)
     
     organization = relationship("Organization", lazy="selectin")
     
@@ -266,7 +250,7 @@ class TelegramIntegration(Base, OrgFKMixin, TimestampMixin, SoftDeleteMixin):
     id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4, nullable=False)
     bot_token_enc = Column(Text, nullable=False)
     webhook_url = Column(Text, nullable=True)
-    status = Column(Enum("inactive", "active", "error", name="integration_status"), default="inactive", nullable=False)
+    status = Column(SQLEnum("inactive", "active", "error", name="integration_status"), default="inactive", nullable=False)
     settings = Column(JSONB, nullable=True)
     
     __table_args__ = (
@@ -299,7 +283,7 @@ class FileAsset(Base, OrgFKMixin, TimestampMixin, SoftDeleteMixin):
     mime_type = Column(String(120), nullable=True)
     size_bytes = Column(Integer, nullable=True)
     sha256_hex = Column(String(64), nullable=True)
-    status = Column(Enum("queued", "scanned", "infected", "ready", name="file_status"), default="queued", nullable=False)
+    status = Column(SQLEnum("queued", "scanned", "infected", "ready", name="file_status"), default="queued", nullable=False)
     meta_data = Column("metadata", JSONB, nullable=True)
 
     owner = relationship("User", back_populates="file_assets")
@@ -343,9 +327,9 @@ class Subscription(Base, OrgFKMixin, TimestampMixin, SoftDeleteMixin):
     
     id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4, nullable=False)
     plan_id = Column(PG_UUID(as_uuid=True), ForeignKey("plans.id", ondelete="RESTRICT"), index=True, nullable=False)
-    provider = Column(Enum("stripe", "paddle", "manual", name="billing_provider"), nullable=False)
+    provider = Column(SQLEnum("stripe", "paddle", "manual", name="billing_provider"), nullable=False)
     external_id = Column(String(120), nullable=True, index=True)
-    status = Column(Enum("trialing", "active", "past_due", "canceled", "incomplete", name="subscription_status"), default="active", nullable=False)
+    status = Column(SQLEnum("trialing", "active", "past_due", "canceled", "incomplete", name="subscription_status"), default="active", nullable=False)
     period_start = Column(DateTime(timezone=True), nullable=True)
     period_end = Column(DateTime(timezone=True), nullable=True)
     limits_override = Column(JSONB, nullable=True)
@@ -367,7 +351,7 @@ class MetricDefinition(Base, OrgFKMixin, TimestampMixin, SoftDeleteMixin):
     description = Column(Text, nullable=True)
     unit = Column(String(50), nullable=True)
     formula = Column(Text, nullable=True)
-    aggregation = Column(Enum("sum", "avg", "count", "max", "min", name="aggregation_type"), nullable=True)
+    aggregation = Column(SQLEnum("sum", "avg", "count", "max", "min", name="aggregation_type"), nullable=True)
     meta_data = Column("metadata", JSONB, nullable=True)
     
     organization = relationship("Organization", lazy="selectin")
@@ -388,7 +372,7 @@ class MetricTarget(Base, OrgFKMixin, TimestampMixin, SoftDeleteMixin):
     target_value = Column(Float, nullable=False)
     period_start = Column(DateTime(timezone=True), nullable=False)
     period_end = Column(DateTime(timezone=True), nullable=False)
-    status = Column(Enum("on_track", "at_risk", "off_track", name="target_status"), default="on_track", nullable=False)
+    status = Column(SQLEnum("on_track", "at_risk", "off_track", name="target_status"), default="on_track", nullable=False)
     meta_data = Column("metadata", JSONB, nullable=True)
     
     metric_definition = relationship("MetricDefinition", lazy="selectin", overlaps="targets")
@@ -408,8 +392,8 @@ class OrgCompliance(Base, OrgFKMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "org_compliances"
     
     id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4, nullable=False)
-    type = Column(Enum("legal", "financial", "environmental", "data_protection", name="compliance_type"), nullable=False)
-    status = Column(Enum("compliant", "non_compliant", "pending", name="compliance_status"), default="pending", nullable=False)
+    type = Column(SQLEnum("legal", "financial", "environmental", "data_protection", name="compliance_type"), nullable=False)
+    status = Column(SQLEnum("compliant", "non_compliant", "pending", name="compliance_status"), default="pending", nullable=False)
     documents = Column(JSONB, nullable=True)
     last_audit_date = Column(DateTime(timezone=True), nullable=True)
     meta_data = Column("metadata", JSONB, nullable=True)

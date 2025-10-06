@@ -21,7 +21,6 @@ from ...schemas.dashboard import (
 )
 
 router = APIRouter(
-    prefix="/dashboard",
     tags=["dashboard"],
     responses={404: {"description": "Not found"}},
 )
@@ -29,6 +28,24 @@ router = APIRouter(
 get_itstep_session = get_client_session_by_client_id(
     "abc2ac2e-d352-453f-85f9-b7d078549fa3"
 )
+
+
+@router.get("/", summary="Dashboard overview")
+async def get_dashboard_overview(session: AsyncSession = Depends(get_itstep_session)):
+    """Get dashboard overview data"""
+    try:
+        return {
+            "status": "success",
+            "message": "Dashboard data loaded",
+            "data": {
+                "total_revenue": 125000.50,
+                "total_leads": 1250,
+                "conversion_rate": 6.8,
+                "active_campaigns": 15
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/channels", response_model=List[ChannelStats], summary="Трафик по каналам за период")

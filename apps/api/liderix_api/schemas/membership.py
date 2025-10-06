@@ -1,7 +1,7 @@
 # apps/api/liderix_api/schemas/membership.py
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, ConfigDict, field_validator, EmailStr
+from pydantic import BaseModel, Field, ConfigDict, field_validator, EmailStr, EmailStr
 from typing import Optional, List, Literal, Generic, TypeVar, Dict
 from uuid import UUID
 from datetime import datetime
@@ -184,6 +184,21 @@ class MembershipStatsResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class MembershipBulkInviteItem(BaseModel):
+    """Элемент для пакетного приглашения по email."""
+    email: EmailStr
+    role: Optional[Role] = "member"
+    department_id: Optional[UUID] = None
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+
+class MembershipBulkInviteRequest(BaseModel):
+    memberships: List[MembershipBulkInviteItem] = Field(..., min_items=1, max_items=100)
+
+    model_config = ConfigDict(extra="forbid")
+
+
 __all__ = [
     "Role",
     "Status",
@@ -198,5 +213,7 @@ __all__ = [
     "MembershipInviteRequest",
     "MembershipBulkCreateItem",
     "MembershipBulkCreateRequest",
+    "MembershipBulkInviteItem",
+    "MembershipBulkInviteRequest",
     "MembershipStatsResponse",
 ]

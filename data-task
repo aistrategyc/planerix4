@@ -1,0 +1,483 @@
+
+
+DataAnalytics — ТЗ v3 (prod-ready)
+
+Валюта  — гривна (UAH).  
+
+Глобальные фильтры (шапка)
+	•	Период: date_from, date_to — обязательно.
+	•	Платформы (multi-select): google, meta, email. По умолчанию: google,meta.
+Передаём как CSV в platforms=google,meta. Если параметр не передан или пуст — считаем «все».
+	•	(Опц.) min_spend — минимальный spend для таблицы кампаний. По умолчанию 0.
+
+Технически:
+	•	В SQL используем шаблон:
+AND (%(platforms)s IS NULL OR platform = ANY(%(platforms)s))
+	•	Для CSV на входе парсим в массив текстов (text[]).
+	•	Денежные поля храним/отдаём в decimal/num (без округления на бэке; форматирование — на фронте).
+
+⸻
+
+1) KPI-карточки за период
+
+Что показываем: leads, n_contracts, revenue, spend, cpl, roas
+Источник: dashboards.v5_bi_platform_daily
+
+API
+
+GET /v5/kpi?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD&platforms=google,meta
+
+SQL
+
+SELECT
+  SUM(leads) AS leads,
+  SUM(n_contracts) AS n_contracts,
+  SUM(sum_contracts) AS revenue,
+  SUM(spend) AS spend,
+  CASE WHEN SUM(leads)  > 0 THEN SUM(spend)::numeric        / NULLIF(SUM(leads),0)        END AS cpl,
+  CASE WHEN SUM(spend)  > 0 THEN SUM(sum_contracts)::numeric / NULLIF(SUM(spend),0)        END AS roas
+FROM dashboards.v5_bi_platform_daily
+WHERE dt BETWEEN %(date_from)s::date AND %(date_to)s::date
+  AND (%(platforms)s IS NULL OR platform = ANY(%(platforms)s));
+
+Проверка (твой прогон, 2025-09-10..2025-10-03, platforms=google,meta):
+leads=418, n_contracts=3, revenue=244440.00, spend=32340.88, cpl≈77.3705263158, roas≈7.5582358922
+
+Фильтрация: период, платформы.
+UI-правила: cpl/roas показываем —, если деление на ноль.
+
+⸻
+
+2) Тренды (2 линейных графика)
+
+2.1 Leads по дням
+
+Источник: dashboards.v5_bi_platform_daily
+API: GET /v5/trend/leads?... → массив { dt, leads }
+
+SELECT dt, SUM(leads) AS leads
+FROM dashboards.v5_bi_platform_daily
+WHERE dt BETWEEN %(date_from)s::date AND %(date_to)s::date
+  AND (%(platforms)s IS NULL OR platform = ANY(%(platforms)s))
+GROUP BY dt
+ORDER BY dt;
+
+2.2 Spend по дням
+
+API: GET /v5/trend/spend?... → массив { dt, spend }
+
+SELECT dt, SUM(spend) AS spend
+FROM dashboards.v5_bi_platform_daily
+WHERE dt BETWEEN %(date_from)s::date AND %(date_to)s::date
+  AND (%(platforms)s IS NULL OR platform = ANY(%(platforms)s))
+GROUP BY dt
+ORDER BY dt;
+
+Проверка (твой прогон, 2025-09-10..2025-10-03, google+meta):
+Leads по дням (фрагмент):
+"2025-09-13" 24, "09-14" 33, "09-15" 23, …, "10-01" 4, "10-03" 11
+Spend по дням (фрагмент):
+"2025-09-13" 317.88, "09-14" 789.72, …, "09-29" 3542.75, "10-01" 910.00, "10-03" 22.04
+
+Фильтрация: период, платформы.
+UI-правила:
+	•	Если для даты нет строки — рисуем 0 (zero-fill) в серии.
+	•	Ховер-подсказка: дата, значение, вклад по платформам (по желанию — stacked toggle).
+
+⸻
+
+3) Таблица «Кампании» (агрегат за период)
+
+Колонки: platform, campaign_id, campaign_name, leads, n_contracts, revenue, spend, cpl, roas
+Источник: dashboards.v5_leads_campaign_daily (матвью, агрегаты корректные)
+
+API
+
+GET /v5/campaigns?date_from=...&date_to=...&platforms=...&min_spend=0&limit=500
+
+SQL
+
+SELECT
+  platform, campaign_id, campaign_name,
+  SUM(leads) AS leads, SUM(n_contracts) AS n_contracts,
+  SUM(sum_contracts) AS revenue, SUM(spend) AS spend,
+  CASE WHEN SUM(leads)>0  THEN SUM(spend)::numeric        / NULLIF(SUM(leads),0)        END AS cpl,
+  CASE WHEN SUM(spend)>0  THEN SUM(sum_contracts)::numeric / NULLIF(SUM(spend),0)        END AS roas
+FROM dashboards.v5_leads_campaign_daily
+WHERE dt BETWEEN %(date_from)s::date AND %(date_to)s::date
+  AND (%(platforms)s IS NULL OR platform = ANY(%(platforms)s))
+GROUP BY platform, campaign_id, campaign_name
+HAVING SUM(spend) >= COALESCE(%(min_spend)s::numeric,0)
+ORDER BY leads DESC
+LIMIT COALESCE(%(limit)s, 500);
+
+Проверка (фрагмент твоего вывода):
+	•	google | 20317544053 | Performance Max - ПКО 2025 | 17 | 3 | 244440.00 | 10486.54
+	•	google | 21662576767 | Performance Max - Підлітки  | 11 | 0 | 0.00     | 5981.79
+(бóльшая часть Meta — 0 контрактов за период)
+
+Фильтрация: период, платформы, min_spend.
+UI-правила: сортировка по Leads (по умолчанию), возможность сортировать по любой колонке; пагинация.
+
+⸻
+
+4) Неделя-к-неделе (WoW) по кампаниям
+
+Колонки: leads_cur, leads_prev, leads_diff, leads_diff_pct, spend_cur/prev, spend_diff/% , cpl_cur/prev
+Источник: dashboards.v5_leads_campaign_weekly (готовый view)
+
+API
+
+GET /v5/campaigns/wow?platforms=google,meta&limit=200
+
+SQL
+
+SELECT *
+FROM dashboards.v5_leads_campaign_weekly
+WHERE (%(platforms)s IS NULL OR platform = ANY(%(platforms)s))
+ORDER BY leads_diff DESC
+LIMIT COALESCE(%(limit)s, 200);
+
+Проверка (фрагмент твоего вывода — «cur» неделя):
+	•	google | 21662576767 | Performance Max - Підлітки | leads_cur=3 | spend_cur=864.35 | cpl_cur≈288.1167
+	•	Несколько Meta-кампаний с малыми spend/лидами.
+
+Фильтрация: платформы.
+UI-правила: дефолтная сортировка по leads_diff DESC; подсветка зелёным/красным дельт.
+
+⸻
+
+5) Таблица «UTM-источники» (агрегат за период)
+
+Важно: spend тут по дизайн-решению = 0.
+Колонки: platform, utm_source, leads, n_contracts, revenue, spend
+Источник: dashboards.v5_leads_source_daily_vw
+
+API
+
+GET /v5/utm-sources?date_from=...&date_to=...&platforms=google,meta,email&limit=1000
+
+SQL
+
+SELECT
+  platform, utm_source,
+  SUM(leads) AS leads, SUM(n_contracts) AS n_contracts,
+  SUM(sum_contracts) AS revenue, SUM(spend) AS spend
+FROM dashboards.v5_leads_source_daily_vw
+WHERE dt BETWEEN %(date_from)s::date AND %(date_to)s::date
+  AND (%(platforms)s IS NULL OR platform = ANY(%(platforms)s))
+GROUP BY platform, utm_source
+ORDER BY leads DESC
+LIMIT COALESCE(%(limit)s, 1000);
+
+Проверка (фрагмент твоего вывода):
+	•	google | (unknown) | 877 | 68 | 3570560.00 | 0
+	•	meta   | (unknown) | 795 | 0  | 0.00      | 0
+	•	Далее встречаются ":", google, facebook_mobile_feed, instagram_reels, … — оставляем «как есть», фронт может маппить ':'/(unknown) в —.
+
+Фильтрация: период, платформы.
+UI-правила: spend всегда показываем 0; сортировка по Leads.
+
+⸻
+
+6) Доли (pie/donut)
+
+6.1 По платформам
+
+Источник: dashboards.v5_bi_platform_daily
+API: GET /v5/share/platforms?... → { platform, leads }
+
+SELECT platform, SUM(leads) AS leads
+FROM dashboards.v5_bi_platform_daily
+WHERE dt BETWEEN %(date_from)s::date AND %(date_to)s::date
+GROUP BY platform
+ORDER BY leads DESC;
+
+6.2 Топ-5 кампаний по лидам
+
+Источник: dashboards.v5_leads_campaign_daily
+API: GET /v5/share/top-campaigns?... → { campaign_name, leads }
+
+SELECT campaign_name, SUM(leads) AS leads
+FROM dashboards.v5_leads_campaign_daily
+WHERE dt BETWEEN %(date_from)s::date AND %(date_to)s::date
+GROUP BY campaign_name
+ORDER BY leads DESC
+LIMIT 5;
+
+Фильтрация: период (для кампаний также можно применить platforms, если потребуется — текущая реализация может работать «по всем», но допускается добавить такой параметр).
+
+⸻
+
+7) Справочники (для фильтров)
+
+-- Платформы
+SELECT DISTINCT platform
+FROM dashboards.v5_bi_platform_daily
+ORDER BY platform;
+
+-- Кампании
+SELECT DISTINCT platform, campaign_id, campaign_name
+FROM dashboards.v5_leads_campaign_daily
+ORDER BY platform, campaign_name;
+
+-- UTM-источники
+SELECT DISTINCT platform, utm_source
+FROM dashboards.v5_leads_source_daily_vw
+ORDER BY platform, utm_source;
+
+
+⸻
+
+8) Договоры — новый блок
+
+8.1 Сводка по договорам (best-touch)
+
+Зачем: быстрый зріз по источнику договора за период.
+Источник: dashboards.v6_contracts_ads_detail_mv
+
+API
+
+GET /v6/contracts/summary?date_from=...&date_to=...&platforms=google,meta,email
+
+SQL
+
+SELECT
+  platform_detected AS platform,
+  COUNT(*)          AS n_contracts,
+  SUM(contract_amount) AS revenue
+FROM dashboards.v6_contracts_ads_detail_mv
+WHERE lead_dt BETWEEN %(date_from)s::date AND %(date_to)s::date
+  AND (%(platforms)s IS NULL OR platform_detected = ANY(%(platforms)s))
+GROUP BY platform_detected
+ORDER BY n_contracts DESC;
+
+Проверка (фрагмент твоего вывода):
+	•	unknown | 118 | 4107970.00
+	•	google  |   6 | 244440.00
+(в твоём другом срезе под фильтром google,meta было 3 контракта — это сходится с кампанийной таблицей, где 3 договора пришлись на Google PMax «ПКО 2025».)
+
+Фильтрация: период, платформы.
+UI-правила: donut/pie + таблица под ним.
+
+8.2 Договоры Google — детальная таблица (точный источник)
+
+Зачем: видеть кампанию/группу/ключ/поисковый запрос, gclid/utm, метрики.
+Источник: dashboards.v6_google_contracts_detail (view с уже подмешанными метриками)
+
+Основные колонки:
+contract_id, lead_dt, campaign_id/name, ad_group_id/name, keyword_text, search_term, channel_type, gclid, utm_source/medium/campaign/content/term, contract_amount, is_paid, n_paid_ops, n_reissuance, n_failed, clicks, impressions, spend, cpl, cpc, ctr
+
+API
+
+GET /v6/contracts/google?date_from=...&date_to=...&campaign_id=...&q=...&limit=500
+
+SQL
+
+SELECT
+  contract_id,
+  lead_dt,
+  COALESCE(campaign_id,   ref_campaign_id)    AS campaign_id,
+  COALESCE(campaign_name, ref_campaign_name)  AS campaign_name,
+  COALESCE(ad_group_id,   ref_ad_group_id)    AS ad_group_id,
+  COALESCE(ad_group_name, ref_ad_group_name)  AS ad_group_name,
+  COALESCE(keyword_text,  ref_keyword_text)   AS keyword_text,
+  COALESCE(search_term,   ref_search_term)    AS search_term,
+  COALESCE(channel_type,  ref_channel_type)   AS channel_type,
+  gclid, utm_source, utm_medium, utm_campaign, utm_content, utm_term,
+  contract_amount, is_paid, n_paid_ops, n_reissuance, n_failed,
+  clicks, impressions, spend, cpl, cpc, ctr
+FROM dashboards.v6_google_contracts_detail
+WHERE lead_dt BETWEEN %(date_from)s::date AND %(date_to)s::date
+  AND (%(campaign_id)s IS NULL OR COALESCE(campaign_id, ref_campaign_id) = %(campaign_id)s)
+  AND (%(q)s IS NULL OR (
+        COALESCE(keyword_text, ref_keyword_text) ILIKE '%'||%(q)s||'%' OR
+        COALESCE(search_term,  ref_search_term)  ILIKE '%'||%(q)s||'%'
+      ))
+ORDER BY lead_dt DESC, contract_id DESC
+LIMIT COALESCE(%(limit)s, 500);
+
+Фильтрация: период (обязательно), опционально campaign_id, полнотекстовый q по keyword/search_term.
+UI-правила: выделение кликабельного contract_id → открывает модал «Contract details».
+
+8.3 Карточка договора (fallback)
+
+Логика: сначала ищем в v6_google_contracts_detail; если нет — берём best-touch из v6_contracts_ads_detail_mv.
+
+API
+
+GET /v6/contracts/:contract_id
+
+SQL (сокращённо)
+
+WITH g AS (
+  SELECT 'google' AS platform, ... 
+  FROM dashboards.v6_google_contracts_detail
+  WHERE contract_id = %(contract_id)s
+),
+bt AS (
+  SELECT platform_detected AS platform, ..., gclid, utm_source, utm_medium, utm_campaign, ...
+  FROM dashboards.v6_contracts_ads_detail_mv
+  WHERE contract_id = %(contract_id)s
+)
+SELECT * FROM g
+UNION ALL
+SELECT * FROM bt WHERE NOT EXISTS (SELECT 1 FROM g)
+LIMIT 1;
+
+
+⸻
+
+9) Бенто-сетка (раскладка UI)
+	1.	Header-фильтры (sticky): период, платформы (multi), min_spend.
+	2.	KPI-карточки (6 шт.) — в одну строку на десктопе, 2×3 на планшете.
+	3.	Тренды (2 line charts):
+	•	Leads/день (с zero-fill).
+	•	Spend/день.
+Можно рендерить в один ряд (2 колонки) на десктопе / в столбик на мобиле.
+	4.	Pie/Donut «Доля лидов по платформам».
+	5.	Таблица «Кампании».
+	6.	WoW по кампаниям.
+	7.	UTM-источники (индикативно, spend=0).
+	8.	Новые блоки по договорам:
+	•	Donut/таблица «Договоры по источнику (best-touch)».
+	•	Таблица «Договоры Google — точный источник» с поиском и фильтром campaign_id.
+	•	Модал «Contract details» по клику.
+
+Общие UI-правила:
+	•	В пустых значениях показываем —.
+	•	Формат денег — локаль-aware, без округления на бэке.
+	•	Экспорт таблиц в CSV/Excel (по кнопке).
+	•	Пагинация таблиц, дефолтный limit как в API.
+	•	Все виджеты (кроме справочников) пересчитываются от текущих фильтров.
+
+⸻
+
+10) Контрольные срезы (для QA на фикс-окне)
+
+Окно: 2025-09-10 .. 2025-10-03, platforms=google,meta
+	•	KPI: 418 / 3 / 244440.00 / 32340.88 / CPL≈77.370526 / ROAS≈7.55823589
+	•	Примеры трендов:
+	•	Leads: "2025-09-13" 24, "2025-09-14" 33, …, "2025-10-01" 4, "2025-10-03" 11
+	•	Spend: "2025-09-13" 317.88, …, "2025-09-29" 3542.75, "2025-10-01" 910.00, "2025-10-03" 22.04
+	•	Кампании (топ из фрагмента):
+	•	google | 20317544053 | Performance Max - ПКО 2025 | leads=17 | n_contracts=3 | revenue=244440.00 | spend=10486.54
+	•	google | 21662576767 | Performance Max - Підлітки  | leads=11 | n_contracts=0 | revenue=0.00     | spend=5981.79
+	•	WoW (фрагмент, «cur»):
+	•	google | 21662576767 | leads_cur=3 | spend_cur=864.35 | cpl_cur≈288.1167
+	•	UTM (индикативно, spend=0):
+	•	google | (unknown) leads=877 | n_contracts=68 | revenue=3570560.00 | 0
+	•	meta   | (unknown) leads=795 | n_contracts=0  | revenue=0.00      | 0
+	•	Contracts summary (best-touch, фрагмент):
+	•	unknown 118 | revenue=4107970.00
+	•	google    6 | revenue=244440.00
+
+⸻
+
+11) Анти-грабли и совместимость
+	•	Ошибка column b.id_source does not exist — не использовать b.id_source.
+Корректно: джойн с таблицами/вью, где ключ — b.id_source_bigint.
+Пример:
+... ON fl.id_source = b.id_source_bigint::text
+(учтено во всех v6-вью; если есть свои черновики — заменить).
+	•	В v5_leads_source_daily_vw встречаются ':', (unknown) — фронт может маппить на —.
+	•	Пустые делители → NULL (например, cpl, roas), фронт показывает —.
+	•	В трендах пропуски дат не создаются БД — фронт делает zero-fill.
+
+⸻
+
+12) Форматы ответов (схемы)
+
+/v5/kpi
+
+{
+  "leads": 0,
+  "n_contracts": 0,
+  "revenue": 0.0,
+  "spend": 0.0,
+  "cpl": 0.0,
+  "roas": 0.0
+}
+
+/v5/trend/leads / /v5/trend/spend
+
+[ { "dt": "2025-09-13", "leads": 24 } ]
+[ { "dt": "2025-09-13", "spend": 317.88 } ]
+
+/v5/campaigns
+
+[{
+  "platform": "google",
+  "campaign_id": "20317544053",
+  "campaign_name": "Performance Max - ПКО 2025",
+  "leads": 17, "n_contracts": 3,
+  "revenue": 244440.00, "spend": 10486.54,
+  "cpl": 617.972, "roas": 23.323  // примеры; точное значение считает БД
+}]
+
+/v5/campaigns/wow
+
+[{
+  "platform":"google",
+  "campaign_id":"21662576767",
+  "campaign_name":"Performance Max - Підлітки",
+  "leads_cur":3,"leads_prev":...,"leads_diff":...,"leads_diff_pct":...,
+  "spend_cur":864.35,"spend_prev":...,"spend_diff":...,"spend_diff_pct":...,
+  "cpl_cur":288.1167,"cpl_prev":...
+}]
+
+/v5/utm-sources
+
+[{
+  "platform":"google","utm_source":"(unknown)",
+  "leads":877,"n_contracts":68,"revenue":3570560.00,"spend":0
+}]
+
+/v6/contracts/summary
+
+[ { "platform":"unknown","n_contracts":118,"revenue":4107970.00 },
+  { "platform":"google","n_contracts":6,"revenue":244440.00 } ]
+
+/v6/contracts/google
+
+[{
+  "contract_id":"102557",
+  "lead_dt":"2025-09-24",
+  "campaign_id":"20317544053",
+  "campaign_name":"Performance Max - ПКО 2025",
+  "ad_group_id":"...", "ad_group_name":"...",
+  "keyword_text":"...", "search_term":"...",
+  "channel_type":"SEARCH",
+  "gclid":"EAIaIQob...",
+  "utm_source":"google","utm_medium":"cpc","utm_campaign":"...",
+  "contract_amount":85600.00,"is_paid":true,"n_paid_ops":1,"n_reissuance":0,"n_failed":0,
+  "clicks":12,"impressions":1800,"spend":950.00,"cpl":...,"cpc":...,"ctr":...
+}]
+
+/v6/contracts/:contract_id
+
+{
+  "platform":"google|meta|email|unknown",
+  "contract_id":"102557",
+  "lead_dt":"2025-09-24",
+  "campaign_id":"...", "campaign_name":"...",
+  "ad_group_id":"...", "ad_group_name":"...",
+  "keyword_text":"...", "search_term":"...",
+  "channel_type":"SEARCH|null",
+  "gclid":"...", "utm_source":"google", "utm_medium":"cpc", "utm_campaign":"...",
+  "contract_amount":85600.00, "is_paid":true, "n_paid_ops":1, "n_reissuance":0, "n_failed":0,
+  "clicks":null|12, "impressions":null|1800, "spend":null|950.00,
+  "cpl":null|..., "cpc":null|..., "ctr":null|...
+}
+
+
+⸻
+
+13) Производительность и надёжность
+	•	Индексы: v5_bi_platform_daily(dt, platform), v5_leads_campaign_daily(dt, platform, campaign_id), v5_leads_source_daily_vw(dt, platform, utm_source), v6_contracts_ads_detail_mv(lead_dt, platform_detected), v6_google_contracts_detail(lead_dt, contract_id, campaign_id).
+	•	Параметры только именованные (psycopg3).
+	•	Никакого string-concat SQL.
+	•	Лимиты/пагинация — во всех списках.
+
+⸻
+

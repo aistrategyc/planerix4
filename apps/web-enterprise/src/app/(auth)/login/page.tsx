@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import Link from "next/link"
-import { useAuth } from "@/app/(auth)/hooks/useAuth"
+import { useAuth } from "@/contexts/auth-context"
 import { cn } from "@/lib/utils"
 
 import { Button } from "@/components/ui/button"
@@ -33,7 +33,7 @@ type LoginForm = z.infer<typeof loginSchema>
 
 export default function LoginPage() {
   const router = useRouter()
-  const { login, user, loading, error, clearError } = useAuth()
+  const { login, user, isLoading, isAuthenticated, error: authError, clearError } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [resending, setResending] = useState(false)
@@ -52,26 +52,26 @@ export default function LoginPage() {
   const emailValue = watch("email")
 
   useEffect(() => {
-  if (!user || loading) return
-  
+  if (!user || isLoading || !isAuthenticated) return
+
   const checkOrganization = async () => {
     try {
       const org = await CompanyAPI.getCurrentCompany()
-      router.replace(org?.id ? "/dashboard" : "/onboarding")
+      router.replace(org?.id ? "/analytics" : "/onboarding")
     } catch (error) {
       console.error('Failed to get organization:', error)
       router.replace("/onboarding")
     }
   }
-  
+
   checkOrganization()
-}, [user, loading, router])
+}, [user, isLoading, isAuthenticated, router])
 
   useEffect(() => {
-    if (error) clearError()
-  }, [watch("email"), watch("password"), error, clearError])
+    if (authError) clearError()
+  }, [watch("email"), watch("password"), authError, clearError])
 
-  const isUnverified = !!error && /not\s+verified|verify\s+your\s+email|email\s+not\s+verified/i.test(error)
+  const isUnverified = !!authError && /not\s+verified|verify\s+your\s+email|email\s+not\s+verified/i.test(authError)
 
   const handleResend = async () => {
     if (!emailValue) return
@@ -91,16 +91,14 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginForm) => {
     if (isSubmitting) return
     setIsSubmitting(true)
-    try {
-      await login(data)
-    } catch (err) {
-      console.error("Login failed:", err)
-    } finally {
-      setIsSubmitting(false)
-    }
+    clearError()
+
+    await login(data.email, data.password)
+
+    setIsSubmitting(false)
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center space-y-4">
@@ -125,10 +123,10 @@ export default function LoginPage() {
 
         <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            {error && !isUnverified && (
+            {authError && !isUnverified && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
+                <AlertDescription>{authError}</AlertDescription>
               </Alert>
             )}
 

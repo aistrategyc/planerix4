@@ -13,7 +13,7 @@ from sqlalchemy import select, and_, or_
 
 from liderix_api.models.users import User, UserRole
 from liderix_api.models.memberships import Membership, MembershipRole
-from liderix_api.models.projects import Project, ProjectMemberRole
+from liderix_api.models.projects import Project
 from liderix_api.models.project_members import ProjectMember
 
 logger = logging.getLogger(__name__)
@@ -329,3 +329,22 @@ def is_system_admin(user: User) -> bool:
 def is_active_user(user: User) -> bool:
     """Check if user is active"""
     return user and getattr(user, 'is_active', False)
+
+
+async def check_organization_access(
+    session: AsyncSession,
+    organization_id,
+    user: User
+) -> bool:
+    """
+    Check if user has access to organization (alias for check_organization_permission with read)
+
+    Args:
+        session: Database session
+        organization_id: Organization ID or instance
+        user: User instance
+
+    Returns:
+        bool: True if user has read access to the organization
+    """
+    return await check_organization_permission(session, organization_id, user, "read")
