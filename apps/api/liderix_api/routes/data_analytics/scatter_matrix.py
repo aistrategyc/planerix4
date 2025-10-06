@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from datetime import date
 
-from liderix_api.database import get_session
+from liderix_api.db import get_itstep_session
 
 router = APIRouter()
 
@@ -20,7 +20,7 @@ async def get_scatter_matrix(
     platform: Optional[str] = Query(None, description="Platform filter (google/meta)"),
     min_leads: int = Query(5, description="Minimum leads to include"),
     min_spend: float = Query(100, description="Minimum spend to include"),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_itstep_session),
 ):
     """
     Get scatter matrix data for CPL vs ROAS visualization.
@@ -29,9 +29,13 @@ async def get_scatter_matrix(
     Data source: dashboards.v5_leads_campaign_daily
     """
 
-    platform_filter = ""
+    # Build platform filter
     if platform and platform.lower() in ["google", "meta"]:
-        platform_filter = f"AND platform = '{platform.lower()}'"
+        platform_filter = "AND platform = :platform"
+        has_platform_filter = True
+    else:
+        platform_filter = ""
+        has_platform_filter = False
 
     query = text(f"""
         SELECT
@@ -63,15 +67,16 @@ async def get_scatter_matrix(
         LIMIT 50
     """)
 
-    result = await session.execute(
-        query,
-        {
-            "date_from": date_from,
-            "date_to": date_to,
-            "min_leads": min_leads,
-            "min_spend": min_spend,
-        },
-    )
+    params = {
+        "date_from": date_from,
+        "date_to": date_to,
+        "min_leads": min_leads,
+        "min_spend": min_spend,
+    }
+    if has_platform_filter:
+        params["platform"] = platform.lower()
+
+    result = await session.execute(query, params)
     rows = result.mappings().all()
 
     return {

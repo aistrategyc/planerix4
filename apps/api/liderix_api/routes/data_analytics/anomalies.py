@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from datetime import date, timedelta
 
-from liderix_api.database import get_session
+from liderix_api.db import get_itstep_session
 
 router = APIRouter()
 
@@ -20,7 +20,7 @@ async def get_campaign_anomalies(
     platform: Optional[str] = Query(None, description="Platform filter (google/meta)"),
     anomaly_type: Optional[str] = Query(None, description="Type: spike_cpl, drop_leads, spike_spend"),
     severity: Optional[str] = Query(None, description="Severity: high, medium, low"),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_itstep_session),
 ):
     """
     Get campaign anomalies based on statistical analysis.
@@ -29,9 +29,13 @@ async def get_campaign_anomalies(
     Data source: dashboards.v5_leads_campaign_daily (calculated on-the-fly)
     """
 
-    platform_filter = ""
+    # Build platform filter
     if platform and platform.lower() in ["google", "meta"]:
-        platform_filter = f"AND platform = '{platform.lower()}'"
+        platform_filter = "AND platform = :platform"
+        has_platform_filter = True
+    else:
+        platform_filter = ""
+        has_platform_filter = False
 
     # Calculate baseline (previous period)
     date_diff = (date_to - date_from).days
@@ -111,15 +115,16 @@ async def get_campaign_anomalies(
         LIMIT 20
     """)
 
-    result = await session.execute(
-        query,
-        {
-            "date_from": date_from,
-            "date_to": date_to,
-            "baseline_from": baseline_from,
-            "baseline_to": baseline_to,
-        },
-    )
+    params = {
+        "date_from": date_from,
+        "date_to": date_to,
+        "baseline_from": baseline_from,
+        "baseline_to": baseline_to,
+    }
+    if has_platform_filter:
+        params["platform"] = platform.lower()
+
+    result = await session.execute(query, params)
     rows = result.mappings().all()
 
     # Filter by anomaly_type and severity if provided

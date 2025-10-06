@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from datetime import date
 
-from liderix_api.database import get_session
+from liderix_api.db import get_itstep_session
 
 router = APIRouter()
 
@@ -17,7 +17,7 @@ router = APIRouter()
 async def get_paid_split_platforms(
     date_from: date = Query(..., description="Start date (YYYY-MM-DD)"),
     date_to: date = Query(..., description="End date (YYYY-MM-DD)"),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_itstep_session),
 ):
     """
     Get paid vs organic split by platform.
@@ -111,7 +111,7 @@ async def get_paid_split_campaigns(
     date_to: date = Query(..., description="End date (YYYY-MM-DD)"),
     platform: str = Query(..., description="Platform (google/meta)"),
     limit: int = Query(20, description="Limit results"),
-    session: AsyncSession = Depends(get_session),
+    session: AsyncSession = Depends(get_itstep_session),
 ):
     """
     Get paid vs organic split by campaigns for a specific platform.
@@ -124,7 +124,10 @@ async def get_paid_split_campaigns(
     if platform.lower() not in ["google", "meta"]:
         return {"data": []}
 
-    query = text("""
+    # Calculate limit value in Python to avoid parameter binding issue
+    query_limit = limit * 2
+
+    query = text(f"""
         WITH paid_campaigns AS (
             SELECT
                 platform,
@@ -174,7 +177,7 @@ async def get_paid_split_campaigns(
             spend
         FROM organic_campaigns
         ORDER BY leads DESC
-        LIMIT :limit
+        LIMIT {query_limit}
     """)
 
     source_pattern = "%facebook%" if platform.lower() == "meta" else "%google%"
@@ -186,7 +189,6 @@ async def get_paid_split_campaigns(
             "date_to": date_to,
             "platform": platform.lower(),
             "source_pattern": source_pattern,
-            "limit": limit * 2,  # Get more to show both paid and organic
         },
     )
     rows = result.mappings().all()
