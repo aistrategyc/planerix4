@@ -4,7 +4,7 @@
 
 Этот документ определяет единую спецификацию API между фронтендом (Next.js) и бекендом (FastAPI) для предотвращения расхождений в моделях и вызовах.
 
-**Обновлено:** 30 сентября 2025
+**Обновлено:** 6 октября 2025
 **Статус:** ✅ Актуально и проверено
 
 ## Базовые конфигурации
@@ -21,15 +21,42 @@ http://localhost:3002
 # API префикс
 /api
 
-# Все backend endpoints начинаются с /api/
+# ВАЖНО: Все backend endpoints начинаются с /api/
+# NEXT_PUBLIC_API_URL уже содержит /api суффикс
 ```
+
+### ⚠️ КРИТИЧЕСКИ ВАЖНО: Правильная конфигурация API URL
+
+**Правильная настройка (исправлено 6 октября 2025):**
+
+```bash
+# В .env и docker-compose
+NEXT_PUBLIC_API_URL=http://localhost:8001/api  # ✅ УЖЕ С /api
+
+# В коде используем без дополнительного /api
+fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`)  # ✅ Правильно
+# Результат: http://localhost:8001/api/auth/login
+
+# НЕ ДЕЛАЙТЕ ТАК:
+fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`)  # ❌ Неправильно
+# Результат: http://localhost:8001/api/api/auth/login (404 ошибка)
+```
+
+**Файлы с правильной конфигурацией:**
+- ✅ `apps/web-enterprise/src/contexts/auth-context.tsx` - все fetch URL БЕЗ `/api` префикса
+- ✅ `apps/web-enterprise/.dockerignore` - добавлен `.env.production`
+- ✅ Корневой `.env` - `NEXT_PUBLIC_API_URL=http://localhost:8001/api`
+- ✅ `apps/api/liderix_api/config/settings.py` - CORS с конкретными origins
 
 ### Аутентификация
 
 ```bash
 POST /api/auth/login
+POST /api/auth/register
 POST /api/auth/refresh
-GET  /api/auth/me
+POST /api/auth/logout
+GET  /api/users/me
+POST /api/auth/resend-verification
 ```
 
 **Структура токена:**

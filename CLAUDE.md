@@ -1,5 +1,42 @@
 # Claude Code Project Configuration Guide
 
+## Критическое исправление API URL (6 октября 2025) 🔥
+
+### Проблема: Duplicate /api prefix
+**Симптом**: Все API запросы возвращали 404 ошибку, запросы шли на `/api/api/auth/login`
+
+**Причина**:
+- `NEXT_PUBLIC_API_URL` = `http://localhost:8001/api` (уже содержит `/api`)
+- Код в `auth-context.tsx` добавлял `/api` еще раз: `${NEXT_PUBLIC_API_URL}/api/auth/login`
+- Результат: `http://localhost:8001/api/api/auth/login` ❌
+
+**Решение (commit 229c637)**: ✅
+1. Удалён префикс `/api` из всех fetch URL в `auth-context.tsx` (7 мест):
+   - `/auth/login` (2 раза - обычный логин и dev auto-login)
+   - `/auth/register`
+   - `/auth/refresh`
+   - `/auth/logout`
+   - `/auth/resend-verification`
+   - `/users/me`
+
+2. Добавлен `.env.production` в `.dockerignore` - предотвращает переопределение build args
+
+3. Обновлён корневой `.env`: `NEXT_PUBLIC_API_URL=http://localhost:8001/api`
+
+4. Исправлены CORS настройки в `settings.py`:
+   - Заменён wildcard `*` на конкретные origins
+   - Улучшен парсинг comma-separated списков
+
+5. Увеличен rate limit для `/auth/refresh`: 10 → 100 запросов/час (dev)
+
+6. Удалены несуществующие ссылки из sidebar (Settings, Help)
+
+7. Обновлены default даты в data-analytics: 2025-09-10 до 2025-10-03
+
+**Проверка**: ✅ Все API запросы теперь идут на правильные URL без дублирования `/api`
+
+---
+
 ## Authentication Audit Results (September 2025)
 
 ### Fixed Issues Summary
