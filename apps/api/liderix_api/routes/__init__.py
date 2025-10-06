@@ -25,4 +25,5 @@ __all__ = [
     "kpis",
     "okrs",
     "analytics",
+    "data_analytics",
 ]

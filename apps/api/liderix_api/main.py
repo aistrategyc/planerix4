@@ -266,6 +266,9 @@ from liderix_api.routes import (
     analytics as analytics_router,
 )
 
+# --- клиентские (ITstep БД) ---
+from liderix_api.routes import data_analytics as data_analytics_router
+
 # Import test analytics endpoint
 try:
     from liderix_api.test_analytics_endpoint import router as test_analytics_router
@@ -286,6 +289,13 @@ app.include_router(analytics_router.router, prefix=f"{PREFIX}/analytics", tags=[
 # Add test analytics router if available
 if TEST_ANALYTICS_AVAILABLE:
     app.include_router(test_analytics_router, prefix=PREFIX, tags=["Test Analytics"])
+
+# Data Analytics router (ITstep client data)
+app.include_router(
+    data_analytics_router.router,
+    prefix=f"{PREFIX}/data-analytics",
+    tags=["Data Analytics"],
+)
 
 # Direct test endpoints for ITstep analytics
 @app.get("/api/test-itstep/health")
