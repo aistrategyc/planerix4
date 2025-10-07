@@ -29,6 +29,9 @@ export default function DataAnalyticsPage() {
   const [scatterMatrix, setScatterMatrix] = useState<any[]>([])
   const [anomalies, setAnomalies] = useState<any[]>([])
   const [paidSplit, setPaidSplit] = useState<any[]>([])
+  // NEW: Oct 7, 2025 - Campaign Insights
+  const [campaignInsights, setCampaignInsights] = useState<any[]>([])
+  const [metricsTrend, setMetricsTrend] = useState<any[]>([])
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -44,7 +47,7 @@ export default function DataAnalyticsPage() {
         limit: 50,
       }
 
-      // Use Promise.allSettled for independent failures (11 endpoints)
+      // Use Promise.allSettled for independent failures (13 endpoints)
       const results = await Promise.allSettled([
         dataAnalyticsApi.getKPICards(filters),
         dataAnalyticsApi.getLeadsTrend(filters),
@@ -58,6 +61,9 @@ export default function DataAnalyticsPage() {
         dataAnalyticsApi.getScatterMatrix(filters),
         dataAnalyticsApi.getAnomalies(filters),
         dataAnalyticsApi.getPaidSplitPlatforms(dateFrom, dateTo),
+        // NEW: Oct 7, 2025
+        dataAnalyticsApi.getCampaignInsights(dateFrom, dateTo, 5),
+        dataAnalyticsApi.getMetricsTrend(dateFrom, dateTo),
       ])
 
       // Set data for successful requests
@@ -69,10 +75,13 @@ export default function DataAnalyticsPage() {
       if (results[5].status === "fulfilled") setUtmSources(results[5].value)
       if (results[6].status === "fulfilled") setWowCampaigns(results[6].value)
       if (results[7].status === "fulfilled") setBudgetReco(results[7].value)
-      // NEW
+      // NEW: Oct 6
       if (results[8].status === "fulfilled") setScatterMatrix(results[8].value)
       if (results[9].status === "fulfilled") setAnomalies(results[9].value)
       if (results[10].status === "fulfilled") setPaidSplit(results[10].value)
+      // NEW: Oct 7
+      if (results[11].status === "fulfilled") setCampaignInsights(results[11].value)
+      if (results[12].status === "fulfilled") setMetricsTrend(results[12].value)
 
       // Log failures
       const failed = results.filter((r) => r.status === "rejected")
@@ -679,6 +688,222 @@ export default function DataAnalyticsPage() {
           ) : (
             <div className="py-8 text-center text-gray-400">
               No anomalies detected
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Campaign Insights - Performance Categories (NEW: Oct 7, 2025) */}
+      <Card className="col-span-full">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Target className="h-5 w-5" />
+            Campaign Performance Insights
+          </CardTitle>
+          <p className="text-sm text-gray-500 mt-1">
+            Active campaigns with contracts and performance metrics
+          </p>
+        </CardHeader>
+        <CardContent>
+          {campaignInsights && campaignInsights.length > 0 ? (
+            <div className="space-y-4">
+              {/* Performance Categories Summary */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                {["high_performer", "medium_performer", "volume_driver", "needs_attention"].map((category) => {
+                  const campaigns = campaignInsights.filter((c: any) => c.performance_category === category)
+                  const totalLeads = campaigns.reduce((sum: number, c: any) => sum + c.leads, 0)
+                  const totalContracts = campaigns.reduce((sum: number, c: any) => sum + c.contracts, 0)
+                  const totalRevenue = campaigns.reduce((sum: number, c: any) => sum + c.revenue, 0)
+
+                  const categoryConfig: Record<string, { label: string; color: string; bg: string; border: string }> = {
+                    high_performer: { label: "High Performers", color: "text-green-700", bg: "bg-green-50", border: "border-green-300" },
+                    medium_performer: { label: "Medium Performers", color: "text-blue-700", bg: "bg-blue-50", border: "border-blue-300" },
+                    volume_driver: { label: "Volume Drivers", color: "text-purple-700", bg: "bg-purple-50", border: "border-purple-300" },
+                    needs_attention: { label: "Needs Attention", color: "text-orange-700", bg: "bg-orange-50", border: "border-orange-300" },
+                  }
+
+                  const config = categoryConfig[category]
+
+                  return (
+                    <div key={category} className={`p-4 rounded-lg border-2 ${config.bg} ${config.border}`}>
+                      <div className={`text-xs font-semibold uppercase tracking-wide mb-2 ${config.color}`}>
+                        {config.label}
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-gray-600">Campaigns:</span>
+                          <span className="font-bold text-sm">{campaigns.length}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-gray-600">Leads:</span>
+                          <span className="font-semibold text-sm">{totalLeads}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-gray-600">Contracts:</span>
+                          <span className="font-semibold text-sm text-green-600">{totalContracts}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-gray-600">Revenue:</span>
+                          <span className="font-semibold text-sm text-blue-600">₴{(totalRevenue / 1000).toFixed(0)}k</span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Detailed Campaign Cards (Top 12) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+                {campaignInsights.slice(0, 12).map((campaign: any, idx: number) => {
+                  const categoryColors: Record<string, string> = {
+                    high_performer: "border-l-green-500 bg-green-50/50",
+                    medium_performer: "border-l-blue-500 bg-blue-50/50",
+                    volume_driver: "border-l-purple-500 bg-purple-50/50",
+                    needs_attention: "border-l-orange-500 bg-orange-50/50",
+                  }
+
+                  return (
+                    <div key={idx} className={`border-l-4 rounded-lg p-4 ${categoryColors[campaign.performance_category] || "border-l-gray-400"}`}>
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-semibold text-gray-500 uppercase mb-1">
+                            {campaign.platform}
+                          </div>
+                          <div className="text-sm font-bold text-gray-900 truncate" title={campaign.campaign_name}>
+                            {campaign.campaign_name}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
+                        <div>
+                          <div className="text-gray-500">Leads</div>
+                          <div className="font-bold text-lg">{campaign.leads}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500">Contracts</div>
+                          <div className="font-bold text-lg text-green-600">{campaign.contracts}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500">Revenue</div>
+                          <div className="font-semibold text-blue-600">₴{(campaign.revenue / 1000).toFixed(0)}k</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500">Conv. Rate</div>
+                          <div className="font-semibold">{campaign.conversion_rate.toFixed(1)}%</div>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 pt-2 border-t">
+                        <div className="text-xs text-gray-500">Avg Contract</div>
+                        <div className="font-semibold text-sm">₴{(campaign.avg_contract_value / 1000).toFixed(1)}k</div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="py-8 text-center text-gray-400">
+              No campaign insights available
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Metrics Trend - CPL, CPC, CTR, CPM (NEW: Oct 7, 2025) */}
+      <Card className="col-span-full">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Daily Metrics Trend
+          </CardTitle>
+          <p className="text-sm text-gray-500 mt-1">
+            CPL, CPC, CTR, CPM daily evolution
+          </p>
+        </CardHeader>
+        <CardContent>
+          {metricsTrend && metricsTrend.length > 0 ? (
+            <div className="space-y-6">
+              {/* CPL & CPC Trend */}
+              <div>
+                <h4 className="text-sm font-semibold mb-3">Cost Per Lead & Cost Per Click</h4>
+                <ResponsiveContainer width="100%" height={250}>
+                  <LineChart data={metricsTrend}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="dt" tick={{ fontSize: 12 }} />
+                    <YAxis yAxisId="left" tick={{ fontSize: 12 }} />
+                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12 }} />
+                    <Tooltip />
+                    <Legend />
+                    <Line yAxisId="left" type="monotone" dataKey="cpl" name="CPL (₴)" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} />
+                    <Line yAxisId="right" type="monotone" dataKey="cpc" name="CPC (₴)" stroke="#10b981" strokeWidth={2} dot={{ r: 4 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* CTR & CPM Trend */}
+              <div>
+                <h4 className="text-sm font-semibold mb-3">Click-Through Rate & Cost Per Mille</h4>
+                <ResponsiveContainer width="100%" height={250}>
+                  <LineChart data={metricsTrend}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="dt" tick={{ fontSize: 12 }} />
+                    <YAxis yAxisId="left" tick={{ fontSize: 12 }} />
+                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12 }} />
+                    <Tooltip />
+                    <Legend />
+                    <Line yAxisId="left" type="monotone" dataKey="ctr" name="CTR (%)" stroke="#f59e0b" strokeWidth={2} dot={{ r: 4 }} />
+                    <Line yAxisId="right" type="monotone" dataKey="cpm" name="CPM (₴)" stroke="#ef4444" strokeWidth={2} dot={{ r: 4 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Metrics Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-gray-50">
+                      <th className="text-left p-2">Date</th>
+                      <th className="text-right p-2">Leads</th>
+                      <th className="text-right p-2">Clicks</th>
+                      <th className="text-right p-2">Impressions</th>
+                      <th className="text-right p-2">Spend</th>
+                      <th className="text-right p-2">CPL</th>
+                      <th className="text-right p-2">CPC</th>
+                      <th className="text-right p-2">CTR</th>
+                      <th className="text-right p-2">CPM</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {metricsTrend.map((row: any, idx: number) => (
+                      <tr key={idx} className="border-b hover:bg-gray-50">
+                        <td className="p-2 font-medium">{row.dt}</td>
+                        <td className="text-right p-2">{row.leads}</td>
+                        <td className="text-right p-2">{row.clicks.toLocaleString()}</td>
+                        <td className="text-right p-2">{row.impressions.toLocaleString()}</td>
+                        <td className="text-right p-2">₴{row.spend.toFixed(0)}</td>
+                        <td className="text-right p-2 font-semibold text-blue-600">
+                          {row.cpl ? `₴${row.cpl.toFixed(0)}` : "—"}
+                        </td>
+                        <td className="text-right p-2 font-semibold text-green-600">
+                          {row.cpc ? `₴${row.cpc.toFixed(2)}` : "—"}
+                        </td>
+                        <td className="text-right p-2 font-semibold text-orange-600">
+                          {row.ctr ? `${row.ctr.toFixed(2)}%` : "—"}
+                        </td>
+                        <td className="text-right p-2 font-semibold text-red-600">
+                          {row.cpm ? `₴${row.cpm.toFixed(2)}` : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div className="py-8 text-center text-gray-400">
+              No metrics trend data available
             </div>
           )}
         </CardContent>

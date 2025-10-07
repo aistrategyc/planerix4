@@ -402,3 +402,54 @@ export const getPaidSplitCampaigns = async (
   })
   return response.data.data || []
 }
+
+// ============================================
+// ✅ CAMPAIGN INSIGHTS (Oct 7, 2025)
+// ============================================
+
+export interface CampaignInsightItem {
+  platform: string
+  campaign_id: string
+  campaign_name: string
+  leads: number
+  contracts: number
+  revenue: number
+  avg_contract_value: number
+  conversion_rate: number
+  performance_category: "high_performer" | "medium_performer" | "volume_driver" | "needs_attention"
+}
+
+export interface MetricsTrendItem {
+  dt: string
+  leads: number
+  clicks: number
+  impressions: number
+  spend: number
+  cpl: number | null
+  cpc: number | null
+  ctr: number | null
+  cpm: number | null
+}
+
+// 13. Campaign Insights (NEW - v5/campaigns/insights)
+export const getCampaignInsights = async (
+  date_from: string,
+  date_to: string,
+  min_leads: number = 5
+): Promise<CampaignInsightItem[]> => {
+  const response = await apiClient.get("/data-analytics/v5/campaigns/insights", {
+    params: { date_from, date_to, min_leads },
+  })
+  return response.data.data || []
+}
+
+// 14. Metrics Trend (NEW - v5/campaigns/metrics-trend)
+export const getMetricsTrend = async (
+  date_from: string,
+  date_to: string
+): Promise<MetricsTrendItem[]> => {
+  const response = await apiClient.get("/data-analytics/v5/campaigns/metrics-trend", {
+    params: { date_from, date_to },
+  })
+  return response.data.data || []
+}

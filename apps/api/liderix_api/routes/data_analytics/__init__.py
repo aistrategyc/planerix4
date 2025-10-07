@@ -9,7 +9,7 @@ from fastapi import APIRouter
 from . import kpi, trends, campaigns, utm_sources, share
 
 # Import v5 advanced endpoints
-from . import scatter_matrix, anomalies, paid_split
+from . import scatter_matrix, anomalies, paid_split, campaign_insights
 
 # Import v4 compare endpoints (already exist from previous sessions)
 from . import trends_compare, campaigns_compare, share_compare, top_movers, budget_recommendations
@@ -23,9 +23,10 @@ router.include_router(campaigns.router, prefix="/v5/campaigns", tags=["Data Anal
 router.include_router(utm_sources.router, prefix="/v5", tags=["Data Analytics v5 - UTM Sources"])
 router.include_router(share.router, prefix="/v5/share", tags=["Data Analytics v5 - Share"])
 
-# Include v5 advanced endpoints (Oct 6, 2025)
+# Include v5 advanced endpoints (Oct 6-7, 2025)
 router.include_router(scatter_matrix.router, prefix="/v5/campaigns", tags=["Data Analytics v5 - Advanced"])
 router.include_router(anomalies.router, prefix="/v5/campaigns", tags=["Data Analytics v5 - Advanced"])
+router.include_router(campaign_insights.router, prefix="/v5", tags=["Data Analytics v5 - Campaign Insights"])
 
 # Include v4 compare endpoints (already exist from previous sessions)
 router.include_router(trends_compare.router, prefix="/v5", tags=["Data Analytics v5 - Compare"])
