@@ -47,8 +47,8 @@ async def get_paid_split_platforms(
                 COUNT(*) as leads,
                 'organic' as source_type
             FROM dashboards.fact_leads
-            WHERE created_at::date >= :date_from
-              AND created_at::date <= :date_to
+            WHERE row_created_at::date >= :date_from
+              AND row_created_at::date <= :date_to
               AND (
                   utm_medium ILIKE '%organic%'
                   OR utm_source ILIKE '%organic%'
@@ -151,8 +151,8 @@ async def get_paid_split_campaigns(
                 0.0 as spend,
                 'organic' as source_type
             FROM dashboards.fact_leads
-            WHERE created_at::date >= :date_from
-              AND created_at::date <= :date_to
+            WHERE row_created_at::date >= :date_from
+              AND row_created_at::date <= :date_to
               AND (
                   utm_medium ILIKE '%organic%'
                   OR (utm_campaign IS NOT NULL AND utm_source ILIKE :source_pattern)

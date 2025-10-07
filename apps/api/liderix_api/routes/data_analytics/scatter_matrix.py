@@ -29,7 +29,7 @@ async def get_scatter_matrix(
     Data source: dashboards.v5_leads_campaign_daily
     """
 
-    # Build query with proper parameter binding
+    # Build query - simplified without optional platform filter
     query = text("""
         SELECT
             platform,
@@ -50,7 +50,6 @@ async def get_scatter_matrix(
         FROM dashboards.v5_leads_campaign_daily
         WHERE dt >= :date_from
           AND dt <= :date_to
-          AND (:platform = '' OR platform = :platform)
         GROUP BY platform, campaign_id, campaign_name
         HAVING SUM(leads) >= :min_leads
            AND SUM(spend) >= :min_spend
@@ -65,7 +64,6 @@ async def get_scatter_matrix(
         "date_to": date_to,
         "min_leads": min_leads,
         "min_spend": min_spend,
-        "platform": platform.lower() if platform and platform.lower() in ["google", "meta"] else "",
     }
 
     result = await session.execute(query, params)

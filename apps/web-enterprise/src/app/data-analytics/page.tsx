@@ -11,9 +11,9 @@ import * as dataAnalyticsApi from "@/lib/api/data-analytics"
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"]
 
 export default function DataAnalyticsPage() {
-  // Filters - September 2025 ITstep data
-  const [dateFrom, setDateFrom] = useState("2025-09-01")
-  const [dateTo, setDateTo] = useState("2025-09-30")
+  // Filters - October 2025 ITstep data (updated Oct 7)
+  const [dateFrom, setDateFrom] = useState("2025-10-01")
+  const [dateTo, setDateTo] = useState("2025-10-03")
   const [selectedPlatform, setSelectedPlatform] = useState<string>("")
 
   // Data states (11 working endpoints)

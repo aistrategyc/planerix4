@@ -34,9 +34,7 @@ async def get_campaign_anomalies(
     baseline_from = date_from - timedelta(days=date_diff)
     baseline_to = date_from - timedelta(days=1)
 
-    # Set platform param (None means all platforms)
-    platform_param = platform.lower() if platform and platform.lower() in ["google", "meta"] else None
-
+    # Simplified query without optional platform filter
     query = text("""
         WITH current_period AS (
             SELECT
@@ -48,7 +46,6 @@ async def get_campaign_anomalies(
                 CASE WHEN SUM(leads) > 0 THEN SUM(spend) / SUM(leads) ELSE NULL END as cpl
             FROM dashboards.v5_leads_campaign_daily
             WHERE dt >= :date_from AND dt <= :date_to
-              AND (:platform = '' OR platform = :platform)
             GROUP BY platform, campaign_id, campaign_name
             HAVING SUM(leads) > 0
         ),
@@ -69,7 +66,6 @@ async def get_campaign_anomalies(
                     CASE WHEN leads > 0 THEN spend / leads ELSE NULL END as daily_cpl
                 FROM dashboards.v5_leads_campaign_daily
                 WHERE dt >= :baseline_from AND dt <= :baseline_to
-                  AND (:platform = '' OR platform = :platform)
             ) daily
             WHERE daily_cpl IS NOT NULL
             GROUP BY platform, campaign_id
@@ -117,7 +113,6 @@ async def get_campaign_anomalies(
         "date_to": date_to,
         "baseline_from": baseline_from,
         "baseline_to": baseline_to,
-        "platform": platform_param if platform_param else "",
     }
 
     result = await session.execute(query, params)
