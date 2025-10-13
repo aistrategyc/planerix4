@@ -64,15 +64,6 @@
     # Compression
     encode gzip
 
-    # Rate limiting
-    rate_limit {
-        zone static {
-            key {remote_host}
-            events 100
-            window 1m
-        }
-    }
-
     # Logging
     log {
         output file /data/logs/app.access.log {
@@ -128,15 +119,6 @@
     # Compression
     encode gzip
 
-    # Rate limiting for API
-    rate_limit {
-        zone api {
-            key {remote_host}
-            events 1000
-            window 1m
-        }
-    }
-
     # Logging
     log {
         output file /data/logs/api.access.log {
@@ -179,15 +161,6 @@
 
     # Compression
     encode gzip
-
-    # Rate limiting for RAG API
-    rate_limit {
-        zone rag {
-            key {remote_host}
-            events 200
-            window 1m
-        }
-    }
 
     # Logging
     log {
