@@ -156,6 +156,8 @@ async def register(
                     id=uuid4(),
                     username=username,
                     email=email,
+                    first_name=data.first_name,
+                    last_name=data.last_name,
                     hashed_password=hash_password(data.password),
                     client_id=data.client_id,
                     is_verified=False,
@@ -171,6 +173,8 @@ async def register(
                     .where(User.id == existing.id, User.is_verified == False)  # noqa: E712
                     .values(
                         username=username,  # допускаем смену имени до верификации
+                        first_name=data.first_name,
+                        last_name=data.last_name,
                         hashed_password=hash_password(data.password),
                         verification_token_hash=token_hash,
                         verification_token_expires_at=expires_at,

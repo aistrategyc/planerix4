@@ -8,6 +8,8 @@ class RegisterSchema(BaseModel):
     username: str = Field(..., min_length=3, max_length=50, description="Username (3-50 characters)")
     email: EmailStr = Field(..., description="Valid email address")
     password: str = Field(..., min_length=8, max_length=128, description="Password (8-128 characters)")
+    first_name: Optional[str] = Field(None, max_length=100, description="User's first name")
+    last_name: Optional[str] = Field(None, max_length=100, description="User's last name")
     client_id: Optional[str] = Field(None, description="Client ID for tracking registration source")
     terms_accepted: bool = Field(..., description="User must accept terms of service")
     

@@ -214,3 +214,115 @@ curl -X GET https://app.planerix.com/api/health
 - **Тестируй изменения локально перед деплоем на сервер**
 
 This configuration has been tested and verified working on September 30, 2025.
+
+## Authentication Schema Alignment (October 13, 2025)
+
+### Critical Fix: Frontend/Backend Schema Mismatch
+
+**Problem**: Frontend registration form was sending `first_name` and `last_name` fields, but backend `RegisterSchema` didn't accept them. Registration succeeded (201), but these fields were silently discarded and saved as NULL in the database.
+
+**Root Cause**: Schema definitions were not synchronized between frontend and backend after the User model was updated to include name fields.
+
+### Files Fixed
+
+1. **Backend Schema** (`apps/api/liderix_api/schemas/auth.py`):
+   ```python
+   class RegisterSchema(BaseModel):
+       username: str = Field(..., min_length=3, max_length=50)
+       email: EmailStr = Field(...)
+       password: str = Field(..., min_length=8, max_length=128)
+       first_name: Optional[str] = Field(None, max_length=100)  # ✅ ADDED
+       last_name: Optional[str] = Field(None, max_length=100)   # ✅ ADDED
+       client_id: Optional[str] = Field(None)
+       terms_accepted: bool = Field(...)
+   ```
+
+2. **Backend Registration Route** (`apps/api/liderix_api/routes/auth/register.py`):
+   ```python
+   # New user creation
+   user = User(
+       id=uuid4(),
+       username=username,
+       email=email,
+       first_name=data.first_name,  # ✅ ADDED
+       last_name=data.last_name,    # ✅ ADDED
+       hashed_password=hash_password(data.password),
+       # ... other fields
+   )
+
+   # Existing user update
+   await session.execute(
+       update(User)
+       .where(User.id == existing.id, User.is_verified == False)
+       .values(
+           username=username,
+           first_name=data.first_name,  # ✅ ADDED
+           last_name=data.last_name,    # ✅ ADDED
+           # ... other fields
+       )
+   )
+   ```
+
+3. **Frontend TypeScript Types** (`apps/web-enterprise/src/lib/api/auth.ts`):
+   ```typescript
+   export type RegisterSchema = {
+     email: string
+     password: string
+     username: string
+     first_name?: string  // ✅ Now matches backend
+     last_name?: string   // ✅ Now matches backend
+     terms_accepted: boolean
+   }
+   ```
+
+### Testing Verification
+
+```bash
+# Test registration with name fields
+curl -X POST "http://localhost:8001/api/auth/register" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "test@example.com",
+    "password": "SecurePass123!",
+    "username": "testuser",
+    "first_name": "John",
+    "last_name": "Doe",
+    "terms_accepted": true
+  }'
+
+# Verify database
+docker exec db-postgres psql -U app -d app -c \
+  "SELECT username, email, first_name, last_name, is_verified
+   FROM users WHERE email='test@example.com';"
+
+# Result:
+#  username |      email       | first_name | last_name | is_verified
+# ----------+------------------+------------+-----------+-------------
+#  testuser | test@example.com | John       | Doe       | f
+```
+
+**Status**: ✅ VERIFIED WORKING
+
+### Important Notes
+
+1. **Container Rebuild Required**: After schema changes, the backend container must be rebuilt to pick up Python file changes:
+   ```bash
+   docker-compose -f docker-compose.dev.yml up -d --build backend
+   ```
+
+2. **Schema Synchronization Rule**: When updating authentication schemas, ALWAYS update:
+   - Backend Pydantic schema (`apps/api/liderix_api/schemas/auth.py`)
+   - Backend route handlers (`apps/api/liderix_api/routes/auth/*.py`)
+   - Frontend TypeScript types (`apps/web-enterprise/src/lib/api/auth.ts`)
+   - Frontend Zod schemas (in respective page files)
+   - Database model (if needed) + Alembic migration
+
+3. **Documentation**: See `AUTHENTICATION_RULES.md` for complete authentication system documentation, including:
+   - Full schema definitions
+   - Validation rules
+   - Registration and login flows
+   - Environment variables
+   - Testing instructions
+   - Troubleshooting guide
+
+This fix has been tested and verified working on October 13, 2025.
