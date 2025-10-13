@@ -77,7 +77,6 @@ services:
     build:
       context: ./apps/api
       dockerfile: Dockerfile
-      target: production
     restart: unless-stopped
     env_file:
       - .env.production
@@ -126,7 +125,6 @@ services:
     build:
       context: ./apps/web-enterprise
       dockerfile: Dockerfile
-      target: production
       args:
         NEXT_PUBLIC_API_URL: https://api.${MAIN_DOMAIN}
         NEXT_PUBLIC_API_PREFIX: /api
@@ -162,7 +160,6 @@ services:
     build:
       context: ./apps/planerix
       dockerfile: Dockerfile
-      target: production
       args:
         NEXT_PUBLIC_API_URL: https://api.${MAIN_DOMAIN}
         NEXT_PUBLIC_API_PREFIX: /api
