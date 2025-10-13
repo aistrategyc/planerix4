@@ -22,6 +22,8 @@ volumes:
     name: planerix-lightrag-storage
   lightrag_tiktoken:
     name: planerix-lightrag-tiktoken
+  n8n_data:
+    name: planerix-n8n-data
 
 services:
   postgres:
@@ -212,6 +214,47 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: planerix-n8n-prod
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      N8N_HOST: n8n.${MAIN_DOMAIN}
+      N8N_PORT: 5678
+      N8N_PROTOCOL: https
+      WEBHOOK_URL: https://n8n.${MAIN_DOMAIN}/
+      GENERIC_TIMEZONE: Europe/Kiev
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      N8N_USER_MANAGEMENT_JWT_SECRET: ${N8N_JWT_SECRET}
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: ${POSTGRES_DB}
+      DB_POSTGRESDB_USER: ${POSTGRES_USER}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - n8n_data:/home/node/.n8n
+    expose:
+      - "5678"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - planerix-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:5678/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   caddy:
     image: caddy:2-alpine
     container_name: planerix-caddy-prod
@@ -230,12 +273,15 @@ services:
         condition: service_healthy
       landing:
         condition: service_healthy
+      n8n:
+        condition: service_healthy
     environment:
       MAIN_DOMAIN: planerix.com
       APP_DOMAIN: app.planerix.com
       API_DOMAIN: api.planerix.com
       SSL_EMAIL: kprolieiev@gmail.com
       RAG_DOMAIN: rag.planerix.com
+      N8N_DOMAIN: n8n.planerix.com
     networks:
       - planerix-network
     logging:

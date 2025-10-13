@@ -174,6 +174,36 @@
     }
 }
 
+# n8n Workflow Automation
+{$N8N_DOMAIN:n8n.planerix.com} {
+    reverse_proxy planerix-n8n-prod:5678 {
+        # Health check
+        health_uri /healthz
+        health_interval 30s
+        health_timeout 5s
+    }
+
+    # Security headers
+    header {
+        X-Frame-Options SAMEORIGIN
+        X-Content-Type-Options nosniff
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        -Server
+    }
+
+    # Compression
+    encode gzip
+
+    # Logging
+    log {
+        output file /data/logs/n8n.access.log {
+            roll_size 50mb
+            roll_keep 3
+        }
+        format json
+    }
+}
+
 # Traefik Dashboard (if needed)
 traefik.{$MAIN_DOMAIN:planerix.com} {
     basicauth {
