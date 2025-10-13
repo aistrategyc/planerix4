@@ -6,12 +6,6 @@
     email {$SSL_EMAIL}
 }
 
-# Health check endpoint for monitoring (must be before domain blocks)
-:8080 {
-    respond /health "healthy" 200
-    respond /ready "ready" 200
-}
-
 # Landing page - главная страница
 {$MAIN_DOMAIN:planerix.com}, www.{$MAIN_DOMAIN:planerix.com} {
     reverse_proxy planerix-landing-prod:3000
