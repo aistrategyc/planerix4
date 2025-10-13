@@ -126,7 +126,7 @@ services:
       context: ./apps/web-enterprise
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: https://api.${MAIN_DOMAIN}
+        NEXT_PUBLIC_API_URL: https://api.${MAIN_DOMAIN}/api
         NEXT_PUBLIC_API_PREFIX: /api
         NODE_ENV: production
     restart: unless-stopped
@@ -134,7 +134,7 @@ services:
       - ./apps/web-enterprise/.env.production
     environment:
       NODE_ENV: production
-      NEXT_PUBLIC_API_URL: https://api.${MAIN_DOMAIN}
+      NEXT_PUBLIC_API_URL: https://api.${MAIN_DOMAIN}/api
       NEXT_PUBLIC_API_PREFIX: /api
       INTERNAL_API_URL: http://api:8001/api
     depends_on:
@@ -161,7 +161,7 @@ services:
       context: ./apps/planerix
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: https://api.${MAIN_DOMAIN}
+        NEXT_PUBLIC_API_URL: https://api.${MAIN_DOMAIN}/api
         NEXT_PUBLIC_API_PREFIX: /api
         NODE_ENV: production
     restart: unless-stopped
@@ -169,7 +169,7 @@ services:
       - ./apps/planerix/.env.production
     environment:
       NODE_ENV: production
-      NEXT_PUBLIC_API_URL: https://api.${MAIN_DOMAIN}
+      NEXT_PUBLIC_API_URL: https://api.${MAIN_DOMAIN}/api
       NEXT_PUBLIC_API_PREFIX: /api
     depends_on:
       api:
