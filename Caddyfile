@@ -43,7 +43,7 @@
 
 # Web Enterprise Application
 {$APP_DOMAIN:app.planerix.com} {
-    reverse_proxy planerix-web-prod:3000 {
+    reverse_proxy planerix-web-prod:3001 {
         # Load balancing for future scaling
         health_uri /api/health
         health_interval 30s
