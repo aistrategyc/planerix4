@@ -42,7 +42,7 @@ echo -e "${BLUE}🔍 Проверяем SSL сертификаты...${NC}"
 sleep 10
 
 # Проверяем домены
-domains=("planerix.com" "app.planerix.com" "api.planerix.com")
+domains=("planerix.com" "app.planerix.com" "api.planerix.com" "rag.planerix.com")
 for domain in "${domains[@]}"; do
     if curl -s -I "https://$domain" >/dev/null; then
         echo -e "  $domain: ${GREEN}✅ OK${NC}"
@@ -56,6 +56,7 @@ echo -e "${GREEN}🎉 Продакшн развертывание заверше
 echo -e "Landing: ${BLUE}https://planerix.com${NC}"
 echo -e "App: ${BLUE}https://app.planerix.com${NC}"
 echo -e "API: ${BLUE}https://api.planerix.com/api${NC}"
+echo -e "LightRAG: ${BLUE}https://rag.planerix.com${NC}"
 echo -e "Traefik Dashboard: ${BLUE}https://traefik.planerix.com${NC}"
 echo
 echo -e "${YELLOW}Для остановки запустите:${NC} docker-compose -f docker-compose.prod.yml down"
@@ -186,6 +187,9 @@ wait_for_service "api"
 wait_for_service "web"
 wait_for_service "landing"
 
+# Wait for LightRAG
+wait_for_service "lightrag"
+
 # Run database migrations
 print_status "Running database migrations..."
 docker-compose -f docker-compose.prod.yml exec -T api alembic upgrade head || {
@@ -208,6 +212,7 @@ echo "Services are now running at:"
 echo "  🌐 Landing Page:      https://planerix.com"
 echo "  📱 Web Application:   https://app.planerix.com"
 echo "  🔌 API Endpoints:     https://api.planerix.com"
+echo "  🧠 LightRAG API:      https://rag.planerix.com"
 echo ""
 echo "Monitoring and Logs:"
 echo "  📊 View logs:         docker-compose -f docker-compose.prod.yml logs -f"

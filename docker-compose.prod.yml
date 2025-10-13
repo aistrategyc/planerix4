@@ -18,6 +18,10 @@ volumes:
     name: planerix-caddy-data
   caddy_config:
     name: planerix-caddy-config
+  lightrag_storage:
+    name: planerix-lightrag-storage
+  lightrag_tiktoken:
+    name: planerix-lightrag-tiktoken
 
 services:
   postgres:
@@ -188,6 +192,34 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  lightrag:
+    image: ghcr.io/hkuds/lightrag:latest
+    container_name: planerix-lightrag-prod
+    restart: unless-stopped
+    env_file:
+      - .env.lightrag
+    volumes:
+      - lightrag_storage:/app/data/rag_storage
+      - lightrag_tiktoken:/app/data/tiktoken
+    expose:
+      - "9621"
+    environment:
+      TIKTOKEN_CACHE_DIR: /app/data/tiktoken
+      HOST: 0.0.0.0
+      PORT: 9621
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9621/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - planerix-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   caddy:
     image: caddy:2-alpine
     container_name: planerix-caddy-prod
@@ -206,11 +238,14 @@ services:
         condition: service_healthy
       landing:
         condition: service_healthy
+      lightrag:
+        condition: service_healthy
     environment:
       MAIN_DOMAIN: ${MAIN_DOMAIN}
       APP_DOMAIN: ${APP_DOMAIN}
       API_DOMAIN: ${API_DOMAIN}
       SSL_EMAIL: ${SSL_EMAIL}
+      RAG_DOMAIN: ${RAG_DOMAIN}
     networks:
       - planerix-network
     logging:

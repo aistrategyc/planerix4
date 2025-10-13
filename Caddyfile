@@ -154,6 +154,58 @@
     }
 }
 
+# LightRAG Knowledge Base API
+{$RAG_DOMAIN:rag.planerix.com} {
+    reverse_proxy planerix-lightrag-prod:9621 {
+        # Health check
+        health_uri /health
+        health_interval 30s
+        health_timeout 5s
+    }
+
+    # Security headers
+    header {
+        Access-Control-Allow-Origin "https://{$APP_DOMAIN:app.planerix.com}"
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        Access-Control-Allow-Headers "Content-Type, Authorization, X-API-Key, X-Requested-With"
+        Access-Control-Allow-Credentials "true"
+        X-Frame-Options DENY
+        X-Content-Type-Options nosniff
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        -Server
+    }
+
+    # Handle preflight requests
+    @options method OPTIONS
+    respond @options 200 {
+        Access-Control-Allow-Origin "https://{$APP_DOMAIN:app.planerix.com}"
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        Access-Control-Allow-Headers "Content-Type, Authorization, X-API-Key, X-Requested-With"
+        Access-Control-Max-Age "86400"
+    }
+
+    # Compression
+    encode gzip
+
+    # Rate limiting for RAG API
+    rate_limit {
+        zone rag {
+            key {remote_host}
+            events 200
+            window 1m
+        }
+    }
+
+    # Logging
+    log {
+        output file /data/logs/rag.access.log {
+            roll_size 50mb
+            roll_keep 3
+        }
+        format json
+    }
+}
+
 # Traefik Dashboard (if needed)
 traefik.{$MAIN_DOMAIN:planerix.com} {
     basicauth {
