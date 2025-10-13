@@ -216,6 +216,8 @@ services:
     image: caddy:2-alpine
     container_name: planerix-caddy-prod
     restart: unless-stopped
+    env_file:
+      - .env.production
     ports:
       - "80:80"
       - "443:443"
