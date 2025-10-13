@@ -204,11 +204,6 @@ services:
       TIKTOKEN_CACHE_DIR: /app/data/tiktoken
       HOST: 0.0.0.0
       PORT: 9621
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9621/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
     networks:
       - planerix-network
     logging:
@@ -234,8 +229,6 @@ services:
       web:
         condition: service_healthy
       landing:
-        condition: service_healthy
-      lightrag:
         condition: service_healthy
     environment:
       MAIN_DOMAIN: ${MAIN_DOMAIN}
