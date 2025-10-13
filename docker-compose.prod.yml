@@ -141,9 +141,9 @@ services:
       api:
         condition: service_healthy
     expose:
-      - "3000"
+      - "3001"
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:3001/ || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
