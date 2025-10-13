@@ -216,8 +216,6 @@ services:
     image: caddy:2-alpine
     container_name: planerix-caddy-prod
     restart: unless-stopped
-    env_file:
-      - .env.production
     ports:
       - "80:80"
       - "443:443"
@@ -233,11 +231,11 @@ services:
       landing:
         condition: service_healthy
     environment:
-      MAIN_DOMAIN: ${MAIN_DOMAIN}
-      APP_DOMAIN: ${APP_DOMAIN}
-      API_DOMAIN: ${API_DOMAIN}
-      SSL_EMAIL: ${SSL_EMAIL}
-      RAG_DOMAIN: ${RAG_DOMAIN}
+      MAIN_DOMAIN: planerix.com
+      APP_DOMAIN: app.planerix.com
+      API_DOMAIN: api.planerix.com
+      SSL_EMAIL: kprolieiev@gmail.com
+      RAG_DOMAIN: rag.planerix.com
     networks:
       - planerix-network
     logging:
