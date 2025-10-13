@@ -54,6 +54,7 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3001
+ENV HOSTNAME=0.0.0.0
 RUN apk add --no-cache libc6-compat curl
 
 # Безопасный пользователь
