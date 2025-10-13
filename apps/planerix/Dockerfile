@@ -64,7 +64,7 @@ ENV NODE_ENV=production
 ENV PORT=3000
 
 # Alpine fix
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat curl
 
 # Безопасный юзер
 RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
