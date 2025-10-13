@@ -4,13 +4,6 @@
 # Global options
 {
     email {$SSL_EMAIL}
-
-    # Production-ready settings
-    servers {
-        protocol {
-            allow_h2c
-        }
-    }
 }
 
 # Landing page - главная страница
