@@ -1,7 +1,7 @@
 """
 Data Analytics routes for ITstep client
-Includes v5 (basic + advanced) and v6 (recommendations) endpoints
-Updated: October 6, 2025
+Includes v5 (basic + advanced) and v6 (recommendations, sales, contracts) endpoints
+Updated: October 14, 2025
 """
 from fastapi import APIRouter
 
@@ -13,6 +13,9 @@ from . import scatter_matrix, anomalies, paid_split, campaign_insights
 
 # Import v4 compare endpoints (already exist from previous sessions)
 from . import trends_compare, campaigns_compare, share_compare, top_movers, budget_recommendations
+
+# Import v6 sales and contracts endpoints (Oct 14, 2025)
+from . import sales_v6, contracts_v6
 
 router = APIRouter()
 
@@ -37,3 +40,9 @@ router.include_router(top_movers.router, prefix="/v5/campaigns", tags=["Data Ana
 # Include v6 recommendations and paid split
 router.include_router(budget_recommendations.router, prefix="/v6", tags=["Data Analytics v6 - Recommendations"])
 router.include_router(paid_split.router, prefix="/v6/leads/paid-split", tags=["Data Analytics v6 - Paid Split"])
+
+# Include v6 sales endpoints (Oct 14, 2025)
+router.include_router(sales_v6.router, prefix="/sales/v6", tags=["Data Analytics v6 - Sales"])
+
+# Include v6 contracts endpoints (Oct 14, 2025)
+router.include_router(contracts_v6.router, prefix="/contracts/v6", tags=["Data Analytics v6 - Contracts"])
