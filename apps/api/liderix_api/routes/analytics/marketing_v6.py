@@ -111,6 +111,9 @@ async def get_creatives(
 ):
     """Get creative performance using v6_creative_performance"""
     try:
+        date_from_obj = parse_date(date_from)
+        date_to_obj = parse_date(date_to)
+
         search_filter = ""
         if search:
             search_filter = "AND (title ILIKE :search OR body ILIKE :search)"
@@ -139,15 +142,15 @@ async def get_creatives(
                 days_active,
                 performance_status
             FROM dashboards.v6_creative_performance
-            WHERE first_seen_date >= :date_from::date OR last_seen_date <= :date_to::date
+            WHERE (first_seen_date >= :date_from OR last_seen_date <= :date_to)
             {search_filter}
             ORDER BY total_spend DESC NULLS LAST
             LIMIT 100
         """)
 
         params = {
-            "date_from": date_from,
-            "date_to": date_to
+            "date_from": date_from_obj,
+            "date_to": date_to_obj
         }
         if search:
             params["search"] = f"%{search}%"
@@ -421,18 +424,16 @@ async def get_product_performance(
         query = text("""
             SELECT
                 product_name,
-                branch_name,
-                COUNT(*) as leads,
-                SUM(CASE WHEN contract_amount > 0 THEN 1 END) as contracts,
-                SUM(COALESCE(contract_amount, 0)) as revenue,
-                ROUND(AVG(contract_amount), 2) as avg_contract_value,
-                ROUND(100.0 * SUM(CASE WHEN contract_amount > 0 THEN 1 END) / NULLIF(COUNT(*), 0), 2) as conversion_rate
-            FROM dashboards.fact_leads
-            WHERE created_date_txt::date >= :date_from
-              AND created_date_txt::date <= :date_to
-              AND product_name IS NOT NULL
-            GROUP BY product_name, branch_name
-            ORDER BY revenue DESC NULLS LAST
+                product_category as branch_name,
+                total_leads as leads,
+                total_contracts as contracts,
+                total_revenue as revenue,
+                avg_contract_value,
+                lead_to_contract_rate as conversion_rate
+            FROM dashboards.v6_product_performance
+            WHERE first_contract_date >= :date_from
+              OR last_contract_date <= :date_to
+            ORDER BY total_revenue DESC NULLS LAST
             LIMIT 50
         """)
 

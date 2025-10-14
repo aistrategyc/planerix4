@@ -127,32 +127,31 @@ async def get_wow_campaigns(
         platforms_list = [p.strip() for p in platforms.split(",")] if platforms else []
 
         if platforms_list:
-            platform_filter = "WHERE platform = ANY(:platforms)"
+            platform_filter = "WHERE dominant_platform = ANY(:platforms)"
         else:
             platform_filter = ""
 
         query = text(f"""
             SELECT
-                platform,
+                dominant_platform as platform,
                 campaign_id,
                 campaign_name,
-                leads_cur,
-                leads_prev,
-                (leads_cur - leads_prev) AS leads_diff,
-                CASE WHEN leads_prev > 0
-                    THEN (leads_cur - leads_prev)::numeric * 100.0 / leads_prev
+                leads as leads_cur,
+                prev_week_leads as leads_prev,
+                (leads - COALESCE(prev_week_leads, 0)) AS leads_diff,
+                CASE WHEN COALESCE(prev_week_leads, 0) > 0
+                    THEN (leads - COALESCE(prev_week_leads, 0))::numeric * 100.0 / prev_week_leads
+                    ELSE NULL
                 END AS leads_diff_pct,
-                spend_cur,
-                spend_prev,
-                (spend_cur - spend_prev) AS spend_diff,
-                CASE WHEN spend_prev > 0
-                    THEN (spend_cur - spend_prev) * 100.0 / spend_prev
-                END AS spend_diff_pct,
-                cpl_cur,
-                cpl_prev
+                0.0 as spend_cur,
+                0.0 as spend_prev,
+                0.0 AS spend_diff,
+                NULL AS spend_diff_pct,
+                revenue_per_lead as cpl_cur,
+                NULL as cpl_prev
             FROM dashboards.v5_leads_campaign_weekly
             {platform_filter}
-            ORDER BY leads_diff DESC
+            ORDER BY (leads - COALESCE(prev_week_leads, 0)) DESC
             LIMIT :limit
         """)
 
