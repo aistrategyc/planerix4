@@ -1,0 +1,902 @@
+{
+  "name": "2 Staging",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtMinute": 40
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1440,
+        608
+      ],
+      "id": "6150ed51-33c0-483f-9f53-af5a606b9550",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "BEGIN;\n\n/* База источников */\nWITH ns AS (\n  SELECT\n    s.id_source::text        AS id_source,  -- ✅ единообразно text\n    s.type::int              AS source_type,\n    s.date_time              AS source_date_time,\n    s.updated_at             AS source_updated_at,\n    s.id_user::bigint        AS manager_id,\n    s.id_uniq::bigint        AS id_uniq\n  FROM raw.itcrm_new_source s\n),\n/* уникальные связи source↔request */\nrr AS (\n  SELECT\n    irr.id_source::text AS id_source,  -- ✅ text\n    irr.id_request::int AS id_request\n  FROM raw.itcrm_internet_request_relation irr\n  GROUP BY irr.id_source, irr.id_request\n),\n/* агрегируем по source */\nrel AS (\n  SELECT\n    id_source,\n    ARRAY_AGG(id_request ORDER BY id_request)::int[] AS request_ids,\n    MIN(id_request)                                  AS primary_request_id\n  FROM rr\n  GROUP BY id_source\n),\n/* все codes по всем IR конкретного source */\nall_codes AS (\n  SELECT\n    r.id_source,\n    JSONB_AGG(\n      CASE \n        WHEN a.code IS NOT NULL AND jsonb_typeof(a.code) IN ('object','array') \n        THEN a.code \n        ELSE NULL \n      END \n      ORDER BY a.analytic_id\n    ) AS codes\n  FROM rr r\n  JOIN raw.itcrm_analytics a\n    ON a.internet_request_id::int = r.id_request\n  GROUP BY r.id_source\n),\n/* последний code по primary_request_id */\nlast_code AS (\n  SELECT DISTINCT ON (r.id_source)\n    r.id_source,\n    CASE\n      WHEN a.code IS NULL THEN NULL\n      WHEN jsonb_typeof(a.code) IN ('object','array','string') THEN a.code\n      ELSE NULL\n    END AS code\n  FROM rel r\n  JOIN raw.itcrm_analytics a\n    ON a.internet_request_id::int = r.primary_request_id\n  WHERE a.code IS NOT NULL  -- ✅ фильтр NULL\n  ORDER BY r.id_source, a.analytic_id DESC\n),\n/* менеджер */\nmgr AS (\n  SELECT u.id_user::bigint AS manager_id, u.login_user AS manager_login\n  FROM raw.itcrm_users_ua u\n),\n/* договор (последний) */\ndoc_pick AS (\n  SELECT DISTINCT ON (dc.id_source)\n    dc.id_source::text AS id_source,  -- ✅ text\n    dc.contract_id::bigint AS contract_id,\n    COALESCE(dc.total_cost_of_the_contract, dc.sum2)::numeric AS contract_total\n  FROM raw.itcrm_docs_clients dc\n  ORDER BY dc.id_source, COALESCE(dc.updated_at, dc.created_at) DESC NULLS LAST\n)\n\nINSERT INTO dashboards.crm_requests AS tgt (\n  id_source, source_type, source_date_time, source_updated_at, id_uniq,\n  request_ids, primary_request_id,\n  request_created_at, request_type, form_name, email,\n  manager_id, manager_login,\n  branch_id, branch_name,\n  contract_id, contract_total,\n  code, codes\n)\nSELECT\n  n.id_source,  -- ✅ уже text\n  n.source_type,\n  n.source_date_time,\n  n.source_updated_at,\n  n.id_uniq,\n  r.request_ids,\n  r.primary_request_id,\n  NULL::timestamp,\n  NULL::text,\n  NULL::text,\n  NULL::text,\n  n.manager_id,\n  m.manager_login,\n  NULL::bigint AS branch_id,\n  'kiev'::text AS branch_name,\n  d.contract_id,\n  d.contract_total,\n  lc.code,\n  ac.codes\nFROM ns n\nLEFT JOIN rel        r  ON r.id_source = n.id_source\nLEFT JOIN mgr        m  ON m.manager_id = n.manager_id\nLEFT JOIN doc_pick   d  ON d.id_source  = n.id_source\nLEFT JOIN last_code  lc ON lc.id_source = n.id_source\nLEFT JOIN all_codes  ac ON ac.id_source = n.id_source\nON CONFLICT (id_source) DO UPDATE SET\n  source_type         = EXCLUDED.source_type,\n  source_date_time    = EXCLUDED.source_date_time,\n  source_updated_at   = EXCLUDED.source_updated_at,\n  id_uniq             = EXCLUDED.id_uniq,\n  request_ids         = EXCLUDED.request_ids,\n  primary_request_id  = EXCLUDED.primary_request_id,\n  manager_id          = EXCLUDED.manager_id,\n  manager_login       = EXCLUDED.manager_login,\n  branch_id           = EXCLUDED.branch_id,\n  branch_name         = EXCLUDED.branch_name,\n  contract_id         = EXCLUDED.contract_id,\n  contract_total      = EXCLUDED.contract_total,\n  code                = EXCLUDED.code,\n  codes               = EXCLUDED.codes,\n  row_updated_at      = now();\n\nCOMMIT;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1232,
+        608
+      ],
+      "id": "ef243ae5-6c6a-4b71-a8ae-41c57d486db7",
+      "name": "dashboards.crm_requests",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "BEGIN;\n\n/* Создание индексов если нет */\nCREATE INDEX IF NOT EXISTS idx_gar_gclid ON dashboards.google_ad_reference(gclid) WHERE gclid IS NOT NULL;\nCREATE INDEX IF NOT EXISTS idx_gar_campaign_id ON dashboards.google_ad_reference(campaign_id) WHERE campaign_id IS NOT NULL;\n\nWITH clicks AS (\n  /* 1 строка на gclid */\n  SELECT DISTINCT ON (gc.gclid)\n    gc.gclid,\n    gc.campaign_id,\n    gc.ad_group_id\n  FROM raw.google_ads_clicks gc\n  WHERE gc.gclid IS NOT NULL \n    AND gc.gclid <> ''\n    AND length(gc.gclid) BETWEEN 10 AND 200  -- ✅ валидация\n  ORDER BY gc.gclid, gc.campaign_id DESC NULLS LAST, gc.ad_group_id DESC NULLS LAST\n),\nnames AS (\n  SELECT\n    gn.campaign_id,\n    gn.ad_group_id,\n    MIN(NULLIF(btrim(gn.campaign_name),'')) AS campaign_name,  -- ✅ trim\n    MIN(NULLIF(btrim(gn.ad_group_name),'')) AS ad_group_name\n  FROM raw.google_ads_names gn\n  WHERE gn.campaign_id IS NOT NULL OR gn.ad_group_id IS NOT NULL  -- ✅ фильтр\n  GROUP BY gn.campaign_id, gn.ad_group_id\n),\nchan AS (\n  SELECT\n    gcd.campaign_id,\n    MIN(NULLIF(btrim(gcd.advertising_channel_type),'')) AS advertising_channel_type\n  FROM raw.google_ads_campaign_daily gcd\n  WHERE gcd.campaign_id IS NOT NULL\n  GROUP BY gcd.campaign_id\n),\nkw AS (\n  SELECT\n    k.ad_group_id,\n    MIN(NULLIF(btrim(k.keyword_text),'')) AS keyword_text\n  FROM raw.google_ads_keyword_daily k\n  WHERE k.ad_group_id IS NOT NULL\n  GROUP BY k.ad_group_id\n),\nst AS (\n  SELECT\n    s.ad_group_id,\n    MIN(NULLIF(btrim(s.search_term),'')) AS search_term\n  FROM raw.google_ads_search_terms_daily s\n  WHERE s.ad_group_id IS NOT NULL\n  GROUP BY s.ad_group_id\n)\nINSERT INTO dashboards.google_ad_reference AS tgt (\n  gclid, campaign_id, campaign_name, advertising_channel_type,\n  ad_group_id, ad_group_name, keyword_text, search_term\n)\nSELECT\n  c.gclid,\n  c.campaign_id,\n  n.campaign_name,\n  ch.advertising_channel_type,\n  c.ad_group_id,\n  n.ad_group_name,\n  kw.keyword_text,\n  st.search_term\nFROM clicks c\nLEFT JOIN names n ON n.campaign_id = c.campaign_id AND n.ad_group_id = c.ad_group_id\nLEFT JOIN chan  ch ON ch.campaign_id = c.campaign_id\nLEFT JOIN kw      ON kw.ad_group_id  = c.ad_group_id\nLEFT JOIN st      ON st.ad_group_id  = c.ad_group_id\nWHERE c.gclid IS NOT NULL  -- ✅ финальная проверка\nON CONFLICT (gclid) DO UPDATE SET\n  campaign_id              = COALESCE(EXCLUDED.campaign_id,              tgt.campaign_id),\n  campaign_name            = COALESCE(EXCLUDED.campaign_name,            tgt.campaign_name),\n  advertising_channel_type = COALESCE(EXCLUDED.advertising_channel_type, tgt.advertising_channel_type),\n  ad_group_id              = COALESCE(EXCLUDED.ad_group_id,              tgt.ad_group_id),\n  ad_group_name            = COALESCE(EXCLUDED.ad_group_name,            tgt.ad_group_name),\n  keyword_text             = COALESCE(EXCLUDED.keyword_text,             tgt.keyword_text),\n  search_term              = COALESCE(EXCLUDED.search_term,              tgt.search_term),\n  row_updated_at           = now();\n\nCOMMIT;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -384,
+        608
+      ],
+      "id": "e960e688-89ad-4af3-9517-de30c48ec154",
+      "name": "dashboards.google_ad_reference",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "BEGIN;\n\nWITH base AS (\n  SELECT\n    l.*,\n    CASE\n      WHEN code IS NULL THEN NULL::jsonb\n      WHEN jsonb_typeof(code)='object' THEN code\n      WHEN jsonb_typeof(code)='string' THEN \n        CASE \n          WHEN (code #>> '{}') ~ '^[\\[{]' THEN  -- ✅ проверка JSON структуры\n            (code #>> '{}')::jsonb\n          ELSE NULL::jsonb\n        END\n      ELSE NULL::jsonb\n    END AS j\n  FROM raw.fb_leads l\n  WHERE code IS NOT NULL\n    AND code::text NOT IN ('', '\"\"', 'null', '[]', '{}')  -- ✅ больше фильтров\n),\nparsed AS (\n  SELECT\n    NULLIF(btrim(j->>'fb_lead_id'), '')       AS fb_lead_id,\n    NULLIF(btrim(j->>'fbclid'), '')           AS fbclid,\n    NULLIF(btrim(j->>'fb_campaign_id'), '')   AS fb_campaign_id,\n    NULLIF(btrim(j->>'fb_adset_id'), '')      AS fb_adset_id,\n    NULLIF(btrim(j->>'fb_ad_id'), '')         AS fb_ad_id,\n    NULLIF(btrim(j->>'fb_campaign_name'), '') AS fb_campaign_name_raw,\n    NULLIF(btrim(j->>'fb_adset_name'), '')    AS fb_adset_name_raw,\n    NULLIF(btrim(j->>'fb_ad_name'), '')       AS fb_ad_name_raw,\n    NULLIF(btrim(j->>'fb_page_id'), '')       AS fb_page_id,\n    NULLIF(btrim(j->>'fb_form_id'), '')       AS fb_form_id,\n    COALESCE(\n      NULLIF(btrim(j->>'fb_form_name'), ''), \n      NULLIF(btrim(l.form_name), '')\n    ) AS form_name,\n    COALESCE(\n      NULLIF(btrim(j->>'fb_platform'), ''),  \n      NULLIF(btrim(l.platform), '')\n    ) AS platform\n  FROM base l\n  WHERE j IS NOT NULL \n    AND jsonb_typeof(j)='object'\n),\ndim_names AS (\n  SELECT\n    p.*,\n    fc.name AS campaign_name_dim,\n    fa.name AS adset_name_dim\n  FROM parsed p\n  LEFT JOIN raw.fb_campaigns fc \n    ON fc.campaign_id = p.fb_campaign_id\n  LEFT JOIN raw.fb_adsets fa \n    ON fa.adset_id = p.fb_adset_id\n)\nINSERT INTO dashboards.fb_ad_reference AS tgt (\n  fb_lead_id, fbclid,\n  campaign_id, campaign_name,\n  adset_id, adset_name,\n  ad_id, ad_name,\n  page_id, form_id, form_name, platform\n)\nSELECT\n  d.fb_lead_id,\n  d.fbclid,\n  d.fb_campaign_id,\n  COALESCE(d.campaign_name_dim, d.fb_campaign_name_raw, 'Unknown') AS campaign_name,\n  d.fb_adset_id,\n  COALESCE(d.adset_name_dim, d.fb_adset_name_raw) AS adset_name,\n  d.fb_ad_id,\n  d.fb_ad_name_raw,\n  d.fb_page_id,\n  d.fb_form_id,\n  d.form_name,\n  d.platform\nFROM dim_names d\nWHERE d.fb_lead_id IS NOT NULL \n  AND d.fb_lead_id <> ''\n  AND length(d.fb_lead_id) BETWEEN 5 AND 100  -- ✅ валидация\nON CONFLICT (fb_lead_id) DO UPDATE SET\n  fbclid        = COALESCE(EXCLUDED.fbclid,        tgt.fbclid),\n  campaign_id   = COALESCE(EXCLUDED.campaign_id,   tgt.campaign_id),\n  campaign_name = COALESCE(EXCLUDED.campaign_name, tgt.campaign_name),\n  adset_id      = COALESCE(EXCLUDED.adset_id,      tgt.adset_id),\n  adset_name    = COALESCE(EXCLUDED.adset_name,    tgt.adset_name),\n  ad_id         = COALESCE(EXCLUDED.ad_id,         tgt.ad_id),\n  ad_name       = COALESCE(EXCLUDED.ad_name,       tgt.ad_name),\n  page_id       = COALESCE(EXCLUDED.page_id,       tgt.page_id),\n  form_id       = COALESCE(EXCLUDED.form_id,       tgt.form_id),\n  form_name     = COALESCE(EXCLUDED.form_name,     tgt.form_name),\n  platform      = COALESCE(EXCLUDED.platform,      tgt.platform),\n  row_updated_at= now();\n\nCOMMIT;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -160,
+        608
+      ],
+      "id": "2838418d-8209-429f-b656-ea3c3e9d06ac",
+      "name": "dashboards.fb_ad_reference",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "BEGIN;\n\n/* Создание индексов */\nCREATE UNIQUE INDEX IF NOT EXISTS idx_cr_platform_account_campaign \n  ON dashboards.campaign_reference(platform, account_id, campaign_id);\n\n/* GOOGLE */\nWITH g_seen AS (\n  SELECT\n    btrim(gcd.customer_id::text)   AS account_id,\n    btrim(gcd.campaign_id::text)   AS campaign_id,\n    MIN(gcd.date::date)            AS first_seen_date,\n    MAX(gcd.date::date)            AS last_seen_date,\n    MIN(NULLIF(btrim(gcd.campaign_name),'')) AS any_campaign_name\n  FROM raw.google_ads_campaign_daily gcd\n  WHERE gcd.customer_id IS NOT NULL \n    AND gcd.campaign_id IS NOT NULL\n    AND gcd.date IS NOT NULL  -- ✅ фильтр NULL дат\n  GROUP BY 1,2\n)\nINSERT INTO dashboards.campaign_reference AS tgt (\n  platform, account_id, account_name,\n  campaign_id, campaign_name, campaign_name_human,\n  objective, campaign_status, campaign_effective_status,\n  first_seen_date, last_seen_date\n)\nSELECT\n  'google'::text,\n  s.account_id,\n  'Unknown'::text,\n  s.campaign_id,\n  COALESCE(s.any_campaign_name,'Unknown'),\n  COALESCE(r.campaign_name_human, s.any_campaign_name, 'Unknown'),\n  'unknown','unknown','unknown',\n  s.first_seen_date, \n  s.last_seen_date\nFROM g_seen s\nLEFT JOIN dashboards.ref_google_campaign_names r\n  ON r.account_id = s.account_id AND r.campaign_id = s.campaign_id\nWHERE s.account_id IS NOT NULL \n  AND s.campaign_id IS NOT NULL  -- ✅ финальный фильтр\nON CONFLICT (platform, account_id, campaign_id) DO UPDATE SET\n  campaign_name             = COALESCE(EXCLUDED.campaign_name, tgt.campaign_name),\n  campaign_name_human       = COALESCE(EXCLUDED.campaign_name_human, tgt.campaign_name_human),\n  objective                 = COALESCE(EXCLUDED.objective, tgt.objective),\n  campaign_status           = COALESCE(EXCLUDED.campaign_status, tgt.campaign_status),\n  campaign_effective_status = COALESCE(EXCLUDED.campaign_effective_status, tgt.campaign_effective_status),\n  first_seen_date           = LEAST(COALESCE(tgt.first_seen_date, EXCLUDED.first_seen_date), EXCLUDED.first_seen_date),\n  last_seen_date            = GREATEST(COALESCE(tgt.last_seen_date, EXCLUDED.last_seen_date), EXCLUDED.last_seen_date),\n  row_updated_at            = now();\n\n/* META */\nWITH s AS (\n  SELECT\n    btrim(i.campaign_id::text)   AS campaign_id,\n    MIN(i.date_start::date)      AS first_seen_date,\n    MAX(i.date_start::date)      AS last_seen_date\n  FROM raw.fb_ad_insights i\n  WHERE i.campaign_id IS NOT NULL\n    AND i.date_start IS NOT NULL  -- ✅ фильтр NULL дат\n  GROUP BY 1\n),\ncand AS (\n  SELECT DISTINCT ON (btrim(c.campaign_id::text))\n    'unknown'::text AS account_id,\n    btrim(c.campaign_id::text) AS campaign_id,\n    NULLIF(btrim(c.name),'') AS campaign_name,\n    COALESCE(NULLIF(btrim(c.objective),''),'unknown')        AS objective,\n    COALESCE(NULLIF(btrim(c.status),''),'unknown')           AS status,\n    COALESCE(NULLIF(btrim(c.effective_status),''),'unknown') AS effective_status,\n    'Unknown'::text AS account_name\n  FROM raw.fb_campaigns c\n  WHERE c.campaign_id IS NOT NULL  -- ✅ фильтр\n  ORDER BY btrim(c.campaign_id::text), c.updated_time DESC NULLS LAST\n)\nINSERT INTO dashboards.campaign_reference AS tgt (\n  platform, account_id, account_name,\n  campaign_id, campaign_name, campaign_name_human,\n  objective, campaign_status, campaign_effective_status,\n  first_seen_date, last_seen_date\n)\nSELECT\n  'meta'::text,\n  cand.account_id,\n  cand.account_name,\n  cand.campaign_id,\n  COALESCE(cand.campaign_name,'Unknown'),\n  COALESCE(r.campaign_name_human, cand.campaign_name, 'Unknown'),\n  cand.objective,\n  cand.status,\n  cand.effective_status,\n  s.first_seen_date, \n  s.last_seen_date\nFROM cand\nLEFT JOIN s ON s.campaign_id = cand.campaign_id\nLEFT JOIN dashboards.ref_meta_campaign_names r\n  ON r.account_id = cand.account_id AND r.campaign_id = cand.campaign_id\nWHERE cand.campaign_id IS NOT NULL  -- ✅ финальный фильтр\nON CONFLICT (platform, account_id, campaign_id) DO UPDATE SET\n  campaign_name             = COALESCE(EXCLUDED.campaign_name, tgt.campaign_name),\n  campaign_name_human       = COALESCE(EXCLUDED.campaign_name_human, tgt.campaign_name_human),\n  objective                 = COALESCE(EXCLUDED.objective, tgt.objective),\n  campaign_status           = COALESCE(EXCLUDED.campaign_status, tgt.campaign_status),\n  campaign_effective_status = COALESCE(EXCLUDED.campaign_effective_status, tgt.campaign_effective_status),\n  first_seen_date           = LEAST(COALESCE(tgt.first_seen_date, EXCLUDED.first_seen_date), EXCLUDED.first_seen_date),\n  last_seen_date            = GREATEST(COALESCE(tgt.last_seen_date, EXCLUDED.last_seen_date), EXCLUDED.last_seen_date),\n  row_updated_at            = now();\n\nCOMMIT;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        272,
+        608
+      ],
+      "id": "97372dc0-2fe6-4e0e-b9e6-8543ffca231a",
+      "name": "dashboards.campaign_reference",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- ✅ БЕЗОПАСНАЯ ВЕРСИЯ с предварительной валидацией\n\nDO $$\nDECLARE\n  ir_table_exists boolean;\n  ir_id_col text;\n  dt_col text;\n  sql_text text;\n  ALLOWED_COLUMNS text[] := ARRAY['id', 'request_id', 'id_request'];  -- ✅ whitelist\n  ALLOWED_DT_COLUMNS text[] := ARRAY['created_date', 'created_at', 'date_create'];\nBEGIN\n  -- Проверка существования таблицы\n  SELECT EXISTS (\n    SELECT 1 FROM information_schema.tables\n    WHERE table_schema='raw' AND table_name='itcrm_internet_request'\n  ) INTO ir_table_exists;\n\n  IF ir_table_exists THEN\n    -- ✅ БЕЗОПАСНО: Проверка через whitelist\n    SELECT col INTO ir_id_col\n    FROM unnest(ALLOWED_COLUMNS) AS col\n    WHERE EXISTS (\n      SELECT 1 FROM information_schema.columns\n      WHERE table_schema='raw' \n        AND table_name='itcrm_internet_request' \n        AND column_name=col\n    )\n    LIMIT 1;\n\n    SELECT col INTO dt_col\n    FROM unnest(ALLOWED_DT_COLUMNS) AS col\n    WHERE EXISTS (\n      SELECT 1 FROM information_schema.columns\n      WHERE table_schema='raw' \n        AND table_name='itcrm_internet_request' \n        AND column_name=col\n    )\n    LIMIT 1;\n  ELSE\n    ir_id_col := NULL;\n    dt_col := NULL;\n  END IF;\n\n  IF ir_id_col IS NULL THEN\n    -- Простой INSERT без JOIN\n    INSERT INTO dashboards.crm_requests AS tgt (\n      id_source, internet_request_id, request_type, form_name, created_date_txt\n    )\n    SELECT\n      irr.id_source::text,\n      irr.id_request::text,\n      NULL::text,\n      NULL::text,\n      NULL::text\n    FROM raw.itcrm_internet_request_relation irr\n    ON CONFLICT (id_source) DO UPDATE SET\n      internet_request_id = EXCLUDED.internet_request_id,\n      request_type        = COALESCE(EXCLUDED.request_type,     tgt.request_type),\n      form_name           = COALESCE(EXCLUDED.form_name,        tgt.form_name),\n      created_date_txt    = COALESCE(EXCLUDED.created_date_txt, tgt.created_date_txt),\n      row_updated_at      = now();\n  ELSE\n    -- ✅ БЕЗОПАСНО: Используем %I для идентификаторов\n    sql_text := format($f$\n      INSERT INTO dashboards.crm_requests AS tgt (\n        id_source, internet_request_id, request_type, form_name, created_date_txt\n      )\n      SELECT\n        irr.id_source::text,\n        irr.id_request::text,\n        ir.request_type::text,\n        ir.form_name::text,\n        %s\n      FROM raw.itcrm_internet_request_relation irr\n      LEFT JOIN raw.itcrm_internet_request ir\n        ON ir.%I::text = irr.id_request::text\n      ON CONFLICT (id_source) DO UPDATE SET\n        internet_request_id = EXCLUDED.internet_request_id,\n        request_type        = COALESCE(EXCLUDED.request_type,     tgt.request_type),\n        form_name           = COALESCE(EXCLUDED.form_name,        tgt.form_name),\n        created_date_txt    = COALESCE(EXCLUDED.created_date_txt, tgt.created_date_txt),\n        row_updated_at      = now();\n    $f$,\n    CASE WHEN dt_col IS NULL THEN 'NULL::text' ELSE format('ir.%I::text', dt_col) END,\n    ir_id_col);\n\n    -- ✅ Добавляем timeout\n    SET LOCAL statement_timeout = '60s';\n    EXECUTE sql_text;\n  END IF;\nEND $$ LANGUAGE plpgsql;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        576,
+        608
+      ],
+      "id": "06e7c682-7b01-4fbd-9162-bc1fa8cc5092",
+      "name": "dashboards.crm_requests1",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "BEGIN;\n\n/* DDL */\nCREATE TABLE IF NOT EXISTS dashboards.fact_leads (\n  id_source text PRIMARY KEY,\n\n  internet_request_id text,\n  request_type        text,\n  form_name           text,\n  created_date_txt    text,\n\n  utm_source  text, utm_medium  text, utm_campaign text, utm_content text, utm_term text,\n  dominant_platform text,\n\n  gclid               text,\n  google_campaign_id  text,\n  google_campaign_name text,\n  google_channel_type text,\n  google_ad_group_id  text,\n  google_ad_group_name text,\n  google_keyword_text text,\n  google_search_term  text,\n\n  fb_lead_id         text,\n  fbclid             text,\n  meta_campaign_id   text,\n  meta_campaign_name text,\n  meta_adset_id      text,\n  meta_adset_name    text,\n  meta_ad_id         text,\n  meta_ad_name       text,\n  meta_page_id       text,\n  meta_form_id       text,\n  meta_form_name     text,\n  meta_platform      text,\n\n  unified_campaign_name_google text,\n  unified_campaign_name_meta   text,\n\n  is_paid boolean,\n  n_paid_ops integer,\n  contract_amount numeric(18,2),\n\n  row_created_at timestamptz NOT NULL DEFAULT now(),\n  row_updated_at timestamptz NOT NULL DEFAULT now()\n);\n\nCREATE OR REPLACE FUNCTION dashboards.fn_touch_row_updated() RETURNS trigger\nLANGUAGE plpgsql AS $$ BEGIN NEW.row_updated_at := now(); RETURN NEW; END $$;\n\nDROP TRIGGER IF EXISTS trg_touch_fact_leads ON dashboards.fact_leads;\nCREATE TRIGGER trg_touch_fact_leads\nBEFORE UPDATE ON dashboards.fact_leads\nFOR EACH ROW EXECUTE FUNCTION dashboards.fn_touch_row_updated();\n\nCOMMIT;\n\n/* UPSERT */\nBEGIN;\n\nWITH\ncr_g AS (\n  SELECT DISTINCT ON (campaign_id)\n         platform, account_id, campaign_id, campaign_name_human\n  FROM dashboards.campaign_reference\n  WHERE platform='google'\n  ORDER BY campaign_id, last_seen_date DESC NULLS LAST\n),\ncr_m AS (\n  SELECT DISTINCT ON (campaign_id)\n         platform, account_id, campaign_id, campaign_name_human\n  FROM dashboards.campaign_reference\n  WHERE platform='meta'\n  ORDER BY campaign_id, last_seen_date DESC NULLS LAST\n)\n\nINSERT INTO dashboards.fact_leads AS tgt (\n  id_source, internet_request_id, request_type, form_name, created_date_txt,\n  utm_source, utm_medium, utm_campaign, utm_content, utm_term,\n  dominant_platform,\n  gclid, google_campaign_id, google_campaign_name, google_channel_type,\n  google_ad_group_id, google_ad_group_name, google_keyword_text, google_search_term,\n  fb_lead_id, fbclid, meta_campaign_id, meta_campaign_name, meta_adset_id, meta_adset_name,\n  meta_ad_id, meta_ad_name, meta_page_id, meta_form_id, meta_form_name, meta_platform,\n  unified_campaign_name_google, unified_campaign_name_meta,\n  is_paid, n_paid_ops, contract_amount\n)\nSELECT\n  lme.id_source,\n  cr.internet_request_id,\n  cr.request_type,\n  cr.form_name,\n  cr.created_date_txt,\n\n  cml.utm_source, cml.utm_medium, cml.utm_campaign, cml.utm_content, cml.utm_term,\n\n  lme.dominant_platform,\n\n  /* GOOGLE (fallback gclid -> google_ad_reference) */\n  COALESCE(NULLIF(lme.gclid,''), cml.gclid)                              AS gclid,\n  COALESCE(lme.google_campaign_id,   gar.campaign_id)                    AS google_campaign_id,\n  COALESCE(lme.google_campaign_name, gar.campaign_name)                  AS google_campaign_name,\n  COALESCE(lme.google_channel_type,  gar.advertising_channel_type)       AS google_channel_type,\n  COALESCE(lme.google_ad_group_id,   gar.ad_group_id)                    AS google_ad_group_id,\n  COALESCE(lme.google_ad_group_name, gar.ad_group_name)                  AS google_ad_group_name,\n  COALESCE(lme.google_keyword_text,  gar.keyword_text)                   AS google_keyword_text,\n  COALESCE(lme.google_search_term,   gar.search_term)                    AS google_search_term,\n\n  /* META (fallback fb_lead_id / fbclid) */\n  COALESCE(lme.fb_lead_id, far.fb_lead_id)                               AS fb_lead_id,\n  COALESCE(cml.fbclid, far.fbclid)                                       AS fbclid,\n  COALESCE(lme.meta_campaign_id,   far.campaign_id)                      AS meta_campaign_id,\n  COALESCE(lme.meta_campaign_name, far.campaign_name)                    AS meta_campaign_name,\n  COALESCE(lme.meta_adset_id,      far.adset_id)                         AS meta_adset_id,\n  COALESCE(lme.meta_adset_name,    far.adset_name)                       AS meta_adset_name,\n  COALESCE(lme.meta_ad_id,         far.ad_id)                            AS meta_ad_id,\n  COALESCE(lme.meta_ad_name,       far.ad_name)                          AS meta_ad_name,\n  COALESCE(lme.meta_page_id,       far.page_id)                          AS meta_page_id,\n  COALESCE(lme.meta_form_id,       far.form_id)                          AS meta_form_id,\n  COALESCE(lme.meta_form_name,     far.form_name)                        AS meta_form_name,\n  COALESCE(lme.meta_platform,      far.platform)                         AS meta_platform,\n\n  /* человекочитаемые имена кампаний */\n  cg.campaign_name_human                                                AS unified_campaign_name_google,\n  cm.campaign_name_human                                                AS unified_campaign_name_meta,\n\n  cps.is_paid,\n  cps.n_paid_ops,\n  ccs.contract_amount\nFROM dashboards.lead_marketing_enriched lme\nLEFT JOIN dashboards.crm_requests         cr  ON cr.id_source  = lme.id_source\nLEFT JOIN dashboards.crm_marketing_link   cml ON cml.id_source = lme.id_source\nLEFT JOIN dashboards.google_ad_reference  gar\n  ON gar.gclid = COALESCE(NULLIF(lme.gclid,''), cml.gclid)\nLEFT JOIN dashboards.fb_ad_reference      far\n  ON (\n       (lme.fb_lead_id IS NOT NULL AND lme.fb_lead_id <> '' AND far.fb_lead_id = lme.fb_lead_id)\n       OR\n       ( (lme.fb_lead_id IS NULL OR lme.fb_lead_id = '')\n         AND cml.fbclid IS NOT NULL AND cml.fbclid <> '' AND far.fbclid = cml.fbclid)\n     )\nLEFT JOIN dashboards.crm_payment_summary  cps ON cps.id_source = lme.id_source\nLEFT JOIN dashboards.crm_contract_summary ccs ON ccs.id_source = lme.id_source\nLEFT JOIN cr_g cg ON cg.campaign_id = COALESCE(lme.google_campaign_id, gar.campaign_id)\nLEFT JOIN cr_m cm ON cm.campaign_id = COALESCE(lme.meta_campaign_id,   far.campaign_id)\n\nON CONFLICT (id_source) DO UPDATE SET\n  internet_request_id = EXCLUDED.internet_request_id,\n  request_type        = EXCLUDED.request_type,\n  form_name           = EXCLUDED.form_name,\n  created_date_txt    = EXCLUDED.created_date_txt,\n\n  utm_source          = COALESCE(EXCLUDED.utm_source,   tgt.utm_source),\n  utm_medium          = COALESCE(EXCLUDED.utm_medium,   tgt.utm_medium),\n  utm_campaign        = COALESCE(EXCLUDED.utm_campaign, tgt.utm_campaign),\n  utm_content         = COALESCE(EXCLUDED.utm_content,  tgt.utm_content),\n  utm_term            = COALESCE(EXCLUDED.utm_term,     tgt.utm_term),\n\n  dominant_platform   = COALESCE(EXCLUDED.dominant_platform, tgt.dominant_platform),\n\n  gclid               = COALESCE(EXCLUDED.gclid,               tgt.gclid),\n  google_campaign_id  = COALESCE(EXCLUDED.google_campaign_id,  tgt.google_campaign_id),\n  google_campaign_name= COALESCE(EXCLUDED.google_campaign_name,tgt.google_campaign_name),\n  google_channel_type = COALESCE(EXCLUDED.google_channel_type, tgt.google_channel_type),\n  google_ad_group_id  = COALESCE(EXCLUDED.google_ad_group_id,  tgt.google_ad_group_id),\n  google_ad_group_name= COALESCE(EXCLUDED.google_ad_group_name,tgt.google_ad_group_name),\n  google_keyword_text = COALESCE(EXCLUDED.google_keyword_text, tgt.google_keyword_text),\n  google_search_term  = COALESCE(EXCLUDED.google_search_term,  tgt.google_search_term),\n\n  fb_lead_id          = COALESCE(EXCLUDED.fb_lead_id,          tgt.fb_lead_id),\n  fbclid              = COALESCE(EXCLUDED.fbclid,              tgt.fbclid),\n  meta_campaign_id    = COALESCE(EXCLUDED.meta_campaign_id,    tgt.meta_campaign_id),\n  meta_campaign_name  = COALESCE(EXCLUDED.meta_campaign_name,  tgt.meta_campaign_name),\n  meta_adset_id       = COALESCE(EXCLUDED.meta_adset_id,       tgt.meta_adset_id),\n  meta_ad_name        = COALESCE(EXCLUDED.meta_ad_name,        tgt.meta_ad_name),\n  meta_ad_id          = COALESCE(EXCLUDED.meta_ad_id,          tgt.meta_ad_id),\n  meta_page_id        = COALESCE(EXCLUDED.meta_page_id,        tgt.meta_page_id),\n  meta_form_id        = COALESCE(EXCLUDED.meta_form_id,        tgt.meta_form_id),\n  meta_form_name      = COALESCE(EXCLUDED.meta_form_name,      tgt.meta_form_name),\n  meta_platform       = COALESCE(EXCLUDED.meta_platform,       tgt.meta_platform),\n\n  unified_campaign_name_google = COALESCE(EXCLUDED.unified_campaign_name_google, tgt.unified_campaign_name_google),\n  unified_campaign_name_meta   = COALESCE(EXCLUDED.unified_campaign_name_meta,   tgt.unified_campaign_name_meta),\n\n  is_paid            = COALESCE(EXCLUDED.is_paid,     tgt.is_paid),\n  n_paid_ops         = COALESCE(EXCLUDED.n_paid_ops,  tgt.n_paid_ops),\n  contract_amount    = COALESCE(EXCLUDED.contract_amount, tgt.contract_amount),\n\n  row_updated_at     = now();\n\nCOMMIT;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -608,
+        848
+      ],
+      "id": "e5e217ab-9c58-4add-b65e-df27b5147551",
+      "name": "dashboards.fact_leads",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "BEGIN;\n\nALTER TABLE dashboards.fact_leads\n  ADD COLUMN IF NOT EXISTS unified_platform      text,\n  ADD COLUMN IF NOT EXISTS unified_campaign_id   text,\n  ADD COLUMN IF NOT EXISTS unified_campaign_name text;\n\nWITH\nplat AS (\n  SELECT\n    fl.id_source,\n    COALESCE(\n      NULLIF(fl.dominant_platform, ''),\n      CASE\n        WHEN fl.google_campaign_id IS NOT NULL OR NULLIF(fl.gclid,'') IS NOT NULL THEN 'google'\n        WHEN fl.meta_campaign_id   IS NOT NULL OR NULLIF(fl.fbclid,'') IS NOT NULL THEN 'meta'\n        WHEN cml.utm_source ILIKE 'google%' OR cml.utm_source ILIKE '%adwords%' OR cml.utm_source ILIKE '%gads%' THEN 'google'\n        WHEN cml.utm_source ILIKE 'facebook%' OR cml.utm_source ILIKE 'instagram%' OR cml.utm_source ILIKE 'meta%' OR cml.utm_source ILIKE 'fb%' OR cml.utm_source ILIKE 'ig%' THEN 'meta'\n        WHEN lower(cml.utm_source) IN ('email','e-mail','mail','mailchimp','sendpulse') THEN 'email'\n        WHEN lower(cml.utm_source) IN ('direct','(direct)','none') THEN 'direct'\n        WHEN (lower(cml.utm_medium) IN ('cpc','ppc') AND cml.utm_source ILIKE '%google%') THEN 'google'\n        WHEN (lower(cml.utm_medium) IN ('cpc','ppc') AND (cml.utm_source ILIKE '%facebook%' OR cml.utm_source ILIKE '%instagram%' OR cml.utm_source ILIKE '%meta%')) THEN 'meta'\n        ELSE NULL\n      END\n    ) AS unified_platform\n  FROM dashboards.fact_leads fl\n  LEFT JOIN dashboards.crm_marketing_link cml ON cml.id_source = fl.id_source\n),\npref AS (\n  SELECT\n    fl.id_source,\n    p.unified_platform,\n    CASE WHEN p.unified_platform='google' THEN NULLIF(fl.google_campaign_id,'')\n         WHEN p.unified_platform='meta'   THEN NULLIF(fl.meta_campaign_id,'')\n         ELSE NULL END                   AS pref_campaign_id_raw,\n    CASE WHEN p.unified_platform='google' THEN NULLIF(fl.google_campaign_name,'')\n         WHEN p.unified_platform='meta'   THEN NULLIF(fl.meta_campaign_name,'')\n         ELSE NULL END                   AS pref_campaign_name_raw,\n    NULLIF(NULLIF(cml.utm_campaign,''), ':')  AS utm_campaign  -- ✅ Исключаем \":\"\n  FROM dashboards.fact_leads fl\n  LEFT JOIN plat p ON p.id_source = fl.id_source\n  LEFT JOIN dashboards.crm_marketing_link cml ON cml.id_source = fl.id_source\n),\nhum AS (\n  SELECT\n    pr.id_source,\n    pr.unified_platform,\n    COALESCE(\n      cr.campaign_name_human, \n      pr.pref_campaign_name_raw, \n      pr.utm_campaign,\n      '(без кампании)'  -- ✅ Fallback по умолчанию\n    ) AS best_name,\n    COALESCE(pr.pref_campaign_id_raw, pr.utm_campaign) AS best_id\n  FROM pref pr\n  LEFT JOIN dashboards.campaign_reference cr\n    ON cr.platform    = pr.unified_platform\n   AND cr.campaign_id = pr.pref_campaign_id_raw\n)\nUPDATE dashboards.fact_leads fl\nSET\n  unified_platform      = h.unified_platform,\n  unified_campaign_name = CASE \n                            WHEN h.best_name = ':' THEN '(без кампании)'\n                            ELSE h.best_name \n                          END,  -- ✅ Еще одна проверка\n  unified_campaign_id   = md5(\n                            COALESCE(h.unified_platform,'direct') || '|' ||\n                            COALESCE(h.best_id, '(no-id)')\n                          ),\n  row_updated_at        = now()\nFROM hum h\nWHERE h.id_source = fl.id_source;\n\nCOMMIT;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1056,
+        1088
+      ],
+      "id": "0daebffb-a531-4395-99d0-7c5a7b5fbe2a",
+      "name": "dashboards.fact_leads(additional platform)",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH ranked AS (\n  SELECT\n    cr.id_source,\n    -- UTM параметры\n    LOWER(NULLIF(cr.code->>'utm_source', '')) as utm_source,\n    LOWER(NULLIF(cr.code->>'utm_medium', '')) as utm_medium,\n    NULLIF(cr.code->>'utm_campaign', '') as utm_campaign,\n    NULLIF(cr.code->>'utm_content', '') as utm_content,\n    NULLIF(cr.code->>'utm_term', '') as utm_term,\n\n    -- Google Click IDs\n    NULLIF(cr.code->>'gclid', '') as gclid,\n    NULLIF(cr.code->>'gbraid', '') as gbraid,\n    NULLIF(cr.code->>'wbraid', '') as wbraid,\n\n    -- Facebook Click IDs (несколько вариантов!)\n    NULLIF(cr.code->>'fbclid', '') as fbclid,\n    NULLIF(cr.code->>'fclid', '') as fclid,  -- Альтернативное название\n\n    ROW_NUMBER() OVER (\n      PARTITION BY cr.id_source\n      ORDER BY COALESCE(cr.request_created_at, cr.source_date_time) DESC\n    ) as rn\n  FROM dashboards.crm_requests cr\n  WHERE cr.id_source IS NOT NULL\n    AND cr.code IS NOT NULL\n    AND jsonb_typeof(cr.code) = 'object'\n    -- ✅ ВАЖНО: Только последние 30 дней!\n    AND COALESCE(cr.request_created_at, cr.source_date_time) >= CURRENT_DATE - 30\n)\nINSERT INTO dashboards.crm_marketing_link (\n  id_source,\n  utm_source,\n  utm_medium,\n  utm_campaign,\n  utm_content,\n  utm_term,\n  gclid,\n  fbclid,\n  row_created_at,\n  row_updated_at\n)\nSELECT\n  id_source,\n  utm_source,\n  utm_medium,\n  utm_campaign,\n  utm_content,\n  utm_term,\n  -- Google Click ID (используем первый непустой)\n  COALESCE(gclid, gbraid, wbraid) as gclid,\n  -- Facebook Click ID (используем первый непустой)\n  COALESCE(fbclid, fclid) as fbclid,\n  now(),\n  now()\nFROM ranked\nWHERE rn = 1\nON CONFLICT (id_source) DO UPDATE SET\n  utm_source  = COALESCE(EXCLUDED.utm_source,  crm_marketing_link.utm_source),\n  utm_medium  = COALESCE(EXCLUDED.utm_medium,  crm_marketing_link.utm_medium),\n  utm_campaign= COALESCE(EXCLUDED.utm_campaign,crm_marketing_link.utm_campaign),\n  utm_content = COALESCE(EXCLUDED.utm_content, crm_marketing_link.utm_content),\n  utm_term    = COALESCE(EXCLUDED.utm_term,    crm_marketing_link.utm_term),\n  gclid       = COALESCE(EXCLUDED.gclid,       crm_marketing_link.gclid),\n  fbclid      = COALESCE(EXCLUDED.fbclid,      crm_marketing_link.fbclid),\n  row_updated_at = now();\n\n-- Статистика (последние 7 дней)\nSELECT\n  'crm_marketing_link updated' as status,\n  COUNT(*) as total_last_7days,\n  COUNT(CASE WHEN gclid IS NOT NULL THEN 1 END) as with_gclid,\n  COUNT(CASE WHEN fbclid IS NOT NULL THEN 1 END) as with_fbclid,\n  COUNT(CASE WHEN utm_source IS NOT NULL THEN 1 END) as with_utm\nFROM dashboards.crm_marketing_link\nWHERE row_updated_at >= CURRENT_DATE - 7;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1024,
+        608
+      ],
+      "id": "6f7566b7-65bd-4997-9f6b-9c1f31f78d33",
+      "name": "dashboards.crm_marketing_link_upsert",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "BEGIN;\n\nUPDATE dashboards.fact_leads AS fl\nSET\n  google_campaign_id    = COALESCE(fl.google_campaign_id,    gar.campaign_id),\n  google_campaign_name  = COALESCE(fl.google_campaign_name,  gar.campaign_name),\n  google_channel_type   = COALESCE(fl.google_channel_type,   gar.advertising_channel_type),\n  google_ad_group_id    = COALESCE(fl.google_ad_group_id,    gar.ad_group_id),\n  google_ad_group_name  = COALESCE(fl.google_ad_group_name,  gar.ad_group_name),\n  google_keyword_text   = COALESCE(fl.google_keyword_text,   gar.keyword_text),\n  google_search_term    = COALESCE(fl.google_search_term,    gar.search_term),\n  row_updated_at        = now()\nFROM dashboards.google_ad_reference gar\nWHERE gar.gclid = fl.gclid\n  AND gar.gclid IS NOT NULL AND gar.gclid <> ''\n  AND (\n    fl.google_campaign_id   IS NULL OR\n    fl.google_campaign_name IS NULL OR\n    fl.google_channel_type  IS NULL OR\n    fl.google_ad_group_id   IS NULL OR\n    fl.google_ad_group_name IS NULL OR\n    fl.google_keyword_text  IS NULL OR\n    fl.google_search_term   IS NULL\n  );\n\nCOMMIT;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        656,
+        848
+      ],
+      "id": "fb60fa40-cc60-460a-964c-68f0c0800acc",
+      "name": "dashboards.fact_leads_backfill_google",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "BEGIN;\n\n/* 2.1 — точный ключ: fb_lead_id */\nUPDATE dashboards.fact_leads AS fl\nSET\n  meta_campaign_id   = COALESCE(fl.meta_campaign_id,   far.campaign_id),\n  meta_campaign_name = COALESCE(fl.meta_campaign_name, far.campaign_name),\n  meta_adset_id      = COALESCE(fl.meta_adset_id,      far.adset_id),\n  meta_adset_name    = COALESCE(fl.meta_adset_name,    far.adset_name),\n  meta_ad_id         = COALESCE(fl.meta_ad_id,         far.ad_id),\n  meta_ad_name       = COALESCE(fl.meta_ad_name,       far.ad_name),\n  meta_page_id       = COALESCE(fl.meta_page_id,       far.page_id),\n  meta_form_id       = COALESCE(fl.meta_form_id,       far.form_id),\n  meta_form_name     = COALESCE(fl.meta_form_name,     far.form_name),\n  meta_platform      = COALESCE(fl.meta_platform,      far.platform),\n  row_updated_at     = now()\nFROM dashboards.fb_ad_reference far\nWHERE fl.fb_lead_id IS NOT NULL AND fl.fb_lead_id <> ''\n  AND far.fb_lead_id = fl.fb_lead_id\n  AND (\n    fl.meta_campaign_id   IS NULL OR\n    fl.meta_campaign_name IS NULL OR\n    fl.meta_adset_id      IS NULL OR\n    fl.meta_adset_name    IS NULL OR\n    fl.meta_ad_id         IS NULL OR\n    fl.meta_ad_name       IS NULL OR\n    fl.meta_page_id       IS NULL OR\n    fl.meta_form_id       IS NULL OR\n    fl.meta_form_name     IS NULL OR\n    fl.meta_platform      IS NULL\n  );\n\n/* 2.2 — добивка по fbclid */\nUPDATE dashboards.fact_leads AS fl\nSET\n  meta_campaign_id   = COALESCE(fl.meta_campaign_id,   far.campaign_id),\n  meta_campaign_name = COALESCE(fl.meta_campaign_name, far.campaign_name),\n  meta_adset_id      = COALESCE(fl.meta_adset_id,      far.adset_id),\n  meta_adset_name    = COALESCE(fl.meta_adset_name,    far.adset_name),\n  meta_ad_id         = COALESCE(fl.meta_ad_id,         far.ad_id),\n  meta_ad_name       = COALESCE(fl.meta_ad_name,       far.ad_name),\n  meta_page_id       = COALESCE(fl.meta_page_id,       far.page_id),\n  meta_form_id       = COALESCE(fl.meta_form_id,       far.form_id),\n  meta_form_name     = COALESCE(fl.meta_form_name,     far.form_name),\n  meta_platform      = COALESCE(fl.meta_platform,      far.platform),\n  row_updated_at     = now()\nFROM dashboards.fb_ad_reference far\nWHERE (fl.fb_lead_id IS NULL OR fl.fb_lead_id = '')\n  AND fl.fbclid IS NOT NULL AND fl.fbclid <> ''\n  AND far.fbclid = fl.fbclid\n  AND (\n    fl.meta_campaign_id   IS NULL OR\n    fl.meta_campaign_name IS NULL OR\n    fl.meta_adset_id      IS NULL OR\n    fl.meta_adset_name    IS NULL OR\n    fl.meta_ad_id         IS NULL OR\n    fl.meta_ad_name       IS NULL OR\n    fl.meta_page_id       IS NULL OR\n    fl.meta_form_id       IS NULL OR\n    fl.meta_form_name     IS NULL OR\n    fl.meta_platform      IS NULL\n  );\n\nCOMMIT;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        944,
+        848
+      ],
+      "id": "51b100cf-3b4f-4061-80f6-1b2ed0e16379",
+      "name": "dashboards.fact_leads_backfill_meta",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "DO $$\nDECLARE\n  view_name text;\n  view_names text[] := ARRAY['v5_leads_campaign_daily'];\n  error_count int := 0;\nBEGIN\n  FOREACH view_name IN ARRAY view_names\n  LOOP\n    BEGIN\n      IF EXISTS (\n        SELECT 1 FROM pg_matviews \n        WHERE schemaname = 'dashboards' \n          AND matviewname = view_name\n      ) THEN\n        EXECUTE format('REFRESH MATERIALIZED VIEW CONCURRENTLY dashboards.%I', view_name);\n        RAISE NOTICE '✅ Refreshed: %', view_name;\n      ELSE\n        RAISE WARNING '⚠️ View does not exist: %', view_name;\n      END IF;\n    EXCEPTION WHEN OTHERS THEN\n      error_count := error_count + 1;\n      RAISE WARNING '❌ Error refreshing %: %', view_name, SQLERRM;\n    END;\n  END LOOP;\n  \n  IF error_count > 0 THEN\n    RAISE NOTICE '⚠️ Completed with % errors', error_count;\n  ELSE\n    RAISE NOTICE '✅ All views refreshed successfully';\n  END IF;\nEND $$;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -608,
+        1088
+      ],
+      "id": "5ea6a5f0-4355-4104-af07-8deb6a30599a",
+      "name": "REFRESH MATERIALIZED VIEW CONCURRENTLY",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "DO $$\nDECLARE\n  view_name text;\n  view_names text[] := ARRAY[\n    'v5_leads_source_daily',\n    'crm_marketing_link_kvm'\n    'v5_campaign_anomalies',\n    'v5_campaign_total',\n    'v5_campaign_weekly',\n    'v5_leads_campaign_daily',\n    'v5_manager_daily',\n    'v5_platform_daily_kpis',\n    'v5_platform_wow',\n    'v5_source_daily_alloc',\n    'v5_source_total_alloc',\n    'v5_product_daily'\n  ];\n  error_count int := 0;\n  success_count int := 0;\nBEGIN\n  SET LOCAL statement_timeout = '30min';  -- ✅ долгая операция\n  \n  FOREACH view_name IN ARRAY view_names\n  LOOP\n    BEGIN\n      IF EXISTS (\n        SELECT 1 FROM pg_matviews \n        WHERE schemaname = 'dashboards' \n          AND matviewname = view_name\n      ) THEN\n        /* v5_product_daily - без CONCURRENTLY (нет уникального индекса) */\n        IF view_name = 'v5_product_daily' THEN\n          EXECUTE format('REFRESH MATERIALIZED VIEW dashboards.%I', view_name);\n        ELSE\n          EXECUTE format('REFRESH MATERIALIZED VIEW CONCURRENTLY dashboards.%I', view_name);\n        END IF;\n        \n        success_count := success_count + 1;\n        RAISE NOTICE '✅ [%/%] Refreshed: %', success_count, array_length(view_names,1), view_name;\n      ELSE\n        RAISE WARNING '⚠️ View does not exist: %', view_name;\n      END IF;\n    EXCEPTION WHEN OTHERS THEN\n      error_count := error_count + 1;\n      RAISE WARNING '❌ Error refreshing %: %', view_name, SQLERRM;\n    END;\n  END LOOP;\n  \n  RAISE NOTICE '========================================';\n  RAISE NOTICE '✅ Success: % views', success_count;\n  RAISE NOTICE '❌ Errors: % views', error_count;\n  RAISE NOTICE '========================================';\n  \n  IF error_count > array_length(view_names,1) / 2 THEN\n    RAISE EXCEPTION 'Too many errors (>50%%), aborting workflow';\n  END IF;\nEND $$;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -384,
+        1088
+      ],
+      "id": "54773f2e-f860-4d91-8e84-ec3713eb4194",
+      "name": "REFRESH MATERIALIZED VIEW CONCURRENTLY1",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "BEGIN;\n\n/* индексы на ключи, если ещё нет */\nCREATE UNIQUE INDEX IF NOT EXISTS ux_cml_id_source ON dashboards.crm_marketing_link(id_source);\nCREATE INDEX IF NOT EXISTS idx_cml_gclid  ON dashboards.crm_marketing_link (gclid);\nCREATE INDEX IF NOT EXISTS idx_cml_fbclid ON dashboards.crm_marketing_link (fbclid);\n\n/* извлечём параметры из последнего code */\nWITH src AS (\n  SELECT\n    cr.id_source,\n    CASE\n      WHEN cr.code IS NULL THEN NULL\n      WHEN jsonb_typeof(cr.code)='string' THEN cr.code #>> '{}'\n      ELSE cr.code::text\n    END AS code_text\n  FROM dashboards.crm_requests cr\n  WHERE cr.id_source IS NOT NULL\n),\next AS (\n  SELECT\n    id_source,\n    lower(NULLIF(substring(code_text FROM '(?i)utm_source[=:\\\"?&]+([^\\\"&\\\\s]+)'),  '')) AS utm_source,\n    lower(NULLIF(substring(code_text FROM '(?i)utm_medium[=:\\\"?&]+([^\\\"&\\\\s]+)'),  '')) AS utm_medium,\n    NULLIF(substring(code_text     FROM '(?i)utm_campaign[=:\\\"?&]+([^\\\"&\\\\s]+)'), '')   AS utm_campaign,\n    NULLIF(substring(code_text     FROM '(?i)utm_content[=:\\\"?&]+([^\\\"&\\\\s]+)'),  '')   AS utm_content,\n    NULLIF(substring(code_text     FROM '(?i)utm_term[=:\\\"?&]+([^\\\"&\\\\s]+)'),     '')   AS utm_term,\n    NULLIF(substring(code_text     FROM '(?i)gclid[=:\\\"?&]+([A-Za-z0-9._-]+)'), '')   AS gclid,\n    NULLIF(substring(code_text     FROM '(?i)gbraid[=:\\\"?&]+([A-Za-z0-9._-]+)'), '')  AS gbraid,\n    NULLIF(substring(code_text     FROM '(?i)wbraid[=:\\\"?&]+([A-Za-z0-9._-]+)'), '')  AS wbraid,\n    NULLIF(substring(code_text     FROM '(?i)fbclid[=:\\\"?&]+([A-Za-z0-9._-]+)'), '')  AS fbclid\n  FROM src\n)\nINSERT INTO dashboards.crm_marketing_link AS tgt\n  (id_source, utm_source, utm_medium, utm_campaign, utm_content, utm_term, gclid, fbclid)\nSELECT\n  e.id_source,\n  e.utm_source, e.utm_medium, e.utm_campaign, e.utm_content, e.utm_term,\n  COALESCE(e.gclid, e.gbraid, e.wbraid) AS gclid,   -- любой google-маркер в gclid\n  e.fbclid\nFROM ext e\nWHERE e.id_source IS NOT NULL\nON CONFLICT (id_source) DO UPDATE SET\n  utm_source  = COALESCE(EXCLUDED.utm_source,  tgt.utm_source),\n  utm_medium  = COALESCE(EXCLUDED.utm_medium,  tgt.utm_medium),\n  utm_campaign= COALESCE(EXCLUDED.utm_campaign,tgt.utm_campaign),\n  utm_content = COALESCE(EXCLUDED.utm_content, tgt.utm_content),\n  utm_term    = COALESCE(EXCLUDED.utm_term,    tgt.utm_term),\n  gclid       = COALESCE(EXCLUDED.gclid,       tgt.gclid),\n  fbclid      = COALESCE(EXCLUDED.fbclid,      tgt.fbclid),\n  row_updated_at = now();\n\nCOMMIT;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        96,
+        1088
+      ],
+      "id": "67977fd6-03e5-44cb-a8ad-08912fab3f97",
+      "name": "dashboards.crm_marketing_link_upsert1",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Безопасно убрать конфликтующий объект (TABLE/MATERIALIZED VIEW), если он есть\nDO $$\nBEGIN\n  IF EXISTS (\n    SELECT 1 FROM pg_class c\n    JOIN pg_namespace n ON n.oid = c.relnamespace\n    WHERE n.nspname='dashboards' AND c.relname='v6_google_contracts_detail' AND c.relkind='m'  -- matview\n  ) THEN\n    EXECUTE 'DROP MATERIALIZED VIEW dashboards.v6_google_contracts_detail';\n  ELSIF EXISTS (\n    SELECT 1 FROM pg_class c\n    JOIN pg_namespace n ON n.oid = c.relnamespace\n    WHERE n.nspname='dashboards' AND c.relname='v6_google_contracts_detail' AND c.relkind='r'  -- table\n  ) THEN\n    EXECUTE 'DROP TABLE dashboards.v6_google_contracts_detail';\n  END IF;\nEND $$ LANGUAGE plpgsql;\n\n-- Создать/переопределить VIEW\nCREATE OR REPLACE VIEW dashboards.v6_google_contracts_detail AS\nWITH dc_pick AS (\n  SELECT DISTINCT ON (dc.contract_id)\n    dc.contract_id::bigint                               AS contract_id,\n    COALESCE(dc.updated_at, dc.created_at)::date         AS contract_dt\n  FROM raw.itcrm_docs_clients dc\n  WHERE dc.contract_id IS NOT NULL\n  ORDER BY dc.contract_id, COALESCE(dc.updated_at, dc.created_at) DESC NULLS LAST\n)\nSELECT\n  'google'::text                           AS platform_detected,\n  cr.contract_id::bigint                   AS contract_id,\n  cr.contract_total::numeric               AS contract_amount,\n  dp.contract_dt                           AS contract_dt,\n  cr.id_source::text                       AS id_source,\n  cr.internet_request_id                   AS internet_request_id,\n\n  -- META поля оставляем нулями/как есть для унификации структуры (могут быть NULL)\n  fl.meta_platform,\n  fl.meta_campaign_id,\n  fl.meta_adset_id,\n  fl.meta_ad_id,\n  fl.fb_lead_id,\n  fl.fbclid,\n\n  -- GOOGLE источник договора\n  fl.gclid,\n  fl.google_campaign_id,\n  fl.google_campaign_name,\n  fl.google_ad_group_id,\n  fl.google_ad_group_name,\n  fl.google_keyword_text,\n  fl.google_search_term,\n\n  -- UTM\n  fl.utm_source,\n  fl.utm_medium,\n  fl.utm_campaign,\n  fl.utm_content,\n  fl.utm_term\nFROM dashboards.crm_requests cr\nLEFT JOIN dc_pick dp ON dp.contract_id = cr.contract_id\nLEFT JOIN dashboards.fact_leads fl ON fl.id_source = cr.id_source\nWHERE (fl.google_campaign_id IS NOT NULL OR NULLIF(fl.gclid,'') IS NOT NULL);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -144,
+        1088
+      ],
+      "id": "0279af06-4622-4ae7-a68a-509ae933be84",
+      "name": "dashboards.v6_google_contracts_detail",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "BEGIN;\n\nINSERT INTO dashboards.lead_marketing_enriched AS tgt (\n  id_source,\n  internet_request_id,\n  request_type,\n  form_name,\n  created_date_txt,\n  dominant_platform\n)\nSELECT DISTINCT\n  cr.id_source,\n  cr.internet_request_id,\n  cr.request_type,\n  cr.form_name,\n  -- ✅ ИСПРАВЛЕНИЕ: Используем source_date_time если request_created_at NULL\n  COALESCE(cr.request_created_at, cr.source_date_time)::text AS created_date_txt,\n  NULL::text AS dominant_platform\nFROM dashboards.crm_requests cr\nWHERE cr.id_source IS NOT NULL\n  -- Загружаем последние 30 дней для надёжности\n  AND COALESCE(cr.request_created_at, cr.source_date_time) >= CURRENT_DATE - 30\nON CONFLICT (id_source) DO UPDATE SET\n  internet_request_id = COALESCE(EXCLUDED.internet_request_id, tgt.internet_request_id),\n  request_type        = COALESCE(EXCLUDED.request_type, tgt.request_type),\n  form_name           = COALESCE(EXCLUDED.form_name, tgt.form_name),\n  created_date_txt    = COALESCE(EXCLUDED.created_date_txt, tgt.created_date_txt),\n  row_updated_at      = now();\n\n-- Статистика\nSELECT\n  'lead_marketing_enriched' as table_name,\n  COUNT(*) as total_records,\n  COUNT(CASE WHEN created_date_txt::date >= CURRENT_DATE - 7 THEN 1 END) as last_7_days,\n  MAX(created_date_txt::date) as latest_date\nFROM dashboards.lead_marketing_enriched;\n\nCOMMIT;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1232,
+        848
+      ],
+      "id": "95d95764-025e-4dd1-88eb-a59ea83f3d69",
+      "name": "lead_marketing_enriched",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "BEGIN;\n\n-- Обновление агрегации оплат\nINSERT INTO dashboards.crm_payment_summary AS tgt (\n  id_source, \n  is_paid, \n  n_paid_ops, \n  n_reissuance, \n  n_failed,\n  first_payment_date, \n  last_payment_date\n)\nSELECT\n  np.id_source::text,\n  BOOL_OR(np.payment = 1) AS is_paid,\n  COUNT(*) FILTER (WHERE np.payment = 1) AS n_paid_ops,\n  COUNT(*) FILTER (WHERE np.reissuance = 1) AS n_reissuance,\n  COUNT(*) FILTER (WHERE np.date_fail IS NOT NULL) AS n_failed,\n  MIN(np.date_payment) AS first_payment_date,\n  MAX(np.date_payment) AS last_payment_date\nFROM raw.itcrm_new_payment np\nWHERE np.id_source IS NOT NULL\nGROUP BY np.id_source\nON CONFLICT (id_source) DO UPDATE SET\n  is_paid = EXCLUDED.is_paid,\n  n_paid_ops = EXCLUDED.n_paid_ops,\n  n_reissuance = EXCLUDED.n_reissuance,\n  n_failed = EXCLUDED.n_failed,\n  first_payment_date = LEAST(\n    COALESCE(tgt.first_payment_date, EXCLUDED.first_payment_date), \n    EXCLUDED.first_payment_date\n  ),\n  last_payment_date = GREATEST(\n    COALESCE(tgt.last_payment_date, EXCLUDED.last_payment_date), \n    EXCLUDED.last_payment_date\n  ),\n  row_updated_at = now();\n\nCOMMIT;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1040,
+        848
+      ],
+      "id": "1f8b0ddd-cae5-4b56-9d13-d1772f1a8e4e",
+      "name": "crm_payment_summary",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "BEGIN;\n\n-- Обновление агрегации договоров\nINSERT INTO dashboards.crm_contract_summary AS tgt (\n  id_source, \n  contract_amount, \n  n_contracts, \n  first_contract_date, \n  last_contract_date\n)\nSELECT\n  dc.id_source::text,\n  SUM(COALESCE(dc.total_cost_of_the_contract, dc.sum2, 0))::numeric(18,2) AS contract_amount,\n  COUNT(*) AS n_contracts,\n  MIN(COALESCE(dc.created_at, dc.updated_at)::date) AS first_contract_date,\n  MAX(COALESCE(dc.updated_at, dc.created_at)::date) AS last_contract_date\nFROM raw.itcrm_docs_clients dc\nWHERE dc.id_source IS NOT NULL\nGROUP BY dc.id_source\nON CONFLICT (id_source) DO UPDATE SET\n  contract_amount = EXCLUDED.contract_amount,\n  n_contracts = EXCLUDED.n_contracts,\n  first_contract_date = LEAST(\n    COALESCE(tgt.first_contract_date, EXCLUDED.first_contract_date), \n    EXCLUDED.first_contract_date\n  ),\n  last_contract_date = GREATEST(\n    COALESCE(tgt.last_contract_date, EXCLUDED.last_contract_date), \n    EXCLUDED.last_contract_date\n  ),\n  row_updated_at = now();\n\nCOMMIT;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -816,
+        848
+      ],
+      "id": "5d215cb1-6f2c-4ea9-b234-051ffd27a55a",
+      "name": "crm_contract_summary",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "BEGIN;\n\n-- Обогащение lead_marketing_enriched из utm_campaign для Meta\nWITH utm_meta AS (\n  SELECT DISTINCT\n    cml.id_source,\n    cml.utm_campaign,\n    cml.utm_source,\n    cml.utm_content\n  FROM dashboards.crm_marketing_link cml\n  WHERE (cml.utm_source ILIKE '%facebook%' \n         OR cml.utm_source ILIKE '%instagram%'\n         OR cml.utm_source ILIKE '%meta%')\n    AND cml.utm_campaign IS NOT NULL\n    AND cml.utm_campaign <> ''\n    AND cml.utm_campaign <> ':'  -- ✅ Исключаем некорректные значения\n    AND cml.fbclid IS NULL  -- только те, где нет маркера\n),\ncampaign_match AS (\n  SELECT DISTINCT ON (utm.id_source)\n    utm.id_source,\n    fc.campaign_id,\n    fc.name as campaign_name\n  FROM utm_meta utm\n  JOIN raw.fb_campaigns fc \n    ON (\n      fc.name = utm.utm_campaign\n      OR fc.name ILIKE '%' || utm.utm_campaign || '%'\n      OR utm.utm_campaign ILIKE '%' || fc.name || '%'\n    )\n  ORDER BY utm.id_source, \n           CASE \n             WHEN fc.name = utm.utm_campaign THEN 1  -- точное совпадение важнее\n             ELSE 2 \n           END\n)\n\nUPDATE dashboards.lead_marketing_enriched lme\nSET \n  meta_campaign_id = cm.campaign_id,\n  meta_campaign_name = cm.campaign_name,\n  row_updated_at = now()\nFROM campaign_match cm\nWHERE cm.id_source = lme.id_source\n  AND (lme.meta_campaign_id IS NULL OR lme.meta_campaign_id = '');\n\nCOMMIT;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        64,
+        608
+      ],
+      "id": "bda4a929-4c18-4c98-bdd0-d919192834be",
+      "name": "fb_ad_reference_enrichment",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "BEGIN;\n\n-- Обновление unified_campaign_name из utm_campaign для записей без названия\nWITH utm_fixes AS (\n  SELECT \n    fl.id_source,\n    cml.utm_campaign,\n    cml.utm_source,\n    cml.utm_medium\n  FROM dashboards.fact_leads fl\n  JOIN dashboards.crm_marketing_link cml ON cml.id_source = fl.id_source\n  WHERE (fl.unified_campaign_name = '(без кампании)' \n         OR fl.unified_campaign_name IS NULL\n         OR btrim(fl.unified_campaign_name) = '')\n    AND cml.utm_campaign IS NOT NULL\n    AND btrim(cml.utm_campaign) <> ''\n    AND cml.utm_campaign <> ':'\n)\nUPDATE dashboards.fact_leads fl\nSET\n  unified_campaign_name = uf.utm_campaign,\n  unified_campaign_id = md5(\n    COALESCE(fl.unified_platform, 'unknown') || '|' || uf.utm_campaign\n  ),\n  row_updated_at = now()\nFROM utm_fixes uf\nWHERE uf.id_source = fl.id_source;\n\n-- Статистика\nDO $$\nDECLARE\n  updated_count int;\nBEGIN\n  GET DIAGNOSTICS updated_count = ROW_COUNT;\n  RAISE NOTICE '✅ Updated % records with utm_campaign fallback', updated_count;\nEND $$;\n\nCOMMIT;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -832,
+        1088
+      ],
+      "id": "5dc9f15d-408e-488b-a5d9-70a232ebe4c1",
+      "name": "fact_leads_utm_backfill",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "BEGIN;\n\n-- ===============================================\n-- 1. ОЧИСТКА НЕКОРРЕКТНЫХ GCLID\n-- ===============================================\n\n-- Обнуляем известные некорректные значения\nUPDATE dashboards.fact_leads\nSET \n  gclid = NULL,\n  row_updated_at = now()\nWHERE gclid IN ('gsession', 'null', '', '(none)', 'undefined')\n   OR length(gclid) < 10  -- валидный gclid минимум 10 символов\n   OR gclid ~ '[^A-Za-z0-9._-]';  -- только допустимые символы\n\n-- ===============================================\n-- 2. БЭКФИЛ КОРРЕКТНЫХ GCLID ИЗ CRM_MARKETING_LINK\n-- ===============================================\n\nUPDATE dashboards.fact_leads fl\nSET \n  gclid = cml.gclid,\n  row_updated_at = now()\nFROM dashboards.crm_marketing_link cml\nWHERE cml.id_source = fl.id_source\n  AND (fl.gclid IS NULL OR fl.gclid = '')\n  AND cml.gclid IS NOT NULL\n  AND cml.gclid <> ''\n  AND length(cml.gclid) >= 10\n  AND fl.unified_platform = 'google';\n\n-- ===============================================\n-- 3. ОБНОВЛЕНИЕ GOOGLE CAMPAIGN NAME ИЗ REFERENCE\n-- ===============================================\n\nUPDATE dashboards.fact_leads fl\nSET \n  google_campaign_id = gar.campaign_id,\n  google_campaign_name = gar.campaign_name,\n  google_channel_type = gar.advertising_channel_type,\n  google_ad_group_id = gar.ad_group_id,\n  google_ad_group_name = gar.ad_group_name,\n  google_keyword_text = gar.keyword_text,\n  google_search_term = gar.search_term,\n  row_updated_at = now()\nFROM dashboards.google_ad_reference gar\nWHERE gar.gclid = fl.gclid\n  AND fl.gclid IS NOT NULL\n  AND fl.gclid <> ''\n  AND fl.unified_platform = 'google'\n  AND (fl.google_campaign_name IS NULL OR fl.google_campaign_name = '');\n\n-- Статистика\nDO $$\nDECLARE\n  cleaned int;\n  backfilled int;\n  enriched int;\nBEGIN\n  RAISE NOTICE '========================================';\n  RAISE NOTICE '✅ GCLID CLEANUP & BACKFILL COMPLETED';\n  RAISE NOTICE '========================================';\nEND $$;\n\nCOMMIT;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -816,
+        608
+      ],
+      "id": "51374d5c-e997-4e59-9127-daed1566e46c",
+      "name": "cleanup_invalid_gclid",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "BEGIN;\n\n-- ===============================================\n-- UTM ФОЛБЭК ДЛЯ GOOGLE ЛИДОВ БЕЗ GCLID\n-- ===============================================\n\nWITH google_utm AS (\n  SELECT \n    fl.id_source,\n    cml.utm_campaign,\n    cml.utm_source,\n    cml.utm_medium\n  FROM dashboards.fact_leads fl\n  JOIN dashboards.crm_marketing_link cml ON cml.id_source = fl.id_source\n  WHERE fl.unified_platform = 'google'\n    AND (fl.google_campaign_name IS NULL OR fl.google_campaign_name = '')\n    AND cml.utm_campaign IS NOT NULL\n    AND btrim(cml.utm_campaign) <> ''\n    AND cml.utm_campaign <> ':'\n)\nUPDATE dashboards.fact_leads fl\nSET\n  google_campaign_name = gu.utm_campaign,\n  row_updated_at = now()\nFROM google_utm gu\nWHERE gu.id_source = fl.id_source;\n\n-- ===============================================\n-- ОБНОВЛЕНИЕ UNIFIED ПОЛЕЙ\n-- ===============================================\n\nUPDATE dashboards.fact_leads\nSET\n  unified_campaign_name = google_campaign_name,\n  unified_campaign_id = md5('google|' || COALESCE(google_campaign_id, google_campaign_name)),\n  row_updated_at = now()\nWHERE unified_platform = 'google'\n  AND google_campaign_name IS NOT NULL\n  AND google_campaign_name <> ''\n  AND (unified_campaign_name = '(без кампании)' OR unified_campaign_name IS NULL);\n\n-- Статистика\nDO $$\nDECLARE\n  updated_count int;\nBEGIN\n  SELECT COUNT(*) INTO updated_count\n  FROM dashboards.fact_leads\n  WHERE unified_platform = 'google'\n    AND unified_campaign_name <> '(без кампании)';\n    \n  RAISE NOTICE '========================================';\n  RAISE NOTICE '✅ GOOGLE UTM FALLBACK COMPLETED';\n  RAISE NOTICE '📊 Total Google leads with campaign: %', updated_count;\n  RAISE NOTICE '========================================';\nEND $$;\n\nCOMMIT;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -608,
+        608
+      ],
+      "id": "8d1f1aad-a157-4681-8358-19da44492be4",
+      "name": "google_utm_fallback",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "  BEGIN;\n\n  -- 1. Базовая матвью (источник для остальных)\n  REFRESH MATERIALIZED VIEW CONCURRENTLY dashboards.crm_marketing_link_kvm;\n  SELECT '✅ Step 1/8: crm_marketing_link_kvm' as status;\n\n  -- 2. Первичные агрегаты (зависят только от fact_leads)\n  REFRESH MATERIALIZED VIEW CONCURRENTLY dashboards.v5_leads_source_daily;\n  SELECT '✅ Step 2/8: v5_leads_source_daily' as status;\n\n  REFRESH MATERIALIZED VIEW CONCURRENTLY dashboards.v5_leads_campaign_daily;\n  SELECT '✅ Step 3/8: v5_leads_campaign_daily' as status;\n\n  REFRESH MATERIALIZED VIEW CONCURRENTLY dashboards.v5_manager_daily;\n  SELECT '✅ Step 4/8: v5_manager_daily' as status;\n\n  -- 3. Платформенные метрики\n  REFRESH MATERIALIZED VIEW CONCURRENTLY dashboards.v5_platform_daily_kpis;\n  SELECT '✅ Step 5/8: v5_platform_daily_kpis' as status;\n\n  -- 4. Вторичные агрегаты (зависят от первичных)\n  REFRESH MATERIALIZED VIEW CONCURRENTLY dashboards.v5_campaign_total;\n  SELECT '✅ Step 6/8: v5_campaign_total' as status;\n\n  REFRESH MATERIALIZED VIEW CONCURRENTLY dashboards.v5_campaign_weekly;\n  SELECT '✅ Step 7/8: v5_campaign_weekly' as status;\n\n  REFRESH MATERIALIZED VIEW CONCURRENTLY dashboards.v5_campaign_anomalies;\n  SELECT '✅ Step 8/8: v5_campaign_anomalies' as status;\n\n  COMMIT;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        384,
+        1088
+      ],
+      "id": "8230ddb0-34d6-4726-b0d3-5a742091ffa7",
+      "name": "REFRESH MATERIALIZED VIEW CONCURRENTLY2",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "BEGIN;\n\n-- 1. Обновить UTM и платформу\nUPDATE dashboards.fact_leads fl\nSET\n  utm_source = cml.utm_source,\n  utm_medium = cml.utm_medium,\n  utm_campaign = cml.utm_campaign,\n  utm_content = cml.utm_content,\n  utm_term = cml.utm_term,\n  gclid = cml.gclid,\n  fbclid = cml.fbclid,\n  dominant_platform = CASE\n    WHEN cml.gclid IS NOT NULL OR LOWER(cml.utm_source) LIKE '%google%' THEN 'google'\n    WHEN cml.fbclid IS NOT NULL OR LOWER(cml.utm_source) IN ('facebook', 'instagram', 'fb', 'ig', 'meta') THEN 'meta'\n    WHEN LOWER(cml.utm_source) LIKE '%telegram%' THEN 'telegram'\n    WHEN LOWER(cml.utm_source) LIKE '%youtube%' THEN 'youtube'\n    WHEN LOWER(cml.utm_source) LIKE '%tiktok%' THEN 'tiktok'\n    WHEN LOWER(cml.utm_source) IN ('email', 'mail') THEN 'email'\n    WHEN LOWER(cml.utm_source) IN ('direct', '(direct)', '(none)') OR cml.utm_source IS NULL THEN 'direct'\n    WHEN LOWER(cml.utm_medium) = 'organic' THEN 'organic'\n    WHEN LOWER(cml.utm_medium) IN ('referral', 'refer') THEN 'referral'\n    WHEN LOWER(cml.utm_medium) IN ('cpc', 'ppc', 'paid') THEN 'paid_other'\n    WHEN cml.utm_source IS NOT NULL AND cml.utm_source <> '' THEN 'other'\n    ELSE NULL\n  END,\n  row_updated_at = now()\nFROM dashboards.crm_marketing_link cml\nWHERE fl.id_source = cml.id_source\n  AND fl.created_date_txt::date >= CURRENT_DATE - 30;\n\n-- 2. Заполнить Google Campaign ID через gclid\nUPDATE dashboards.fact_leads fl\nSET\n  google_campaign_id = gc.campaign_id::text,\n  google_ad_group_id = gc.ad_group_id::text,\n  row_updated_at = now()\nFROM dashboards.crm_marketing_link cml\nJOIN raw.google_ads_clicks gc ON gc.gclid = cml.gclid\nWHERE fl.id_source = cml.id_source\n  AND cml.gclid IS NOT NULL\n  AND fl.google_campaign_id IS NULL;\n\n-- 3. Google keyword attribution\nWITH keyword_attribution AS (\n  SELECT DISTINCT ON (fl.id_source)\n    fl.id_source,\n    gk.ad_group_id,\n    gk.ad_group_criterion_id,\n    gk.keyword_text,\n    gk.keyword_match_type\n  FROM dashboards.fact_leads fl\n  JOIN raw.google_ads_keyword_daily gk\n    ON gk.campaign_id = fl.google_campaign_id::bigint\n    AND gk.date = fl.created_date_txt::date\n  WHERE fl.dominant_platform = 'google'\n    AND fl.google_campaign_id IS NOT NULL\n    AND fl.google_keyword_text IS NULL\n  ORDER BY fl.id_source, gk.clicks DESC, gk.cost_micros DESC\n)\nUPDATE dashboards.fact_leads fl\nSET\n  google_ad_group_id = ka.ad_group_id::text,\n  google_ad_group_criterion_id = ka.ad_group_criterion_id,\n  google_keyword_text = ka.keyword_text,\n  google_keyword_match_type = ka.keyword_match_type,\n  row_updated_at = now()\nFROM keyword_attribution ka\nWHERE fl.id_source = ka.id_source;\n\n-- 4. Google ad attribution\nWITH ad_attribution AS (\n  SELECT DISTINCT ON (fl.id_source)\n    fl.id_source,\n    ga.ad_id\n  FROM dashboards.fact_leads fl\n  JOIN raw.google_ads_ad_daily ga\n    ON ga.campaign_id = fl.google_campaign_id::bigint\n    AND ga.date = fl.created_date_txt::date\n  WHERE fl.dominant_platform = 'google'\n    AND fl.google_campaign_id IS NOT NULL\n    AND fl.google_ad_id IS NULL\n  ORDER BY fl.id_source, ga.clicks DESC\n)\nUPDATE dashboards.fact_leads fl\nSET\n  google_ad_id = aa.ad_id,\n  row_updated_at = now()\nFROM ad_attribution aa\nWHERE fl.id_source = aa.id_source;\n\n-- 5. Meta attribution from fb_leads (только по email)\n-- ✅ УПРОЩЕНО: JOIN только по email (телефонов нет в crm_requests)\nWITH fb_leads_match AS (\n  SELECT DISTINCT\n    cr.id_source,\n    fbl.campaign_id,\n    fbl.adset_id,\n    fbl.ad_id\n  FROM raw.fb_leads fbl\n  JOIN dashboards.crm_requests cr\n    ON fbl.email IS NOT NULL\n    AND fbl.email <> ''\n    AND cr.email IS NOT NULL\n    AND cr.email <> ''\n    AND LOWER(TRIM(cr.email)) = LOWER(TRIM(fbl.email))\n  WHERE fbl.request_created_at >= CURRENT_DATE - 30\n)\nUPDATE dashboards.fact_leads fl\nSET\n  meta_campaign_id = flm.campaign_id,\n  meta_adset_id = flm.adset_id,\n  meta_ad_id = flm.ad_id,\n  row_updated_at = now()\nFROM fb_leads_match flm\nWHERE fl.id_source = flm.id_source;\n\n-- 6. Meta creative\nUPDATE dashboards.fact_leads fl\nSET\n  meta_creative_id = fa.ad_creative_id,\n  row_updated_at = now()\nFROM raw.fb_ads fa\nWHERE fl.meta_ad_id = fa.ad_id\n  AND fl.meta_creative_id IS NULL;\n\nCOMMIT;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -128,
+        848
+      ],
+      "id": "f1665129-7c19-4392-801f-e72d39c300ee",
+      "name": "update_fact_leads_attribution",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "REFRESH MATERIALIZED VIEW dashboards.v6_lead_to_creative_attribution;\nREFRESH MATERIALIZED VIEW dashboards.v6_google_campaign_to_keyword;\nREFRESH MATERIALIZED VIEW dashboards.v6_meta_campaign_to_creative;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        272,
+        848
+      ],
+      "id": "b3e745ef-ff37-4d40-a9a2-99c5302c451e",
+      "name": "refresh_v6_views",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "BEGIN;\n\n-- Telegram\nUPDATE dashboards.fact_leads\nSET\n  telegram_source = utm_content,\n  row_updated_at = now()\nWHERE dominant_platform = 'telegram'\n  AND utm_content IS NOT NULL\n  AND telegram_source IS NULL;\n\n-- TikTok\nUPDATE dashboards.fact_leads\nSET\n  tiktok_campaign_id = utm_campaign,\n  row_updated_at = now()\nWHERE dominant_platform = 'tiktok'\n  AND utm_campaign IS NOT NULL\n  AND tiktok_campaign_id IS NULL;\n\n-- Email\nUPDATE dashboards.fact_leads\nSET\n  email_campaign_id = utm_campaign,\n  row_updated_at = now()\nWHERE dominant_platform = 'email'\n  AND utm_campaign IS NOT NULL\n  AND email_campaign_id IS NULL;\n\nCOMMIT;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        464,
+        848
+      ],
+      "id": "f947fa31-d085-4acb-a5cc-57764b6e76d7",
+      "name": "update_other_platforms",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "BEGIN;\n\n-- 1. Заполнить Meta attribution через fb_lead_id\nUPDATE dashboards.fact_leads fl\nSET\n  meta_campaign_id = fbl.campaign_id,\n  meta_adset_id = fbl.adset_id,\n  meta_ad_id = fbl.ad_id,\n  row_updated_at = now()\nFROM raw.fb_leads fbl\nWHERE fl.fb_lead_id = fbl.fb_lead_id\n  AND fl.fb_lead_id IS NOT NULL\n  AND fbl.fb_lead_id IS NOT NULL\n  AND fl.created_date_txt::date >= CURRENT_DATE - 30\n  AND fl.meta_campaign_id IS NULL;\n\n-- 2. Заполнить Meta creative ID\nUPDATE dashboards.fact_leads fl\nSET\n  meta_creative_id = fa.ad_creative_id,\n  row_updated_at = now()\nFROM raw.fb_ads fa\nWHERE fl.meta_ad_id = fa.ad_id\n  AND fl.meta_creative_id IS NULL\n  AND fl.created_date_txt::date >= CURRENT_DATE - 30;\n\nCOMMIT;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        80,
+        848
+      ],
+      "id": "817827d6-3cae-458c-9056-ba2f9504f07b",
+      "name": "update_meta_attribution",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE dashboards.fact_leads fl\nSET\n  fb_lead_id = cr.code->>'fb_lead_id',\n  event_id = cr.code->>'event_id',\n  row_updated_at = now()\nFROM dashboards.crm_requests cr\nWHERE fl.id_source = cr.id_source\n  AND fl.created_date_txt::date >= CURRENT_DATE - 30\n  AND (\n    (cr.code->>'fb_lead_id' IS NOT NULL AND cr.code->>'fb_lead_id' <> '' AND fl.fb_lead_id IS NULL)\n    OR\n    (cr.code->>'event_id' IS NOT NULL AND cr.code->>'event_id' <> '' AND fl.event_id IS NULL)\n  );\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -400,
+        848
+      ],
+      "id": "1f3b5a95-8222-4f28-89a0-7c8900845849",
+      "name": "update_fb_lead_id",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "dashboards.crm_requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "dashboards.crm_requests": {
+      "main": [
+        [
+          {
+            "node": "dashboards.crm_marketing_link_upsert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "dashboards.google_ad_reference": {
+      "main": [
+        [
+          {
+            "node": "dashboards.fb_ad_reference",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "dashboards.fb_ad_reference": {
+      "main": [
+        [
+          {
+            "node": "fb_ad_reference_enrichment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "dashboards.campaign_reference": {
+      "main": [
+        [
+          {
+            "node": "dashboards.crm_requests1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "dashboards.crm_requests1": {
+      "main": [
+        [
+          {
+            "node": "lead_marketing_enriched",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "dashboards.fact_leads": {
+      "main": [
+        [
+          {
+            "node": "update_fb_lead_id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "dashboards.crm_marketing_link_upsert": {
+      "main": [
+        [
+          {
+            "node": "cleanup_invalid_gclid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "dashboards.fact_leads_backfill_google": {
+      "main": [
+        [
+          {
+            "node": "dashboards.fact_leads_backfill_meta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "dashboards.fact_leads_backfill_meta": {
+      "main": [
+        [
+          {
+            "node": "dashboards.fact_leads(additional platform)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "dashboards.fact_leads(additional platform)": {
+      "main": [
+        [
+          {
+            "node": "fact_leads_utm_backfill",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "REFRESH MATERIALIZED VIEW CONCURRENTLY": {
+      "main": [
+        [
+          {
+            "node": "REFRESH MATERIALIZED VIEW CONCURRENTLY1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "dashboards.v6_google_contracts_detail": {
+      "main": [
+        [
+          {
+            "node": "dashboards.crm_marketing_link_upsert1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "REFRESH MATERIALIZED VIEW CONCURRENTLY1": {
+      "main": [
+        [
+          {
+            "node": "dashboards.v6_google_contracts_detail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "lead_marketing_enriched": {
+      "main": [
+        [
+          {
+            "node": "crm_payment_summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "crm_payment_summary": {
+      "main": [
+        [
+          {
+            "node": "crm_contract_summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "crm_contract_summary": {
+      "main": [
+        [
+          {
+            "node": "dashboards.fact_leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fb_ad_reference_enrichment": {
+      "main": [
+        [
+          {
+            "node": "dashboards.campaign_reference",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fact_leads_utm_backfill": {
+      "main": [
+        [
+          {
+            "node": "REFRESH MATERIALIZED VIEW CONCURRENTLY",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "cleanup_invalid_gclid": {
+      "main": [
+        [
+          {
+            "node": "google_utm_fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "google_utm_fallback": {
+      "main": [
+        [
+          {
+            "node": "dashboards.google_ad_reference",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "dashboards.crm_marketing_link_upsert1": {
+      "main": [
+        [
+          {
+            "node": "REFRESH MATERIALIZED VIEW CONCURRENTLY2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update_fact_leads_attribution": {
+      "main": [
+        [
+          {
+            "node": "update_meta_attribution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "refresh_v6_views": {
+      "main": [
+        [
+          {
+            "node": "update_other_platforms",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update_meta_attribution": {
+      "main": [
+        [
+          {
+            "node": "refresh_v6_views",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update_other_platforms": {
+      "main": [
+        [
+          {
+            "node": "dashboards.fact_leads_backfill_google",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update_fb_lead_id": {
+      "main": [
+        [
+          {
+            "node": "update_fact_leads_attribution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "fa43b4c7-c49e-4621-8f33-bf71523b2e7a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "540ab69109515f10dd49f8acf74edf7f1313658ee3ec59f626a0c42af55aceaf"
+  },
+  "id": "RT46KIq0cleWd8le",
+  "tags": []
+}

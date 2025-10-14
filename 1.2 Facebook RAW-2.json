@@ -1,0 +1,1277 @@
+{
+  "name": "1.2 Facebook RAW",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtMinute": 5
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -224,
+        -144
+      ],
+      "id": "ea92ca1f-c544-4f9c-a28f-de0750c01447",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "content": "Связать CRM analytics.code.fb_lead_id ↔ Facebook Lead ↔ ad/adset/campaign/creative ↔ insights (метрики по дням). Для этого достаточно 4 сущностей:\n\t1.\tad-level insights (daily),\n\t2.\tad → creative map,\n\t3.\tcreative details,\n\t4.\tleads (id, created_time, ad_id, form_id, field_data…).\n\nОстальные справочники (result/form_name и т.д.) у нас уже закрыты по CRM-части.",
+        "height": 336
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -720,
+        -288
+      ],
+      "typeVersion": 1,
+      "id": "52426667-0a42-47ba-ae11-7a7b456accde",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "graphApiVersion": "v19.0",
+        "node": "act_1571785870203567",
+        "edge": "insights",
+        "options": {
+          "queryParameters": {
+            "parameter": [
+              {
+                "name": "fields",
+                "value": "account_id,campaign_id,adset_id,ad_id,ad_name,impressions,clicks,spend,actions,unique_actions,action_values,date_start,date_stop"
+              },
+              {
+                "name": "limit",
+                "value": "5000"
+              },
+              {
+                "name": "level",
+                "value": "ad"
+              },
+              {
+                "name": "date_preset",
+                "value": "last_3d"
+              },
+              {
+                "name": "time_increment",
+                "value": "1"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [
+        32,
+        -144
+      ],
+      "id": "252e0a80-6388-4234-9fd6-1e4844ae25c5",
+      "name": "Insights (ad level)",
+      "alwaysOutputData": false,
+      "retryOnFail": true,
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "AQPTgb7ixtrwvxTx",
+          "name": "Facebook Graph (Подрядчик Киев V2)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Name: Prepare Bulk JSON (fb_ad_insights)\nfunction i64(v){ const n=Number(String(v).replace(/[ ,]/g,'')); return Number.isFinite(n)? Math.trunc(n):0; }\nfunction fnum(v){ const n=Number(String(v).replace(/[ ,]/g,'')); return Number.isFinite(n)? n:0; }\nfunction s(x){ return x==null? null : String(x).trim(); }\nfunction d10(x){ return x? String(x).slice(0,10) : null; }\n\nconst out=[];\nconst roots = items.flatMap(it => Array.isArray(it.json?.data) ? it.json.data : [it.json]).filter(Boolean);\n\nfor (const r of roots){\n  const base = {\n    date_start: d10(r.date_start || r.date),\n    date_stop:  d10(r.date_stop),\n    account_id: s(r.account_id),\n    campaign_id:s(r.campaign_id),\n    adset_id:   s(r.adset_id),\n    ad_id:      s(r.ad_id),\n    ad_name:    s(r.ad_name),\n    impressions:i64(r.impressions),\n    clicks:     i64(r.clicks),\n    spend:      fnum(r.spend),\n  };\n  const actions = Array.isArray(r.actions) ? r.actions : [];\n  if (actions.length === 0) {\n    out.push({ json: { ...base, action_type: '(none)', action_value: 0 } });\n  } else {\n    for (const a of actions){\n      out.push({ json: { ...base, action_type: s(a?.action_type)?.toLowerCase(), action_value: fnum(a?.value) } });\n    }\n  }\n}\nreturn [{ json: { rows: out.map(x => x.json) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        -144
+      ],
+      "id": "37ee3a30-d285-4816-bd98-51cc25e9581c",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH src AS (\n  SELECT *\n  FROM json_to_recordset($1::json) AS x(\n    date_start    text,\n    date_stop     text,\n    account_id    text,\n    campaign_id   text,\n    adset_id      text,\n    ad_id         text,\n    ad_name       text,\n    impressions   text,\n    clicks        text,\n    spend         text,\n    action_type   text,\n    action_value  text\n  )\n)\nINSERT INTO raw.fb_ad_insights AS t (\n  date_start, date_stop, account_id, campaign_id, adset_id, ad_id, ad_name,\n  impressions, clicks, spend, action_type, action_value, load_timestamp\n)\nSELECT\n  NULLIF(date_start,'')::date,\n  NULLIF(date_stop,'')::date,\n  NULLIF(account_id,''),\n  NULLIF(campaign_id,''),\n  NULLIF(adset_id,''),\n  NULLIF(ad_id,''),\n  NULLIF(ad_name,''),\n  COALESCE(NULLIF(impressions,'')::bigint,0),\n  COALESCE(NULLIF(clicks,'')::bigint,0),\n  COALESCE(NULLIF(spend,'')::numeric,0),\n  LOWER(NULLIF(action_type,'')),\n  COALESCE(NULLIF(action_value,'')::numeric,0),\n  now()\nFROM src\nWHERE NULLIF(ad_id,'') IS NOT NULL AND NULLIF(date_start,'') IS NOT NULL AND NULLIF(action_type,'') IS NOT NULL\nON CONFLICT ON CONSTRAINT fb_ad_insights_uk DO UPDATE\nSET impressions  = EXCLUDED.impressions,\n    clicks       = EXCLUDED.clicks,\n    spend        = EXCLUDED.spend,\n    action_value = EXCLUDED.action_value,\n    load_timestamp = now();",
+        "options": {
+          "queryReplacement": "=\t$1 = {{$json.rows}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        448,
+        -144
+      ],
+      "id": "2025f987-8661-4c7f-bb43-191885d9db10",
+      "name": "raw.fb_ad_insights",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "graphApiVersion": "v19.0",
+        "node": "act_1571785870203567",
+        "edge": "ads",
+        "options": {
+          "queryParameters": {
+            "parameter": [
+              {
+                "name": "fields",
+                "value": "id,name,adset_id,campaign_id,creative{id},effective_status,updated_time"
+              },
+              {
+                "name": "limit",
+                "value": "5000"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [
+        32,
+        48
+      ],
+      "id": "3fed95fc-42b2-4861-8841-09f3f15ccafd",
+      "name": "Ads",
+      "alwaysOutputData": false,
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "AQPTgb7ixtrwvxTx",
+          "name": "Facebook Graph (Подрядчик Киев V2)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Name: Prepare Bulk JSON (fb_ad_map)\nfunction s(x){ return x==null ? null : String(x); }\nfunction ts(x){ return x? new Date(x).toISOString() : null; }\n\nconst rows = items.flatMap(it => Array.isArray(it.json?.data) ? it.json.data : [it.json]).filter(Boolean);\nreturn [{\n  json: {\n    rows: rows.map(r => ({\n      ad_id:           s(r.id),\n      ad_name:         s(r.name),\n      adset_id:        s(r.adset_id),\n      campaign_id:     s(r.campaign_id),\n      ad_creative_id:  s(r.creative?.id),\n      effective_status:s(r.effective_status),\n      updated_time:    ts(r.updated_time)\n    })).filter(x => x.ad_id)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        48
+      ],
+      "id": "fdcfd81c-2c47-4de2-bc62-e923b6af4c73",
+      "name": "Code1"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH src AS (\n  SELECT *\n  FROM json_to_recordset($1::json) AS x(\n    ad_id            text,\n    ad_name          text,\n    adset_id         text,\n    campaign_id      text,\n    ad_creative_id   text,\n    effective_status text,\n    updated_time     text\n  )\n)\nINSERT INTO raw.fb_ad_map AS t (\n  ad_id, ad_name, adset_id, campaign_id, ad_creative_id, effective_status, updated_time, load_timestamp\n)\nSELECT\n  NULLIF(ad_id,''),\n  NULLIF(ad_name,''),\n  NULLIF(adset_id,''),\n  NULLIF(campaign_id,''),\n  NULLIF(ad_creative_id,''),\n  NULLIF(effective_status,''),\n  CASE WHEN NULLIF(updated_time,'') IS NULL THEN NULL ELSE updated_time::timestamptz END,\n  now()\nFROM src\nWHERE NULLIF(ad_id,'') IS NOT NULL\nON CONFLICT (ad_id) DO UPDATE\nSET ad_name          = EXCLUDED.ad_name,\n    adset_id         = EXCLUDED.adset_id,\n    campaign_id      = EXCLUDED.campaign_id,\n    ad_creative_id   = COALESCE(EXCLUDED.ad_creative_id, t.ad_creative_id),\n    effective_status = EXCLUDED.effective_status,\n    updated_time     = GREATEST(COALESCE(EXCLUDED.updated_time, t.updated_time), t.updated_time),\n    load_timestamp   = now();",
+        "options": {
+          "queryReplacement": "=\t$1 = {{$json.rows}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        608,
+        64
+      ],
+      "id": "6b7acaa6-0e47-4739-9461-b025a131e6d7",
+      "name": "raw.fb_ad_map",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Make Creative ID Batches (filter by effective_status + dedup)\nconst ALLOWED = new Set([\n  'ACTIVE',\n  'PAUSED',\n  'IN_PROCESS',\n  'PENDING_REVIEW'\n]);\n\n// Берём строки, которые сформировал узел Code1 (там лежит rows[])\nconst rows = Array.isArray(items[0]?.json?.rows) ? items[0].json.rows : [];\n\n// Фильтруем по статусу объявления\nconst filtered = rows.filter(r => {\n  const st = String(r.effective_status || '').toUpperCase();\n  return st ? ALLOWED.has(st) : true; // если статуса нет — не режем\n});\n\n// Собираем креативы, отбрасываем пустые/нулевые\nconst ids = [...new Set(\n  filtered\n    .map(r => String(r.ad_creative_id || '').trim())\n    .filter(id => id && id !== '0')\n)];\n\n// Бьём на пачки по 50\nconst chunkSize = 50;\nconst batches = [];\nfor (let i = 0; i < ids.length; i += chunkSize) {\n  batches.push(ids.slice(i, i + chunkSize));\n}\n\n// Вывод: items[], в каждом item.json.creative_ids = массив id\nreturn batches.map(arr => ({ json: { creative_ids: arr } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        240
+      ],
+      "id": "5f70d2ed-ecc0-44ea-9421-1854410dce7d",
+      "name": "Make Creative ID Batches"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Explode Creative IDs (simple explode + cross-batch dedup)\nconst seen = new Set();\nconst out = [];\n\nfor (const it of items) {\n  const arr = Array.isArray(it.json?.creative_ids) ? it.json.creative_ids : [];\n  for (let id of arr) {\n    id = String(id || '').trim();\n    if (!id || seen.has(id)) continue;\n    seen.add(id);\n    out.push({ json: { node: id, ad_creative_id: id } });\n  }\n}\n\nreturn out.length ? out : [{ json: { _warning: 'no_creatives_after_filter' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        48,
+        464
+      ],
+      "id": "5aea63cb-4989-409a-8a36-0c374f1c1221",
+      "name": "Explode Creative IDs"
+    },
+    {
+      "parameters": {
+        "graphApiVersion": "v23.0",
+        "node": "={{$json.node}}",
+        "options": {
+          "queryParameters": {
+            "parameter": [
+              {
+                "name": "fields",
+                "value": "id,   name,   effective_object_story_id,   object_story_id,   object_url,   url_tags,   object_type,   thumbnail_url,   object_story_spec{     page_id,  instagram_user_id,   link_data{       link,       name,       message,       description,       call_to_action{type,value{link}}     },     video_data{       video_id,       call_to_action{type,value{link}}     }   }"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [
+        240,
+        464
+      ],
+      "id": "04ed0185-cec2-4e52-a716-dc994dd89658",
+      "name": "Creative by ID",
+      "alwaysOutputData": false,
+      "retryOnFail": true,
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "AQPTgb7ixtrwvxTx",
+          "name": "Facebook Graph (Подрядчик Киев V2)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Name: Prepare Bulk JSON (fb_ad_creative_details) — enriched\nfunction s(x){ return x == null ? null : String(x); }\n\nconst seen = new Set();\nconst rows = [];\n\nfor (const it of items) {\n  const c = it.json || {};\n  const oss = c.object_story_spec || {};\n  const ld  = oss.link_data || {};\n\n  const id = s(c.id);\n  if (!id || seen.has(id)) continue;\n  seen.add(id);\n\n  const topObjectUrl = s(c.object_url);\n  const ldLink       = s(ld.link) || s(ld?.call_to_action?.value?.link);\n\n  const title = s(ld.name) || null;\n  const body  = s(ld.description) || s(ld.message) || s(c.body) || null;\n\n  const object_url = topObjectUrl || ldLink || null;\n\n  rows.push({\n    ad_creative_id:            id,\n    name:                      s(c.name),\n    object_story_id:           s(c.object_story_id),\n    effective_object_story_id: s(c.effective_object_story_id),\n    page_id:                   s(oss.page_id),\n    instagram_user_id:         s(oss.instagram_user_id),\n    link_url:                  s(ld.link),\n    title:                     title,\n    body:                      body,\n    object_url:                object_url,\n    object_type:               s(c.object_type),      // ← ДОБАВИЛИ\n    thumbnail_url:             s(c.thumbnail_url),    // ← ДОБАВИЛИ\n    url_tags:                  s(c.url_tags),         // ← ДОБАВИЛИ\n    updated_time:              null\n  });\n}\n\nreturn [{ json: { rows } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        464
+      ],
+      "id": "4a783dc1-9aaf-415a-b53e-dc93c907aad9",
+      "name": "Prepare Bulk"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH src AS (\n  SELECT *\n  FROM json_to_recordset($1::json) AS x(\n    ad_creative_id            text,\n    name                      text,\n    object_story_id           text,\n    effective_object_story_id text,\n    page_id                   text,\n    instagram_user_id         text,\n    link_url                  text,\n    title                     text,\n    body                      text,\n    object_url                text,\n    object_type               text,\n    thumbnail_url             text,\n    url_tags                  text,             -- ← ДОБАВИЛИ\n    updated_time              text\n  )\n),\ndedup AS (\n  SELECT DISTINCT ON (ad_creative_id)\n    NULLIF(ad_creative_id,'')              AS ad_creative_id,\n    NULLIF(object_story_id,'')             AS object_story_id,\n    NULLIF(effective_object_story_id,'')   AS effective_object_story_id,\n    NULLIF(page_id,'')                     AS page_id,\n    NULLIF(instagram_user_id,'')           AS instagram_user_id,\n    NULLIF(link_url,'')                    AS link_url,\n    NULLIF(title,'')                       AS title,\n    NULLIF(body,'')                        AS body,\n    NULLIF(object_url,'')                  AS object_url,\n    NULLIF(object_type,'')                 AS object_type,\n    NULLIF(thumbnail_url,'')               AS thumbnail_url,\n    NULLIF(url_tags,'')                    AS url_tags,   -- ← ДОБАВИЛИ\n    NULLIF(updated_time,'')                AS updated_time\n  FROM src\n)\nINSERT INTO raw.fb_ad_creative_details AS t (\n  ad_creative_id, object_story_id, effective_object_story_id,\n  page_id, instagram_user_id, link_url, title, body,\n  object_url, object_type, thumbnail_url, url_tags,   -- ← ДОБАВИЛИ\n  updated_time, load_timestamp\n)\nSELECT\n  ad_creative_id, object_story_id, effective_object_story_id,\n  page_id, instagram_user_id, link_url, title, body,\n  object_url, object_type, thumbnail_url, url_tags,   -- ← ДОБАВИЛИ\n  CASE WHEN updated_time IS NULL THEN NULL ELSE updated_time::timestamptz END,\n  now()\nFROM dedup\nWHERE ad_creative_id IS NOT NULL\nON CONFLICT (ad_creative_id) DO UPDATE\nSET object_story_id           = COALESCE(EXCLUDED.object_story_id,           t.object_story_id),\n    effective_object_story_id = COALESCE(EXCLUDED.effective_object_story_id, t.effective_object_story_id),\n    page_id                   = COALESCE(EXCLUDED.page_id,                   t.page_id),\n    instagram_user_id         = COALESCE(EXCLUDED.instagram_user_id,         t.instagram_user_id),\n    link_url                  = COALESCE(EXCLUDED.link_url,                  t.link_url),\n    title                     = COALESCE(EXCLUDED.title,                     t.title),\n    body                      = COALESCE(EXCLUDED.body,                      t.body),\n    object_url                = COALESCE(EXCLUDED.object_url,                t.object_url),\n    object_type               = COALESCE(EXCLUDED.object_type,               t.object_type),\n    thumbnail_url             = COALESCE(EXCLUDED.thumbnail_url,             t.thumbnail_url),\n    url_tags                  = COALESCE(EXCLUDED.url_tags,                  t.url_tags),  -- ← ДОБАВИЛИ\n    updated_time              = COALESCE(EXCLUDED.updated_time,              t.updated_time),\n    load_timestamp            = now();",
+        "options": {
+          "queryReplacement": "=\t$1 = {{$json.rows}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        608,
+        464
+      ],
+      "id": "c25518af-023d-4d05-ab36-2923b92f17c8",
+      "name": "raw.fb_ad_creative_details1",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "graphApiVersion": "v19.0",
+        "node": "={{$json.page_id}}",
+        "edge": "leadgen_forms",
+        "options": {
+          "queryParameters": {
+            "parameter": [
+              {
+                "name": "fields",
+                "value": "id,name,status,locale,created_time"
+              },
+              {
+                "name": "access_token",
+                "value": "={{$json.page_access_token}}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [
+        416,
+        960
+      ],
+      "id": "f7840aad-875d-4738-b6e3-5e68d4da5a77",
+      "name": "(Page → leadgen_forms)",
+      "alwaysOutputData": false,
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "AQPTgb7ixtrwvxTx",
+          "name": "Facebook Graph (Подрядчик Киев V2)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Берём массив страниц из items[0].json.data\nconst pages = (items[0]?.json?.data ?? []);\n\n// Оставляем только те, где есть право MANAGE_LEADS\nconst filtered = pages.filter(p => Array.isArray(p.tasks) && p.tasks.includes('MANAGE_LEADS'));\n\n// Возвращаем по одному айтему на страницу с нужными полями\nreturn filtered.map(p => ({\n  json: {\n    page_id: p.id,\n    page_name: p.name,\n    page_access_token: p.access_token,\n    tasks: p.tasks\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        864
+      ],
+      "id": "b04ef7b5-485f-4b64-84d2-b6238bc2748a",
+      "name": "filter & map"
+    },
+    {
+      "parameters": {
+        "graphApiVersion": "v19.0",
+        "node": "={{$json.id}}",
+        "edge": "leads",
+        "options": {
+          "queryParameters": {
+            "parameter": [
+              {
+                "name": "fields",
+                "value": "id,created_time,ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,field_data,platform,form_id,page_id"
+              },
+              {
+                "name": "access_token",
+                "value": "={{$json.page_access_token}}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [
+        1168,
+        880
+      ],
+      "id": "75c03c35-964f-48f6-9e71-d750604977f7",
+      "name": "(Form → leads",
+      "alwaysOutputData": false,
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "AQPTgb7ixtrwvxTx",
+          "name": "Facebook Graph (Подрядчик Киев V2)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        752,
+        880
+      ],
+      "id": "e8a00d3b-fdd1-43d3-a566-9e3c3f2ab2ac",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "// В этом item уже есть и контекст страницы, и массив форм:\nconst { page_id, page_access_token, data } = $json;\nconst forms = Array.isArray(data) ? data : [];\n\n// Разворачиваем формы в отдельные айтемы и приклеиваем page_id/token\nreturn forms.map(f => ({\n  json: {\n    ...f,                // id, name, status, locale, created_time\n    page_id,\n    page_access_token\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        880
+      ],
+      "id": "72146d30-7f78-46cd-8ba1-5049a81e3cfd",
+      "name": "Split Forms"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Code3 — ВХОД: items[] от узла \"(Form → leads)\",\n// каждый items[i].json.data — массив лидов для формы из Split Forms на той же позиции.\n// Забираем параллельный массив контекста форм:\nconst ctxForms = $items('Split Forms', 0) || [];\nconst out = [];\n\n// Вспомогалки\nfunction pick(obj, variants) {\n  for (const k of variants) {\n    const kk = String(k).toLowerCase();\n    if (obj[kk]) return obj[kk];\n  }\n  return null;\n}\nfunction normalizeUaPhone(input){\n  if(!input) return null;\n  let s = String(input).replace(/[^\\d+]/g,'');\n  if (s.startsWith('00')) s = '+' + s.slice(2);\n  if (/^0\\d{9}$/.test(s)) s = '+38' + s;\n  if (/^380\\d{9}$/.test(s)) s = '+' + s;\n  return s;\n}\nfunction flattenLead(lead, ctx){\n  const fd = Array.isArray(lead.field_data) ? lead.field_data : [];\n  const raw = {};\n  for (const f of fd) {\n    const key = String(f?.name ?? '').trim().toLowerCase();\n    const val = Array.isArray(f?.values) ? f.values[0] : f?.values;\n    if (key) raw[key] = String(val ?? '').trim();\n  }\n  const name = pick(raw, [\n    \"name\",\"full_name\",\"ім'я\",\"імʼя\",\"ваше_ім'я\",\"ваше_имя\",\"имя\",\n    \"прізвище_та_ім'я\",\"прізвище_та_імʼя\",\"прізвище та ім'я\",\"прізвище та імʼя\"\n  ]);\n  const phoneRaw = pick(raw, [\n    \"phone_number\",\"phone\",\"телефон\",\"ваш_номер_телефону\",\"номер_телефону\",\"номер телефону\",\"ваш номер телефону\"\n  ]);\n  const email = pick(raw, [\n    \"email\",\"e-mail\",\"електронна_пошта\",\"електронна пошта\",\"почта\"\n  ]);\n\n  const out = {\n    lead_id: lead.id ?? null,\n    lead_created_time: lead.created_time ?? null,\n    platform: lead.platform ?? null,\n\n    // берём из lead, иначе — из контекста формы\n    form_id: lead.form_id ?? ctx.id ?? null,\n    form_name: ctx.name ?? null,\n    page_id: lead.page_id ?? ctx.page_id ?? null,\n\n    ad_id: lead.ad_id ?? null,\n    ad_name: lead.ad_name ?? null,\n    adset_id: lead.adset_id ?? null,\n    adset_name: lead.adset_name ?? null,\n    campaign_id: lead.campaign_id ?? null,\n    campaign_name: lead.campaign_name ?? null,\n\n    name,\n    phone: normalizeUaPhone(phoneRaw),\n    email,\n\n    raw_fields: raw,\n  };\n\n  out.lead_created_time_iso = out.lead_created_time\n    ? (isNaN(new Date(out.lead_created_time)) ? out.lead_created_time : new Date(out.lead_created_time).toISOString())\n    : null;\n\n  return { json: out };\n}\n\n// Проходим по всем пачкам лидов и их «соседним» формам\nfor (let i = 0; i < items.length; i++) {\n  const leads = Array.isArray(items[i]?.json?.data) ? items[i].json.data : [];\n  const ctx = ctxForms[i]?.json ?? {}; // тот же индекс из Split Forms\n  for (const lead of leads) {\n    out.push(flattenLead(lead, ctx));\n  }\n}\n\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1376,
+        880
+      ],
+      "id": "b72fe79a-3e25-4cd0-ab20-b667bb7d6ec6",
+      "name": "Code3"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ВХОД: items[] — по одному лиду в item.json\nconst seen = new Set();\nconst out = [];\nfor (const it of items) {\n  const id = it?.json?.lead_id ?? null;\n  if (!id) continue;           // пропустим пустые\n  if (seen.has(id)) continue;  // уже был — дроп\n  seen.add(id);\n  out.push(it);\n}\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1584,
+        880
+      ],
+      "id": "bbd53264-1e9c-44f3-a551-c5ed2d7554dc",
+      "name": "Code4"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Рекомендуемый уникальный индекс (один раз):\n-- CREATE UNIQUE INDEX IF NOT EXISTS ux_fb_leads ON raw.fb_leads(form_id, fb_lead_id);\n\nWITH p AS (\n  SELECT $1::jsonb AS j\n),\nx AS (\n  SELECT\n    j->>'lead_id'   AS fb_lead_id,\n    j->>'form_id'   AS form_id,\n    COALESCE(\n      NULLIF(j->>'lead_created_time_iso','')::timestamptz,\n      NULLIF(j->>'lead_created_time','')::timestamptz,\n      now()\n    )               AS request_created_at,\n\n    -- phone: top-level -> raw_fields[\"ваш_номер_телефону\"]\n    COALESCE(\n      NULLIF(j->>'phone',''),\n      NULLIF(j#>>'{raw_fields,ваш_номер_телефону}','')\n    )               AS phone,\n\n    NULLIF(j->>'email','') AS email,\n\n    -- name: top-level -> raw_fields[\"ваше_ім'я\"]\n    COALESCE(\n      NULLIF(j->>'name',''),\n      NULLIF(j#>>'{raw_fields,ваше_ім''я}','')\n    )               AS name,\n\n    NULLIF(j->>'platform','')   AS platform,\n    NULLIF(j->>'form_name','')  AS form_name,\n    NULLIF(j->>'page_id','')    AS page_id,\n    NULLIF(j->>'campaign_id','')AS campaign_id,\n    NULLIF(j->>'adset_id','')   AS adset_id,\n    NULLIF(j->>'ad_id','')      AS ad_id,\n    j                           AS raw\n  FROM p\n)\nINSERT INTO raw.fb_leads (\n  fb_lead_id, form_id, request_created_at,\n  phone, email, name, platform, form_name, page_id,\n  campaign_id, adset_id, ad_id,\n  code, raw, updated_at\n)\nSELECT\n  fb_lead_id, form_id, request_created_at,\n  phone, email, name, platform, form_name, page_id,\n  campaign_id, adset_id, ad_id,\n\n  jsonb_build_object(\n    'source','facebook_leads',\n    'fb_lead_id',   fb_lead_id,\n    'fb_form_id',   form_id,\n    'fb_form_name', form_name,\n    'fb_page_id',   page_id,\n    'fb_platform',  platform,\n    'fb_campaign_id',   campaign_id,\n    'fb_campaign_name', raw->>'campaign_name',\n    'fb_adset_id',      adset_id,\n    'fb_adset_name',    raw->>'adset_name',\n    'fb_ad_id',         ad_id,\n    'fb_ad_name',       raw->>'ad_name',\n    'fb_raw_fields',    raw->'raw_fields'\n  )::jsonb,\n\n  raw,\n  now()\nFROM x\nON CONFLICT (form_id, fb_lead_id) DO UPDATE\nSET\n  request_created_at = EXCLUDED.request_created_at,\n  phone              = COALESCE(EXCLUDED.phone, raw.fb_leads.phone),\n  email              = COALESCE(EXCLUDED.email, raw.fb_leads.email),\n  name               = COALESCE(EXCLUDED.name,  raw.fb_leads.name),\n  platform           = COALESCE(EXCLUDED.platform, raw.fb_leads.platform),\n  form_name          = COALESCE(EXCLUDED.form_name, raw.fb_leads.form_name),\n  page_id            = COALESCE(EXCLUDED.page_id, raw.fb_leads.page_id),\n  campaign_id        = COALESCE(EXCLUDED.campaign_id, raw.fb_leads.campaign_id),\n  adset_id           = COALESCE(EXCLUDED.adset_id, raw.fb_leads.adset_id),\n  ad_id              = COALESCE(EXCLUDED.ad_id, raw.fb_leads.ad_id),\n  code               = EXCLUDED.code,\n  raw                = EXCLUDED.raw,\n  updated_at         = now();",
+        "options": {
+          "queryReplacement": "=$1 → ={{ JSON.stringify($json) }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1792,
+        880
+      ],
+      "id": "7f026345-2b25-4e27-984c-1b077a5b0c6a",
+      "name": "raw.fb_leads1",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "graphApiVersion": "v19.0",
+        "node": "act_1571785870203567",
+        "edge": "campaigns",
+        "options": {
+          "queryParameters": {
+            "parameter": [
+              {
+                "name": "fields",
+                "value": "id,name,status,effective_status,objective, buying_type,start_time,stop_time,updated_time, daily_budget,lifetime_budget"
+              },
+              {
+                "name": "limit",
+                "value": "5000"
+              },
+              {
+                "name": "date_preset",
+                "value": "last_3d"
+              },
+              {
+                "name": "time_increment",
+                "value": "1"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [
+        864,
+        -144
+      ],
+      "id": "559afd17-c520-40b1-aa86-a16335ba12a9",
+      "name": "Campaigns",
+      "alwaysOutputData": false,
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "AQPTgb7ixtrwvxTx",
+          "name": "Facebook Graph (Подрядчик Киев V2)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Map Campaigns -> rows[]\nfunction s(x){ return x==null ? null : String(x); }\nfunction ts(x){ return x ? new Date(x).toISOString() : null; }\nfunction i(x){ const n = Number(String(x).replace(/[ ,]/g,'')); return Number.isFinite(n) ? Math.trunc(n) : null; }\n\nconst roots = items.flatMap(it => Array.isArray(it.json?.data) ? it.json.data : [it.json]).filter(Boolean);\n\nreturn [{\n  json: {\n    rows: roots.map(r => ({\n      campaign_id:     s(r.id),\n      name:            s(r.name),\n      status:          s(r.status),\n      effective_status:s(r.effective_status),\n      objective:       s(r.objective),\n      buying_type:     s(r.buying_type),\n      start_time:      ts(r.start_time),\n      stop_time:       ts(r.stop_time),\n      updated_time:    ts(r.updated_time),\n      daily_budget:    i(r.daily_budget),\n      lifetime_budget: i(r.lifetime_budget)\n    })).filter(x => x.campaign_id)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1072,
+        -144
+      ],
+      "id": "f28ca9ac-3615-4174-aec0-6baa085d31b6",
+      "name": "Code2"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH src AS (\n  SELECT *\n  FROM jsonb_to_recordset($1::jsonb) AS x(\n    \"campaign_id\"       text,\n    \"name\"              text,\n    \"status\"            text,\n    \"effective_status\"  text,\n    \"objective\"         text,\n    \"buying_type\"       text,\n    \"start_time\"        text,\n    \"stop_time\"         text,\n    \"updated_time\"      text,\n    \"daily_budget\"      text,\n    \"lifetime_budget\"   text\n  )\n)\nINSERT INTO raw.fb_campaigns AS t (\n  campaign_id, name, status, effective_status, objective, buying_type,\n  start_time, stop_time, updated_time, daily_budget, lifetime_budget, load_timestamp\n)\nSELECT\n  NULLIF(\"campaign_id\",''),\n  NULLIF(\"name\",''),\n  NULLIF(\"status\",''),\n  NULLIF(\"effective_status\",''),\n  NULLIF(\"objective\",''),\n  NULLIF(\"buying_type\",''),\n  CASE WHEN NULLIF(\"start_time\",'')   IS NULL THEN NULL ELSE \"start_time\"::timestamptz   END,\n  CASE WHEN NULLIF(\"stop_time\",'')    IS NULL THEN NULL ELSE \"stop_time\"::timestamptz    END,\n  CASE WHEN NULLIF(\"updated_time\",'') IS NULL THEN NULL ELSE \"updated_time\"::timestamptz END,\n  NULLIF(\"daily_budget\",'')::bigint,\n  NULLIF(\"lifetime_budget\",'')::bigint,\n  now()\nFROM src\nWHERE NULLIF(\"campaign_id\",'') IS NOT NULL\nON CONFLICT (campaign_id) DO UPDATE\nSET name              = EXCLUDED.name,\n    status            = EXCLUDED.status,\n    effective_status  = EXCLUDED.effective_status,\n    objective         = EXCLUDED.objective,\n    buying_type       = EXCLUDED.buying_type,\n    start_time        = COALESCE(EXCLUDED.start_time, t.start_time),\n    stop_time         = COALESCE(EXCLUDED.stop_time,  t.stop_time),\n    updated_time      = GREATEST(COALESCE(EXCLUDED.updated_time, t.updated_time), t.updated_time),\n    daily_budget      = COALESCE(EXCLUDED.daily_budget, t.daily_budget),\n    lifetime_budget   = COALESCE(EXCLUDED.lifetime_budget, t.lifetime_budget),\n    load_timestamp    = now();",
+        "options": {
+          "queryReplacement": "=\t$1 = {{$json.rows}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1312,
+        -144
+      ],
+      "id": "27682a31-b012-4a6c-a696-7a092e83fda9",
+      "name": "raw.fb_campaigns",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "graphApiVersion": "v19.0",
+        "node": "act_1571785870203567",
+        "edge": "adsets",
+        "options": {
+          "queryParameters": {
+            "parameter": [
+              {
+                "name": "fields",
+                "value": "id,name,campaign_id,status,effective_status, daily_budget,lifetime_budget,bid_strategy,billing_event,optimization_goal, start_time,end_time,updated_time"
+              },
+              {
+                "name": "limit",
+                "value": "5000"
+              },
+              {
+                "name": "date_preset",
+                "value": "last_3d"
+              },
+              {
+                "name": "time_increment",
+                "value": "1"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [
+        880,
+        64
+      ],
+      "id": "d94ebf84-f1c7-48e5-a572-1d663e4ac739",
+      "name": "“AdSets”",
+      "alwaysOutputData": false,
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "AQPTgb7ixtrwvxTx",
+          "name": "Facebook Graph (Подрядчик Киев V2)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Name: Map AdSets -> rows[]\nfunction s(x){ return x == null ? null : String(x); }\nfunction ts(x){ return x ? new Date(x).toISOString() : null; }\nfunction i(x){ const n = Number(String(x).replace(/[ ,]/g,'')); return Number.isFinite(n) ? Math.trunc(n) : null; }\n\nconst roots = items.flatMap(it => Array.isArray(it.json?.data) ? it.json.data : [it.json]).filter(Boolean);\n\nreturn [{\n  json: {\n    rows: roots.map(r => ({\n      adset_id:         s(r.id),\n      name:             s(r.name),\n      campaign_id:      s(r.campaign_id),\n      status:           s(r.status),\n      effective_status: s(r.effective_status),\n      daily_budget:     i(r.daily_budget),\n      lifetime_budget:  i(r.lifetime_budget),\n      bid_strategy:     s(r.bid_strategy),\n      billing_event:    s(r.billing_event),\n      optimization_goal:s(r.optimization_goal),\n      start_time:       ts(r.start_time),\n      end_time:         ts(r.end_time),\n      updated_time:     ts(r.updated_time)\n    })).filter(x => x.adset_id)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1088,
+        64
+      ],
+      "id": "e1e230d7-c524-4ac6-b7ff-c32315730667",
+      "name": "Code5"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH src AS (\n  SELECT *\n  FROM json_to_recordset($1::json) AS x(\n    adset_id          text,\n    name              text,\n    campaign_id       text,\n    status            text,\n    effective_status  text,\n    daily_budget      text,\n    lifetime_budget   text,\n    bid_strategy      text,\n    billing_event     text,\n    optimization_goal text,\n    start_time        text,\n    end_time          text,\n    updated_time      text\n  )\n)\nINSERT INTO raw.fb_adsets AS t (\n  adset_id, name, campaign_id, status, effective_status,\n  daily_budget, lifetime_budget, bid_strategy, billing_event, optimization_goal,\n  start_time, end_time, updated_time, load_timestamp\n)\nSELECT\n  NULLIF(adset_id,''),\n  NULLIF(name,''),\n  NULLIF(campaign_id,''),\n  NULLIF(status,''),\n  NULLIF(effective_status,''),\n  NULLIF(daily_budget,'')::bigint,\n  NULLIF(lifetime_budget,'')::bigint,\n  NULLIF(bid_strategy,''),\n  NULLIF(billing_event,''),\n  NULLIF(optimization_goal,''),\n  CASE WHEN NULLIF(start_time,'')   IS NULL THEN NULL ELSE start_time::timestamptz END,\n  CASE WHEN NULLIF(end_time,'')     IS NULL THEN NULL ELSE end_time::timestamptz   END,\n  CASE WHEN NULLIF(updated_time,'') IS NULL THEN NULL ELSE updated_time::timestamptz END,\n  now()\nFROM src\nWHERE NULLIF(adset_id,'') IS NOT NULL\nON CONFLICT (adset_id) DO UPDATE\nSET name              = EXCLUDED.name,\n    campaign_id       = EXCLUDED.campaign_id,\n    status            = EXCLUDED.status,\n    effective_status  = EXCLUDED.effective_status,\n    daily_budget      = COALESCE(EXCLUDED.daily_budget, t.daily_budget),\n    lifetime_budget   = COALESCE(EXCLUDED.lifetime_budget, t.lifetime_budget),\n    bid_strategy      = COALESCE(EXCLUDED.bid_strategy, t.bid_strategy),\n    billing_event     = COALESCE(EXCLUDED.billing_event, t.billing_event),\n    optimization_goal = COALESCE(EXCLUDED.optimization_goal, t.optimization_goal),\n    start_time        = COALESCE(EXCLUDED.start_time, t.start_time),\n    end_time          = COALESCE(EXCLUDED.end_time, t.end_time),\n    updated_time      = GREATEST(COALESCE(EXCLUDED.updated_time, t.updated_time), t.updated_time),\n    load_timestamp    = now();",
+        "options": {
+          "queryReplacement": "=\t$1 = {{$json.rows}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1296,
+        64
+      ],
+      "id": "f78e8977-7f4b-45e2-8204-53e955db13e7",
+      "name": "raw.fb_adsets",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "graphApiVersion": "v19.0",
+        "node": "act_1571785870203567",
+        "edge": "ads",
+        "options": {
+          "queryParameters": {
+            "parameter": [
+              {
+                "name": "fields",
+                "value": "id,name,adset_id,campaign_id,creative{id},status,effective_status,created_time,updated_time"
+              },
+              {
+                "name": "limit",
+                "value": "5000"
+              },
+              {
+                "name": "date_preset",
+                "value": "last_3d"
+              },
+              {
+                "name": "time_increment",
+                "value": "1"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [
+        880,
+        272
+      ],
+      "id": "42041d24-6a0d-4bcc-87a3-a2f26fa30286",
+      "name": "(Ads — details)",
+      "alwaysOutputData": false,
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "AQPTgb7ixtrwvxTx",
+          "name": "Facebook Graph (Подрядчик Киев V2)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Name: Map Ads -> rows[]\nfunction s(x){ return x==null ? null : String(x); }\nfunction ts(x){ return x ? new Date(x).toISOString() : null; }\n\nconst roots = items.flatMap(it => Array.isArray(it.json?.data) ? it.json.data : [it.json]).filter(Boolean);\n\nreturn [{\n  json: {\n    rows: roots.map(r => ({\n      ad_id:           s(r.id),\n      ad_name:         s(r.name),\n      adset_id:        s(r.adset_id),\n      campaign_id:     s(r.campaign_id),\n      ad_creative_id:  s(r.creative?.id),\n      status:          s(r.status),\n      effective_status:s(r.effective_status),\n      created_time:    ts(r.created_time),\n      updated_time:    ts(r.updated_time)\n    })).filter(x => x.ad_id)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1088,
+        272
+      ],
+      "id": "f0f1086e-eaa8-4f08-8f87-e2b2ac3fc285",
+      "name": "Code6"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH src AS (\n  SELECT *\n  FROM json_to_recordset($1::json) AS x(\n    ad_id            text,\n    ad_name          text,\n    adset_id         text,\n    campaign_id      text,\n    ad_creative_id   text,\n    status           text,\n    effective_status text,\n    created_time     text,\n    updated_time     text\n  )\n)\nINSERT INTO raw.fb_ads AS t(\n  ad_id, ad_name, adset_id, campaign_id, ad_creative_id,\n  status, effective_status, created_time, updated_time, load_timestamp\n)\nSELECT\n  NULLIF(ad_id,''),\n  NULLIF(ad_name,''),\n  NULLIF(adset_id,''),\n  NULLIF(campaign_id,''),\n  NULLIF(ad_creative_id,''),\n  NULLIF(status,''),\n  NULLIF(effective_status,''),\n  CASE WHEN NULLIF(created_time,'') IS NULL THEN NULL ELSE created_time::timestamptz END,\n  CASE WHEN NULLIF(updated_time,'') IS NULL THEN NULL ELSE updated_time::timestamptz END,\n  now()\nFROM src\nWHERE NULLIF(ad_id,'') IS NOT NULL\nON CONFLICT (ad_id) DO UPDATE\nSET ad_name          = EXCLUDED.ad_name,\n    adset_id         = EXCLUDED.adset_id,\n    campaign_id      = EXCLUDED.campaign_id,\n    ad_creative_id   = COALESCE(EXCLUDED.ad_creative_id, t.ad_creative_id),\n    status           = EXCLUDED.status,\n    effective_status = EXCLUDED.effective_status,\n    created_time     = COALESCE(EXCLUDED.created_time, t.created_time),\n    updated_time     = GREATEST(COALESCE(EXCLUDED.updated_time, t.updated_time), t.updated_time),\n    load_timestamp   = now();",
+        "options": {
+          "queryReplacement": "=\t$1 = {{$json.rows}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1296,
+        272
+      ],
+      "id": "2efbeac1-cdd7-41bf-b49b-6c5b36734fac",
+      "name": "raw.fb_ads",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Собираем пары: creative_id ↔ effective_object_story_id\nconst out = [];\nfor (const it of items) {\n  const c = it.json || {};\n  const creativeId = String(c.id || '').trim();\n  const eosi = String(c.effective_object_story_id || '').trim();\n  if (!creativeId || !eosi) continue;\n  out.push({ json: { node: eosi, ad_creative_id: creativeId } });\n}\nreturn out.length ? out : [{ json: { _warning: 'no_eosi_found' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        704
+      ],
+      "id": "47b5273e-c7e5-48ca-b436-0726dcfb3e7f",
+      "name": "Make EOSI Requests"
+    },
+    {
+      "parameters": {
+        "graphApiVersion": "v19.0",
+        "node": "={{$json.node}}",
+        "options": {
+          "queryParameters": {
+            "parameter": [
+              {
+                "name": "fields",
+                "value": "message, permalink_url, created_time, attachments{   media_type,   url,   unshimmed_url,   title,   description,   media{     image{src}   },   target{id},   subattachments.limit(50){     media_type,     url,     unshimmed_url,     title,     description,     media{ image{src} },     target{id}   } }"
+              },
+              {
+                "name": "access_token",
+                "value": "={{$json.page_access_token}}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [
+        1168,
+        720
+      ],
+      "id": "2c4c5ae8-baf7-499f-b1ce-eaaf6f0ff099",
+      "name": "Post by EOSI",
+      "alwaysOutputData": false,
+      "retryOnFail": true,
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "AQPTgb7ixtrwvxTx",
+          "name": "Facebook Graph (Подрядчик Киев V2)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * ВХОД: items[] от \"Make EOSI Requests\"\n *  item.json = { node: \"<pageId>_<postId>\", ad_creative_id: \"<id>\" }\n * Нужно: приклеить page_access_token по pageId, взяв его из узла \"me/accounts\".\n */\nconst accounts = ($items('me_accounts', 0)[0]?.json?.data) || [];\nconst pageTokenById = new Map(accounts.map(p => [String(p.id), p.access_token]));\n\nconst out = [];\nfor (const it of items) {\n  const eosi = String(it.json?.node || '');\n  const pageId = eosi.split('_')[0] || '';\n  const token = pageTokenById.get(pageId) || null;\n\n  if (!eosi || !pageId || !token) continue; // без токена не идём на /{eosi}\n\n  out.push({\n    json: {\n      node: eosi,\n      ad_creative_id: it.json.ad_creative_id,\n      page_id: pageId,\n      page_access_token: token,\n    },\n  });\n}\n\nreturn out.length ? out : [{ json: { _warning: 'no_page_token_for_eosi' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        720
+      ],
+      "id": "6ac2ba9c-108b-4cc2-a22d-322f6dcdd430",
+      "name": "Code7"
+    },
+    {
+      "parameters": {
+        "graphApiVersion": "v19.0",
+        "node": "me",
+        "edge": "accounts",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [
+        48,
+        864
+      ],
+      "id": "2609192f-f37f-40ad-8878-8dbd06d37d36",
+      "name": "me_accounts",
+      "alwaysOutputData": false,
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "AQPTgb7ixtrwvxTx",
+          "name": "Facebook Graph (Подрядчик Киев V2)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "chooseBranch"
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        752,
+        720
+      ],
+      "id": "1f31cd6d-191a-4b2f-a8f3-8391b11c948e",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Name: Map Posts → rows[]\n// Склеиваем: ответ Post by EOSI (this items) + контекст из Code7 (ad_creative_id, page_id)\nfunction s(x){ return x == null ? null : String(x); }\nfunction ts(x){ return x ? new Date(x).toISOString() : null; }\n\nconst ctx = $items('Code7', 0) || []; // та же позиция, что шла в Post by EOSI\nconst out = [];\n\nfor (let i = 0; i < items.length; i++) {\n  const post = items[i]?.json || {};\n  const meta = ctx[i]?.json || {}; // node (eosi), ad_creative_id, page_id\n\n  const eosi_id = s(post.id) || s(meta.node); // \"pageId_postId\"\n  const page_id = s(meta.page_id) || (eosi_id ? eosi_id.split('_')[0] : null);\n  const post_id = eosi_id ? eosi_id.split('_')[1] || null : null;\n\n  // первый attachment (если нужен простой флеттен)\n  const att = Array.isArray(post.attachments?.data) ? post.attachments.data[0] : null;\n  const sub = Array.isArray(att?.subattachments?.data) ? att.subattachments.data : [];\n\n  // безопасные вытяжки\n  const media_image_src = s(att?.media?.image?.src) || null;\n  const media_type      = s(att?.media_type) || null;\n  const title           = s(att?.title) || null;\n  const description     = s(att?.description) || null;\n  const url             = s(att?.url) || null;\n  const unshimmed_url   = s(att?.unshimmed_url) || null;\n\n  out.push({\n    json: {\n      ad_creative_id:   s(meta.ad_creative_id),\n      eosi_id,                       // page_post\n      page_id,\n      post_id,\n      message:          s(post.message),\n      permalink_url:    s(post.permalink_url),\n      created_time:     ts(post.created_time),\n\n      // attachment summary (плоское)\n      media_type,\n      media_image_src,\n      title,\n      description,\n      url,\n      unshimmed_url,\n\n      // на будущее можно хранить всё сырьём\n      raw_attachments:  sub?.length ? sub : null\n    }\n  });\n}\n\nreturn [{ json: { rows: out.map(x => x.json) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1376,
+        720
+      ],
+      "id": "f86fe0e6-ed7a-4329-9b39-956f8e8632cc",
+      "name": "Code8"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH src AS (\n  SELECT *\n  FROM json_to_recordset($1::json) AS x(\n    ad_creative_id   text,\n    eosi_id          text,\n    page_id          text,\n    post_id          text,\n    message          text,\n    permalink_url    text,\n    created_time     text,\n    media_type       text,\n    media_image_src  text,\n    title            text,\n    description      text,\n    url              text,\n    unshimmed_url    text,\n    raw_attachments  jsonb\n  )\n)\nINSERT INTO raw.fb_creative_posts AS t (\n  ad_creative_id, eosi_id, page_id, post_id,\n  message, permalink_url, created_time,\n  media_type, media_image_src, title, description, url, unshimmed_url,\n  raw_attachments, load_timestamp\n)\nSELECT\n  NULLIF(ad_creative_id,''),\n  NULLIF(eosi_id,''),\n  NULLIF(page_id,''),\n  NULLIF(post_id,''),\n  NULLIF(message,''),\n  NULLIF(permalink_url,''),\n  CASE WHEN NULLIF(created_time,'') IS NULL THEN NULL ELSE created_time::timestamptz END,\n  NULLIF(media_type,''),\n  NULLIF(media_image_src,''),\n  NULLIF(title,''),\n  NULLIF(description,''),\n  NULLIF(url,''),\n  NULLIF(unshimmed_url,''),\n  COALESCE(raw_attachments, 'null'::jsonb),\n  now()\nFROM src\nWHERE NULLIF(ad_creative_id,'') IS NOT NULL\nON CONFLICT (ad_creative_id) DO UPDATE\nSET eosi_id         = COALESCE(EXCLUDED.eosi_id, t.eosi_id),\n    page_id         = COALESCE(EXCLUDED.page_id, t.page_id),\n    post_id         = COALESCE(EXCLUDED.post_id, t.post_id),\n    message         = COALESCE(EXCLUDED.message, t.message),\n    permalink_url   = COALESCE(EXCLUDED.permalink_url, t.permalink_url),\n    created_time    = COALESCE(EXCLUDED.created_time, t.created_time),\n    media_type      = COALESCE(EXCLUDED.media_type, t.media_type),\n    media_image_src = COALESCE(EXCLUDED.media_image_src, t.media_image_src),\n    title           = COALESCE(EXCLUDED.title, t.title),\n    description     = COALESCE(EXCLUDED.description, t.description),\n    url             = COALESCE(EXCLUDED.url, t.url),\n    unshimmed_url   = COALESCE(EXCLUDED.unshimmed_url, t.unshimmed_url),\n    raw_attachments = COALESCE(EXCLUDED.raw_attachments, t.raw_attachments),\n    load_timestamp  = now();",
+        "options": {
+          "queryReplacement": "=$1 = {{$json.rows}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1584,
+        720
+      ],
+      "id": "9ddbb02e-8bf3-499b-9a1e-2077a704146c",
+      "name": "raw.fb_creative_posts",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Берём плоские ряды из текущего items (после raw.fb_creative_posts мы отдавали rows)\nconst rows = Array.isArray(items[0]?.json?.rows) ? items[0].json.rows : [];\n\n// Оставим только то, что может дополнить creative_details\nconst upd = rows.map(r => ({\n  ad_creative_id: String(r.ad_creative_id || '').trim(),\n  permalink_url:  r.permalink_url ?? null,\n  title:          r.title ?? null,\n  description:    r.description ?? null,\n  media_image_src:r.media_image_src ?? null,\n})).filter(x => x.ad_creative_id);\n\nreturn [{ json: { rows: upd } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1584,
+        560
+      ],
+      "id": "76b31be3-2307-4a21-ae45-6120ab3f5ca6",
+      "name": "Upsert from Posts → CreativeDetails"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH input AS (\n  -- допускаем, что в $1 может прийти либо массив, либо объект с ключом rows\n  SELECT COALESCE(($1::jsonb)->'rows', $1::jsonb) AS jb\n),\nsrc AS (\n  SELECT\n    NULLIF(j->>'ad_creative_id','') AS ad_creative_id,\n    NULLIF(j->>'permalink_url','')  AS permalink_url,\n    NULLIF(j->>'title','')          AS title,\n    NULLIF(j->>'description','')    AS description,\n    NULLIF(j->>'media_image_src','')AS media_image_src\n  FROM input, LATERAL jsonb_array_elements(input.jb) AS j\n  WHERE j ? 'ad_creative_id'\n)\nINSERT INTO raw.fb_ad_creative_details AS t (\n  ad_creative_id,\n  permalink_url,\n  title,\n  body,\n  description,\n  media_image_src,\n  load_timestamp\n)\nSELECT\n  ad_creative_id,\n  permalink_url,\n  title,\n  -- body берём из description поста (если он есть)\n  description AS body,\n  description,\n  media_image_src,\n  now()\nFROM src\nON CONFLICT (ad_creative_id) DO UPDATE\nSET permalink_url   = COALESCE(t.permalink_url,   EXCLUDED.permalink_url),\n    title           = COALESCE(t.title,           EXCLUDED.title),\n    body            = COALESCE(t.body,            EXCLUDED.body),\n    description     = COALESCE(t.description,     EXCLUDED.description),\n    media_image_src = COALESCE(t.media_image_src, EXCLUDED.media_image_src),\n    load_timestamp  = now();",
+        "options": {
+          "queryReplacement": "=$1 = {{$json.rows}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1808,
+        560
+      ],
+      "id": "b18dd3ee-e0f1-4b3e-bc8a-36d9bcc1bd73",
+      "name": "raw.fb_ad_creative_details",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Insights (ad level)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insights (ad level)": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "raw.fb_ad_insights",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ads": {
+      "main": [
+        [
+          {
+            "node": "Code1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code1": {
+      "main": [
+        [
+          {
+            "node": "raw.fb_ad_map",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Make Creative ID Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.fb_ad_map": {
+      "main": [
+        []
+      ]
+    },
+    "raw.fb_ad_insights": {
+      "main": [
+        [
+          {
+            "node": "Ads",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Campaigns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Make Creative ID Batches": {
+      "main": [
+        [
+          {
+            "node": "Explode Creative IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Explode Creative IDs": {
+      "main": [
+        [
+          {
+            "node": "Creative by ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Creative by ID": {
+      "main": [
+        [
+          {
+            "node": "Prepare Bulk",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Make EOSI Requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Bulk": {
+      "main": [
+        [
+          {
+            "node": "raw.fb_ad_creative_details1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "filter & map": {
+      "main": [
+        [
+          {
+            "node": "(Page → leadgen_forms)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "(Page → leadgen_forms)": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Split Forms",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Forms": {
+      "main": [
+        [
+          {
+            "node": "(Form → leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "(Form → leads": {
+      "main": [
+        [
+          {
+            "node": "Code3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code3": {
+      "main": [
+        [
+          {
+            "node": "Code4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code4": {
+      "main": [
+        [
+          {
+            "node": "raw.fb_leads1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.fb_ad_creative_details1": {
+      "main": [
+        [
+          {
+            "node": "me_accounts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Campaigns": {
+      "main": [
+        [
+          {
+            "node": "Code2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code2": {
+      "main": [
+        [
+          {
+            "node": "raw.fb_campaigns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.fb_campaigns": {
+      "main": [
+        [
+          {
+            "node": "“AdSets”",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "“AdSets”": {
+      "main": [
+        [
+          {
+            "node": "Code5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code5": {
+      "main": [
+        [
+          {
+            "node": "raw.fb_adsets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.fb_adsets": {
+      "main": [
+        [
+          {
+            "node": "(Ads — details)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "(Ads — details)": {
+      "main": [
+        [
+          {
+            "node": "Code6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code6": {
+      "main": [
+        [
+          {
+            "node": "raw.fb_ads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Make EOSI Requests": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post by EOSI": {
+      "main": [
+        [
+          {
+            "node": "Code8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code7": {
+      "main": [
+        [
+          {
+            "node": "Post by EOSI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "me_accounts": {
+      "main": [
+        [
+          {
+            "node": "filter & map",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "Code7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code8": {
+      "main": [
+        [
+          {
+            "node": "raw.fb_creative_posts",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Upsert from Posts → CreativeDetails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.fb_creative_posts": {
+      "main": [
+        []
+      ]
+    },
+    "Upsert from Posts → CreativeDetails": {
+      "main": [
+        [
+          {
+            "node": "raw.fb_ad_creative_details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "cf634abd-5908-4d2b-8205-48959777a275",
+  "meta": {
+    "instanceId": "540ab69109515f10dd49f8acf74edf7f1313658ee3ec59f626a0c42af55aceaf"
+  },
+  "id": "EzK1X3Dmn3YC2Pnd",
+  "tags": []
+}

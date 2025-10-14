@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from . import sales, ads, marketing, overview, creatives, campaigns, dashboard, campaigns_v6, contracts
+from . import sales, ads, marketing_v6, overview, creatives, campaigns, dashboard, campaigns_v6, contracts
 
 router = APIRouter()
 
@@ -27,4 +27,4 @@ router.include_router(creatives.router, prefix="/creatives", tags=["Creative Ana
 # Platform analytics
 # Note: /ads registered first to avoid conflict with /marketing/* routes
 router.include_router(ads.router, prefix="/ads", tags=["Ads Analytics"])
-router.include_router(marketing.router, prefix="/marketing", tags=["Marketing Analytics"])
+router.include_router(marketing_v6.router, prefix="/marketing", tags=["Marketing Analytics v6"])

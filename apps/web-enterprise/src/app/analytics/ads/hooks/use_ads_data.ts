@@ -87,7 +87,8 @@ export function useAdsData(dateRange: { from?: Date; to?: Date }): UseAdsDataRes
       setData((prev) => ({ ...prev, isLoading: true }))
 
       try {
-        const res = await fetch(`/api/analytics/marketing/ads?from=${from}&to=${to}`)
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://api.planerix.com/api"
+        const res = await fetch(`${baseUrl}/analytics/ads/?date_from=${from}&date_to=${to}`)
         if (!res.ok) throw new Error("API request failed")
         const json = await res.json()
 
