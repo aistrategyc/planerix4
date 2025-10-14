@@ -25,5 +25,6 @@ router.include_router(campaigns_v6.router, prefix="/campaigns", tags=["Campaigns
 router.include_router(creatives.router, prefix="/creatives", tags=["Creative Analytics"])
 
 # Platform analytics
+# Note: /ads registered first to avoid conflict with /marketing/* routes
 router.include_router(ads.router, prefix="/ads", tags=["Ads Analytics"])
 router.include_router(marketing.router, prefix="/marketing", tags=["Marketing Analytics"])
