@@ -153,9 +153,9 @@ class CampaignsCompareResponse(BaseModel):
 # ============================================================================
 class WoWCampaignItem(BaseModel):
     """Week-over-week campaign comparison"""
-    platform: str
-    campaign_id: str
-    campaign_name: str
+    platform: Optional[str] = None
+    campaign_id: Optional[str] = None
+    campaign_name: Optional[str] = None
     leads_cur: int
     leads_prev: int
     leads_diff: int
