@@ -11,9 +11,9 @@ import * as dataAnalyticsApi from "@/lib/api/data-analytics"
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"]
 
 export default function DataAnalyticsPage() {
-  // Filters - October 2025 ITstep data (updated Oct 7)
-  const [dateFrom, setDateFrom] = useState("2025-10-01")
-  const [dateTo, setDateTo] = useState("2025-10-03")
+  // Filters - Updated Oct 14, 2025 for Contracts Attribution
+  const [dateFrom, setDateFrom] = useState("2025-09-01")
+  const [dateTo, setDateTo] = useState("2025-10-14")
   const [selectedPlatform, setSelectedPlatform] = useState<string>("")
 
   // Data states (11 working endpoints)
@@ -32,6 +32,18 @@ export default function DataAnalyticsPage() {
   // NEW: Oct 7, 2025 - Campaign Insights
   const [campaignInsights, setCampaignInsights] = useState<any[]>([])
   const [metricsTrend, setMetricsTrend] = useState<any[]>([])
+  // NEW: Oct 14, 2025 - Contracts Attribution
+  const [contractsDetail, setContractsDetail] = useState<any[]>([])
+  const [contractsByCreative, setContractsByCreative] = useState<any[]>([])
+  const [contractsByCampaign, setContractsByCampaign] = useState<any[]>([])
+  const [contractsTimeline, setContractsTimeline] = useState<any[]>([])
+  const [attributionCoverage, setAttributionCoverage] = useState<any>(null)
+  // NEW: Oct 14, 2025 - Funnel Analysis
+  const [funnelData, setFunnelData] = useState<any[]>([])
+  const [funnelAggregate, setFunnelAggregate] = useState<any[]>([])
+  // NEW: Oct 14, 2025 - Organic vs Paid & Products
+  const [organicVsPaid, setOrganicVsPaid] = useState<any[]>([])
+  const [productsPerformance, setProductsPerformance] = useState<any[]>([])
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -47,7 +59,7 @@ export default function DataAnalyticsPage() {
         limit: 50,
       }
 
-      // Use Promise.allSettled for independent failures (13 endpoints)
+      // Use Promise.allSettled for independent failures (22 endpoints)
       const results = await Promise.allSettled([
         dataAnalyticsApi.getKPICards(filters),
         dataAnalyticsApi.getLeadsTrend(filters),
@@ -64,6 +76,18 @@ export default function DataAnalyticsPage() {
         // NEW: Oct 7, 2025
         dataAnalyticsApi.getCampaignInsights(dateFrom, dateTo, 5),
         dataAnalyticsApi.getMetricsTrend(dateFrom, dateTo),
+        // NEW: Oct 14, 2025 - Contracts Attribution
+        dataAnalyticsApi.getContractsDetail(dateFrom, dateTo, undefined, 50),
+        dataAnalyticsApi.getContractsByCreative(dateFrom, dateTo, 20),
+        dataAnalyticsApi.getContractsByCampaign(dateFrom, dateTo, undefined, 20),
+        dataAnalyticsApi.getContractsTimeline(dateFrom, dateTo),
+        dataAnalyticsApi.getAttributionCoverage(dateFrom, dateTo),
+        // NEW: Oct 14, 2025 - Funnel Analysis
+        dataAnalyticsApi.getFunnelAnalysis(dateFrom, dateTo, selectedPlatform || undefined),
+        dataAnalyticsApi.getFunnelAggregate(dateFrom, dateTo),
+        // NEW: Oct 14, 2025 - Organic vs Paid & Products
+        dataAnalyticsApi.getOrganicVsPaid(dateFrom, dateTo),
+        dataAnalyticsApi.getProductsPerformance(dateFrom, dateTo, 20),
       ])
 
       // Set data for successful requests
@@ -82,6 +106,18 @@ export default function DataAnalyticsPage() {
       // NEW: Oct 7
       if (results[11].status === "fulfilled") setCampaignInsights(results[11].value)
       if (results[12].status === "fulfilled") setMetricsTrend(results[12].value)
+      // NEW: Oct 14 - Contracts Attribution
+      if (results[13].status === "fulfilled") setContractsDetail(results[13].value)
+      if (results[14].status === "fulfilled") setContractsByCreative(results[14].value)
+      if (results[15].status === "fulfilled") setContractsByCampaign(results[15].value)
+      if (results[16].status === "fulfilled") setContractsTimeline(results[16].value)
+      if (results[17].status === "fulfilled") setAttributionCoverage(results[17].value)
+      // NEW: Oct 14 - Funnel Analysis
+      if (results[18].status === "fulfilled") setFunnelData(results[18].value)
+      if (results[19].status === "fulfilled") setFunnelAggregate(results[19].value)
+      // NEW: Oct 14 - Organic vs Paid & Products
+      if (results[20].status === "fulfilled") setOrganicVsPaid(results[20].value)
+      if (results[21].status === "fulfilled") setProductsPerformance(results[21].value)
 
       // Log failures
       const failed = results.filter((r) => r.status === "rejected")
@@ -968,6 +1004,630 @@ export default function DataAnalyticsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* 🆕 ORGANIC VS PAID TRAFFIC (NEW: Oct 14, 2025) */}
+      {organicVsPaid.length > 0 && (
+        <Card className="col-span-full">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-green-600" />
+              Organic vs Paid Traffic with Contracts
+            </CardTitle>
+            <p className="text-sm text-gray-500 mt-1">
+              Traffic source analysis: paid advertising vs organic channels with contract conversion
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-gray-50">
+                    <th className="text-left p-2">Traffic Type</th>
+                    <th className="text-left p-2">Platform</th>
+                    <th className="text-right p-2">Leads</th>
+                    <th className="text-right p-2">Contracts</th>
+                    <th className="text-right p-2">Revenue</th>
+                    <th className="text-right p-2">CVR %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {organicVsPaid.map((item: any, idx: number) => (
+                    <tr key={idx} className="border-b hover:bg-gray-50">
+                      <td className="p-2">
+                        <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                          item.traffic_type === 'Paid' ? 'bg-blue-100 text-blue-700' :
+                          item.traffic_type === 'Organic' ? 'bg-green-100 text-green-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {item.traffic_type}
+                        </span>
+                      </td>
+                      <td className="p-2 capitalize font-medium">{item.platform}</td>
+                      <td className="text-right p-2">{item.leads.toLocaleString()}</td>
+                      <td className="text-right p-2 font-bold text-green-600">{item.contracts}</td>
+                      <td className="text-right p-2">₴{(item.revenue / 1000).toFixed(0)}k</td>
+                      <td className="text-right p-2 font-semibold text-purple-600">{item.cvr.toFixed(1)}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+              {['Paid', 'Organic', 'Unknown'].map((type) => {
+                const typeData = organicVsPaid.filter((i: any) => i.traffic_type === type)
+                const totalLeads = typeData.reduce((sum: number, i: any) => sum + i.leads, 0)
+                const totalContracts = typeData.reduce((sum: number, i: any) => sum + i.contracts, 0)
+                const totalRevenue = typeData.reduce((sum: number, i: any) => sum + i.revenue, 0)
+                const avgCvr = totalLeads > 0 ? (totalContracts / totalLeads) * 100 : 0
+
+                return (
+                  <div key={type} className={`border-2 rounded-lg p-4 ${
+                    type === 'Paid' ? 'bg-blue-50 border-blue-300' :
+                    type === 'Organic' ? 'bg-green-50 border-green-300' :
+                    'bg-gray-50 border-gray-300'
+                  }`}>
+                    <div className="text-sm font-semibold mb-2 uppercase">{type}</div>
+                    <div className="space-y-1 text-xs">
+                      <div className="flex justify-between">
+                        <span>Leads:</span>
+                        <span className="font-bold">{totalLeads.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Contracts:</span>
+                        <span className="font-bold text-green-600">{totalContracts}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Revenue:</span>
+                        <span className="font-bold text-blue-600">₴{(totalRevenue / 1000).toFixed(0)}k</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>CVR:</span>
+                        <span className="font-bold text-purple-600">{avgCvr.toFixed(1)}%</span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 🆕 PRODUCTS PERFORMANCE (NEW: Oct 14, 2025) */}
+      {productsPerformance.length > 0 && (
+        <Card className="col-span-full">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-orange-600" />
+              Products Performance
+            </CardTitle>
+            <p className="text-sm text-gray-500 mt-1">
+              Revenue and contract statistics by product/service
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-gray-50">
+                    <th className="text-left p-2">Product / Service Name</th>
+                    <th className="text-right p-2">Contracts</th>
+                    <th className="text-right p-2">Total Revenue</th>
+                    <th className="text-right p-2">Avg Contract Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {productsPerformance.map((product: any, idx: number) => (
+                    <tr key={idx} className="border-b hover:bg-orange-50/30">
+                      <td className="p-2 font-medium max-w-md truncate" title={product.product_name}>
+                        {product.product_name}
+                      </td>
+                      <td className="text-right p-2 font-bold text-green-600">{product.contracts}</td>
+                      <td className="text-right p-2 font-bold text-blue-600">
+                        ₴{(product.revenue / 1000).toFixed(0)}k
+                      </td>
+                      <td className="text-right p-2">
+                        ₴{(product.avg_value / 1000).toFixed(1)}k
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {/* Top 5 Products Summary */}
+            <div className="mt-6 p-4 bg-orange-50 rounded-lg border border-orange-200">
+              <div className="text-sm font-semibold mb-2">Top 5 Products Summary</div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <div className="text-xs text-gray-600">Total Contracts (Top 5)</div>
+                  <div className="text-2xl font-bold text-green-600">
+                    {productsPerformance.slice(0, 5).reduce((sum, p) => sum + p.contracts, 0)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-600">Total Revenue (Top 5)</div>
+                  <div className="text-2xl font-bold text-blue-600">
+                    ₴{(productsPerformance.slice(0, 5).reduce((sum, p) => sum + p.revenue, 0) / 1000).toFixed(0)}k
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-600">Avg Contract Value</div>
+                  <div className="text-2xl font-bold text-orange-600">
+                    ₴{(productsPerformance.slice(0, 5).reduce((sum, p) => sum + p.revenue, 0) /
+                       productsPerformance.slice(0, 5).reduce((sum, p) => sum + p.contracts, 0) / 1000).toFixed(1)}k
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 🆕 FUNNEL ANALYSIS DASHBOARD (NEW: Oct 14, 2025) */}
+      {(funnelAggregate.length > 0 || funnelData.length > 0) && (
+        <>
+          <div className="col-span-full pt-8 border-t-4 border-purple-200">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Marketing Funnel Analysis</h2>
+            <p className="text-gray-600">Track the full conversion journey: Impressions → Clicks → Leads → Contracts</p>
+          </div>
+
+          {/* Funnel Aggregate by Platform */}
+          {funnelAggregate.length > 0 && (
+            <Card className="col-span-full">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="h-5 w-5 text-purple-600" />
+                  Funnel Performance by Platform
+                </CardTitle>
+                <p className="text-sm text-gray-500 mt-1">
+                  Conversion rates at each stage of the marketing funnel
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  {/* Platform Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {funnelAggregate.map((platform: any, idx: number) => (
+                      <div key={idx} className={`border-2 rounded-lg p-6 ${
+                        platform.platform === "meta" ? "bg-blue-50 border-blue-300" :
+                        platform.platform === "google" ? "bg-orange-50 border-orange-300" :
+                        "bg-gray-50 border-gray-300"
+                      }`}>
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-bold capitalize">{platform.platform}</h3>
+                          <div className="text-2xl font-bold text-green-600">{platform.contracts}</div>
+                        </div>
+
+                        {/* Funnel Stages */}
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-gray-600">Impressions</span>
+                            <span className="font-semibold">{platform.impressions.toLocaleString()}</span>
+                          </div>
+                          <div className="border-t pt-2">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-sm text-gray-600">Clicks</span>
+                              <span className="font-semibold">{platform.clicks.toLocaleString()}</span>
+                            </div>
+                            <div className="text-xs text-blue-600 text-right">
+                              CTR: {platform.ctr.toFixed(2)}%
+                            </div>
+                          </div>
+                          <div className="border-t pt-2">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-sm text-gray-600">Leads</span>
+                              <span className="font-semibold">{platform.leads}</span>
+                            </div>
+                            <div className="text-xs text-green-600 text-right">
+                              CVR: {platform.cvr.toFixed(2)}%
+                            </div>
+                          </div>
+                          <div className="border-t pt-2">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-sm text-gray-600">Contracts</span>
+                              <span className="font-bold text-lg text-green-700">{platform.contracts}</span>
+                            </div>
+                            <div className="text-xs text-purple-600 text-right">
+                              Contract Rate: {platform.contract_rate.toFixed(2)}%
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Overall Conversion */}
+                        <div className="mt-4 pt-4 border-t-2 border-dashed">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs uppercase font-semibold text-gray-500">End-to-End</span>
+                            <span className="text-lg font-bold text-purple-700">
+                              {((platform.contracts / platform.impressions) * 100).toFixed(4)}%
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-500 text-right">
+                            {platform.impressions.toLocaleString()} impressions → {platform.contracts} contracts
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Funnel Visualization - Bar Chart */}
+                  <div className="mt-6">
+                    <h4 className="text-sm font-semibold mb-3">Funnel Stages Comparison</h4>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={funnelAggregate.map((p: any) => ({
+                        platform: p.platform,
+                        impressions: Math.log10(p.impressions + 1),
+                        clicks: Math.log10(p.clicks + 1),
+                        leads: Math.log10(p.leads + 1),
+                        contracts: Math.log10(p.contracts + 1)
+                      }))}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="platform" />
+                        <YAxis label={{ value: "Log Scale", angle: -90, position: "insideLeft" }} />
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              const platform = funnelAggregate.find((p: any) => p.platform === payload[0].payload.platform)
+                              if (!platform) return null
+                              return (
+                                <div className="bg-white p-3 border rounded shadow-lg">
+                                  <p className="font-semibold capitalize">{platform.platform}</p>
+                                  <p className="text-sm">Impressions: {platform.impressions.toLocaleString()}</p>
+                                  <p className="text-sm">Clicks: {platform.clicks.toLocaleString()} ({platform.ctr.toFixed(2)}%)</p>
+                                  <p className="text-sm">Leads: {platform.leads} ({platform.cvr.toFixed(2)}%)</p>
+                                  <p className="text-sm">Contracts: {platform.contracts} ({platform.contract_rate.toFixed(2)}%)</p>
+                                </div>
+                              )
+                            }
+                            return null
+                          }}
+                        />
+                        <Legend />
+                        <Bar dataKey="impressions" name="Impressions" fill="#cbd5e1" />
+                        <Bar dataKey="clicks" name="Clicks" fill="#3b82f6" />
+                        <Bar dataKey="leads" name="Leads" fill="#10b981" />
+                        <Bar dataKey="contracts" name="Contracts" fill="#8b5cf6" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                    <p className="text-xs text-gray-500 mt-2 text-center">
+                      Note: Values shown on logarithmic scale for visualization (log10)
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Daily Funnel Trend */}
+          {funnelData.length > 0 && (
+            <Card className="col-span-full">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-purple-600" />
+                  Daily Funnel Metrics Trend
+                </CardTitle>
+                <p className="text-sm text-gray-500 mt-1">
+                  Track conversion rates over time by platform
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  {/* CTR Trend */}
+                  <div>
+                    <h4 className="text-sm font-semibold mb-3">Click-Through Rate (CTR) by Date</h4>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <LineChart data={funnelData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                        <YAxis label={{ value: "CTR (%)", angle: -90, position: "insideLeft" }} />
+                        <Tooltip />
+                        <Legend />
+                        <Line type="monotone" dataKey="ctr" name="CTR %" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* CVR Trend */}
+                  <div>
+                    <h4 className="text-sm font-semibold mb-3">Conversion Rate (CVR) by Date</h4>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <LineChart data={funnelData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                        <YAxis label={{ value: "CVR (%)", angle: -90, position: "insideLeft" }} />
+                        <Tooltip />
+                        <Legend />
+                        <Line type="monotone" dataKey="cvr" name="CVR %" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Contract Rate Trend */}
+                  <div>
+                    <h4 className="text-sm font-semibold mb-3">Contract Rate by Date</h4>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <LineChart data={funnelData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                        <YAxis label={{ value: "Contract Rate (%)", angle: -90, position: "insideLeft" }} />
+                        <Tooltip />
+                        <Legend />
+                        <Line type="monotone" dataKey="contract_rate" name="Contract Rate %" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+
+      {/* 🆕 CONTRACTS ATTRIBUTION DASHBOARD (NEW: Oct 14, 2025) */}
+      {(attributionCoverage || contractsTimeline.length > 0 || contractsByCreative.length > 0 || contractsByCampaign.length > 0) && (
+        <>
+          <div className="col-span-full pt-8 border-t-4 border-blue-200">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Contracts Attribution Dashboard</h2>
+            <p className="text-gray-600">Detailed contract attribution to campaigns, ads, and creatives</p>
+          </div>
+
+          {/* Attribution Coverage Stats */}
+          {attributionCoverage && (
+            <Card className="col-span-full">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-blue-600" />
+                  Attribution Coverage Overview
+                </CardTitle>
+                <p className="text-sm text-gray-500 mt-1">
+                  Percentage of contracts and leads with complete attribution data
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {/* Totals */}
+                  <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-6 border-2 border-blue-200">
+                    <div className="text-sm text-blue-700 font-semibold mb-2">TOTAL VOLUME</div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-700">Leads:</span>
+                        <span className="text-2xl font-bold text-blue-900">{attributionCoverage.totals.leads.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-700">Contracts:</span>
+                        <span className="text-2xl font-bold text-green-700">{attributionCoverage.totals.contracts.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Leads Coverage */}
+                  <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-6 border-2 border-green-200">
+                    <div className="text-sm text-green-700 font-semibold mb-2">LEADS ATTRIBUTION</div>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span>With Platform:</span>
+                        <span className="font-bold">{attributionCoverage.leads_coverage.with_platform_pct.toFixed(1)}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>With UTM:</span>
+                        <span className="font-bold">{attributionCoverage.leads_coverage.with_utm_pct.toFixed(1)}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Meta Campaign:</span>
+                        <span className="font-bold text-blue-700">{attributionCoverage.leads_coverage.with_meta_campaign_pct.toFixed(1)}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Meta Creative:</span>
+                        <span className="font-bold text-blue-700">{attributionCoverage.leads_coverage.with_meta_creative_pct.toFixed(1)}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Google Campaign:</span>
+                        <span className="font-bold text-orange-700">{attributionCoverage.leads_coverage.with_google_campaign_pct.toFixed(1)}%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Contracts Coverage */}
+                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-6 border-2 border-purple-200">
+                    <div className="text-sm text-purple-700 font-semibold mb-2">CONTRACTS ATTRIBUTION</div>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span>With Creative:</span>
+                        <span className="font-bold text-blue-700">{attributionCoverage.contracts_coverage.with_creative_pct.toFixed(1)}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Meta Campaign:</span>
+                        <span className="font-bold text-blue-700">{attributionCoverage.contracts_coverage.with_meta_campaign_pct.toFixed(1)}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Google Campaign:</span>
+                        <span className="font-bold text-orange-700">{attributionCoverage.contracts_coverage.with_google_campaign_pct.toFixed(1)}%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Coverage Warning */}
+                  <div className={`rounded-lg p-6 border-2 ${
+                    attributionCoverage.contracts_coverage.with_creative_pct < 20
+                      ? "bg-gradient-to-br from-red-50 to-red-100 border-red-300"
+                      : attributionCoverage.contracts_coverage.with_creative_pct < 50
+                      ? "bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-300"
+                      : "bg-gradient-to-br from-green-50 to-green-100 border-green-300"
+                  }`}>
+                    <div className={`text-sm font-semibold mb-2 ${
+                      attributionCoverage.contracts_coverage.with_creative_pct < 20 ? "text-red-700" :
+                      attributionCoverage.contracts_coverage.with_creative_pct < 50 ? "text-yellow-700" : "text-green-700"
+                    }`}>
+                      ATTRIBUTION HEALTH
+                    </div>
+                    <div className="text-3xl font-bold mb-2">
+                      {attributionCoverage.contracts_coverage.with_creative_pct < 20 ? "⚠️ LOW" :
+                       attributionCoverage.contracts_coverage.with_creative_pct < 50 ? "⚡ MEDIUM" : "✅ GOOD"}
+                    </div>
+                    <p className="text-xs">
+                      {attributionCoverage.contracts_coverage.with_creative_pct < 20
+                        ? "Only " + attributionCoverage.contracts_coverage.with_creative_pct.toFixed(0) + "% of contracts have creative attribution"
+                        : attributionCoverage.contracts_coverage.with_creative_pct < 50
+                        ? attributionCoverage.contracts_coverage.with_creative_pct.toFixed(0) + "% attribution - consider improving tracking"
+                        : "Great! " + attributionCoverage.contracts_coverage.with_creative_pct.toFixed(0) + "% contracts tracked to creatives"}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Contracts Timeline */}
+          {contractsTimeline.length > 0 && (
+            <Card className="col-span-full">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-green-600" />
+                  Daily Contracts & Revenue Timeline
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={350}>
+                  <LineChart data={contractsTimeline}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                    <YAxis yAxisId="left" tick={{ fontSize: 12 }} />
+                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12 }} />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload
+                          return (
+                            <div className="bg-white p-3 border rounded shadow-lg">
+                              <p className="font-semibold">{data.date}</p>
+                              <p className="text-sm">Contracts: {data.contracts_count}</p>
+                              <p className="text-sm">Revenue: ₴{(data.daily_revenue / 1000).toFixed(1)}k</p>
+                              <p className="text-sm text-gray-500">Avg: ₴{(data.avg_contract_value / 1000).toFixed(1)}k</p>
+                              <p className="text-xs text-blue-600">Meta: {data.meta_contracts}</p>
+                              <p className="text-xs text-orange-600">Google: {data.google_contracts}</p>
+                              <p className="text-xs text-gray-600">Direct: {data.direct_contracts}</p>
+                            </div>
+                          )
+                        }
+                        return null
+                      }}
+                    />
+                    <Legend />
+                    <Line yAxisId="left" type="monotone" dataKey="contracts_count" name="Contracts" stroke="#10b981" strokeWidth={3} dot={{ r: 5 }} />
+                    <Line yAxisId="right" type="monotone" dataKey="daily_revenue" name="Revenue (₴)" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Contracts by Creative */}
+          {contractsByCreative.length > 0 && (
+            <Card className="col-span-full">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="h-5 w-5 text-purple-600" />
+                  Top Revenue-Generating Creatives (Meta)
+                </CardTitle>
+                <p className="text-sm text-gray-500 mt-1">
+                  Which specific ad creatives generated the most contracts
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-gray-50">
+                        <th className="text-left p-2">Creative ID</th>
+                        <th className="text-left p-2">Ad Name</th>
+                        <th className="text-left p-2">Campaign</th>
+                        <th className="text-right p-2">Contracts</th>
+                        <th className="text-right p-2">Revenue</th>
+                        <th className="text-right p-2">Avg Value</th>
+                        <th className="text-right p-2">Leads</th>
+                        <th className="text-right p-2">CVR</th>
+                        <th className="text-right p-2">Period</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {contractsByCreative.map((creative: any, idx: number) => (
+                        <tr key={idx} className="border-b hover:bg-blue-50/30">
+                          <td className="p-2 font-mono text-xs text-gray-600">{creative.creative_id}</td>
+                          <td className="p-2 max-w-xs truncate font-medium">{creative.ad_name}</td>
+                          <td className="p-2 max-w-xs truncate text-gray-600">{creative.campaign_name}</td>
+                          <td className="text-right p-2 font-bold text-green-700">{creative.contracts_count}</td>
+                          <td className="text-right p-2 font-bold text-blue-700">₴{(creative.total_revenue / 1000).toFixed(0)}k</td>
+                          <td className="text-right p-2">₴{(creative.avg_contract_value / 1000).toFixed(1)}k</td>
+                          <td className="text-right p-2">{creative.total_leads}</td>
+                          <td className="text-right p-2 font-semibold text-purple-600">{creative.cvr}%</td>
+                          <td className="text-right p-2 text-xs text-gray-500">{creative.first_contract_date}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Contracts by Campaign */}
+          {contractsByCampaign.length > 0 && (
+            <Card className="col-span-full">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-blue-600" />
+                  Contracts Attribution by Campaign
+                </CardTitle>
+                <p className="text-sm text-gray-500 mt-1">
+                  Which campaigns generated the most contract revenue
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-gray-50">
+                        <th className="text-left p-2">Platform</th>
+                        <th className="text-left p-2">Campaign Name</th>
+                        <th className="text-right p-2">Contracts</th>
+                        <th className="text-right p-2">Revenue</th>
+                        <th className="text-right p-2">Avg Value</th>
+                        <th className="text-right p-2">Leads</th>
+                        <th className="text-right p-2">CVR</th>
+                        <th className="text-right p-2">First</th>
+                        <th className="text-right p-2">Last</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {contractsByCampaign.map((campaign: any, idx: number) => (
+                        <tr key={idx} className="border-b hover:bg-green-50/30">
+                          <td className="p-2 capitalize">
+                            <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                              campaign.platform === "meta" ? "bg-blue-100 text-blue-700" :
+                              campaign.platform === "google" ? "bg-orange-100 text-orange-700" :
+                              "bg-gray-100 text-gray-700"
+                            }`}>
+                              {campaign.platform}
+                            </span>
+                          </td>
+                          <td className="p-2 max-w-xs truncate font-medium">{campaign.campaign_name}</td>
+                          <td className="text-right p-2 font-bold text-green-700">{campaign.contracts_count}</td>
+                          <td className="text-right p-2 font-bold text-blue-700">₴{(campaign.total_revenue / 1000).toFixed(0)}k</td>
+                          <td className="text-right p-2">₴{(campaign.avg_contract_value / 1000).toFixed(1)}k</td>
+                          <td className="text-right p-2">{campaign.total_leads}</td>
+                          <td className="text-right p-2 font-semibold text-purple-600">{campaign.cvr}%</td>
+                          <td className="text-right p-2 text-xs text-gray-500">{campaign.first_contract_date}</td>
+                          <td className="text-right p-2 text-xs text-gray-500">{campaign.last_contract_date}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
     </div>
   )
 }

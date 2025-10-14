@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from . import sales, ads, marketing, overview, creatives, campaigns, dashboard
+from . import sales, ads, marketing, overview, creatives, campaigns, dashboard, campaigns_v6, contracts
 
 router = APIRouter()
 
@@ -9,11 +9,17 @@ router.include_router(overview.router, prefix="/overview", tags=["Dashboard Over
 # Analytics dashboard - direct endpoints without prefix for /api/analytics/dashboard
 router.include_router(dashboard.router, tags=["Analytics Dashboard"])
 
-# Sales analytics
+# Contracts attribution analytics (v6 endpoints)
+router.include_router(contracts.router, prefix="/contracts", tags=["Contracts Attribution"])
+
+# Sales analytics (v5/v6 endpoints)
 router.include_router(sales.router, prefix="/sales", tags=["Sales Analytics"])
 
-# Campaign analytics
+# Campaign analytics (legacy)
 router.include_router(campaigns.router, prefix="/campaigns", tags=["Campaign Analytics"])
+
+# Campaign analytics v6 (new v5/v7 endpoints)
+router.include_router(campaigns_v6.router, prefix="/campaigns", tags=["Campaigns Analytics v6"])
 
 # Creative analytics
 router.include_router(creatives.router, prefix="/creatives", tags=["Creative Analytics"])

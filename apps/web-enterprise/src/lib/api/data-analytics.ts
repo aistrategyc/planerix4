@@ -453,3 +453,234 @@ export const getMetricsTrend = async (
   })
   return response.data.data || []
 }
+
+// ============================================
+// ✅ CONTRACTS ATTRIBUTION (Oct 14, 2025)
+// ============================================
+
+export interface ContractDetailItem {
+  sk_contract: string
+  sk_lead: string
+  request_created_at: string
+  contract_created_at: string
+  product_name: string | null
+  contract_amount: number
+  platform: string | null
+  // Meta attribution
+  meta_campaign_name: string | null
+  meta_adset_name: string | null
+  meta_ad_name: string | null
+  meta_creative_id: string | null
+  // Google attribution
+  google_campaign_name: string | null
+  google_ad_group_name: string | null
+  google_keyword: string | null
+  google_gclid: string | null
+  // Attribution flags
+  has_full_attribution: boolean
+  has_partial_attribution: boolean
+  attribution_source: string | null
+}
+
+export interface ContractByCreativeItem {
+  platform: string
+  meta_creative_id: string
+  meta_ad_name: string | null
+  contracts: number
+  revenue: number
+  avg_contract_value: number
+  leads: number
+  conversion_rate: number
+}
+
+export interface ContractByCampaignItem {
+  platform: string
+  campaign_id: string | null
+  campaign_name: string | null
+  contracts: number
+  revenue: number
+  avg_contract_value: number
+  leads: number
+  conversion_rate: number
+  spend: number
+  roas: number | null
+}
+
+export interface ContractTimelineItem {
+  dt: string
+  contracts: number
+  revenue: number
+  avg_contract_value: number
+}
+
+export interface AttributionCoverageStats {
+  total_contracts: number
+  contracts_with_full_attribution: number
+  contracts_with_partial_attribution: number
+  contracts_no_attribution: number
+  full_attribution_pct: number
+  partial_attribution_pct: number
+  no_attribution_pct: number
+  total_leads: number
+  leads_with_attribution: number
+  leads_attribution_pct: number
+  platforms: Array<{
+    platform: string
+    contracts: number
+    full_attribution_pct: number
+  }>
+}
+
+// 15. Contracts Detail (NEW - v6/contracts/detail)
+export const getContractsDetail = async (
+  date_from: string,
+  date_to: string,
+  platform?: string,
+  limit: number = 100
+): Promise<ContractDetailItem[]> => {
+  const response = await apiClient.get("/data-analytics/v6/contracts/detail", {
+    params: { date_from, date_to, platform, limit },
+  })
+  return response.data || []
+}
+
+// 16. Contracts by Creative (NEW - v6/contracts/by-creative)
+export const getContractsByCreative = async (
+  date_from: string,
+  date_to: string,
+  limit: number = 50
+): Promise<ContractByCreativeItem[]> => {
+  const response = await apiClient.get("/data-analytics/v6/contracts/by-creative", {
+    params: { date_from, date_to, limit },
+  })
+  return response.data || []
+}
+
+// 17. Contracts by Campaign (NEW - v6/contracts/by-campaign)
+export const getContractsByCampaign = async (
+  date_from: string,
+  date_to: string,
+  platform?: string,
+  limit: number = 50
+): Promise<ContractByCampaignItem[]> => {
+  const response = await apiClient.get("/data-analytics/v6/contracts/by-campaign", {
+    params: { date_from, date_to, platform, limit },
+  })
+  return response.data || []
+}
+
+// 18. Contracts Timeline (NEW - v6/contracts/timeline)
+export const getContractsTimeline = async (
+  date_from: string,
+  date_to: string,
+  platform?: string
+): Promise<ContractTimelineItem[]> => {
+  const response = await apiClient.get("/data-analytics/v6/contracts/timeline", {
+    params: { date_from, date_to, platform },
+  })
+  return response.data || []
+}
+
+// 19. Attribution Coverage Stats (NEW - contracts/v6/attribution/coverage)
+export const getAttributionCoverage = async (
+  date_from: string,
+  date_to: string
+): Promise<AttributionCoverageStats> => {
+  const response = await apiClient.get("/data-analytics/contracts/v6/attribution/coverage", {
+    params: { date_from, date_to },
+  })
+  return response.data
+}
+
+// ============================================
+// ✅ FUNNEL ANALYSIS (Oct 14, 2025)
+// ============================================
+
+export interface FunnelAnalysisItem {
+  date: string
+  platform: string
+  impressions: number
+  clicks: number
+  leads: number
+  contracts: number
+  ctr: number
+  cvr: number
+  contract_rate: number
+}
+
+export interface FunnelAggregateItem {
+  platform: string
+  impressions: number
+  clicks: number
+  leads: number
+  contracts: number
+  ctr: number
+  cvr: number
+  contract_rate: number
+}
+
+// 20. Funnel Analysis Daily (NEW - sales/v6/funnel)
+export const getFunnelAnalysis = async (
+  date_from: string,
+  date_to: string,
+  platform?: string
+): Promise<FunnelAnalysisItem[]> => {
+  const response = await apiClient.get("/data-analytics/sales/v6/funnel", {
+    params: { date_from, date_to, platform },
+  })
+  return response.data || []
+}
+
+// 21. Funnel Aggregate by Platform (NEW - sales/v6/funnel/aggregate)
+export const getFunnelAggregate = async (
+  date_from: string,
+  date_to: string
+): Promise<FunnelAggregateItem[]> => {
+  const response = await apiClient.get("/data-analytics/sales/v6/funnel/aggregate", {
+    params: { date_from, date_to },
+  })
+  return response.data || []
+}
+
+// ============================================
+// ✅ ORGANIC VS PAID & PRODUCTS (Oct 14, 2025)
+// ============================================
+
+export interface OrganicVsPaidItem {
+  traffic_type: string
+  platform: string
+  leads: number
+  contracts: number
+  revenue: number
+  cvr: number
+}
+
+export interface ProductPerformanceItem {
+  product_name: string
+  contracts: number
+  revenue: number
+  avg_value: number
+}
+
+// 22. Organic vs Paid Traffic (NEW - sales/v6/traffic/organic-vs-paid)
+export const getOrganicVsPaid = async (
+  date_from: string,
+  date_to: string
+): Promise<OrganicVsPaidItem[]> => {
+  const response = await apiClient.get("/data-analytics/sales/v6/traffic/organic-vs-paid", {
+    params: { date_from, date_to },
+  })
+  return response.data || []
+}
+
+// 23. Products Performance (NEW - sales/v6/products/performance)
+export const getProductsPerformance = async (
+  date_from: string,
+  date_to: string,
+  limit: number = 20
+): Promise<ProductPerformanceItem[]> => {
+  const response = await apiClient.get("/data-analytics/sales/v6/products/performance", {
+    params: { date_from, date_to, limit },
+  })
+  return response.data || []
+}
