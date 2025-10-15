@@ -27,8 +27,8 @@ import { DateRangeFilter } from "@/components/analytics/DateRangeFilter"
 import { useDynamicDateRange } from "@/hooks/useDynamicDateRange"
 
 // Import analytics hooks
-import {
 import ProtectedRoute from "@/components/auth/ProtectedRoute"
+import {
   useDashboardOverview,
   useRealTimeMetrics,
   useKPIs,

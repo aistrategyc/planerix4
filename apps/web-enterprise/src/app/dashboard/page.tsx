@@ -6,13 +6,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { 
 import ProtectedRoute from "@/components/auth/ProtectedRoute"
-  BarChart3, 
-  Target, 
-  Users, 
-  Brain, 
-  ArrowRight, 
+import {
+  BarChart3,
+  Target,
+  Users,
+  Brain,
+  ArrowRight,
   TrendingUp,
   TrendingDown,
   Calendar,
