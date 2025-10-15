@@ -86,6 +86,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setAccessToken(data.access_token);
         if (typeof window !== 'undefined') {
           localStorage.setItem('access_token', data.access_token);
+          // Also set cookie for server-side middleware
+          document.cookie = `access_token=${data.access_token}; path=/; max-age=${15 * 60}; samesite=strict`;
         }
 
         // Immediately fetch user data after successful login
@@ -238,6 +240,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Clear state regardless of server response
       setAccessToken(null);
       setUser(null);
+      // Clear cookie
+      if (typeof window !== 'undefined') {
+        document.cookie = 'access_token=; path=/; max-age=0';
+        localStorage.removeItem('access_token');
+      }
     }
   }, []);
 
