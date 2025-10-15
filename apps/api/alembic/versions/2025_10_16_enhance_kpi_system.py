@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = '2025_10_16_enhance_kpi'
-down_revision = '2025_10_15_1510_create_calendar_tables'
+down_revision = '2025_10_15_1510'  # Latest from calendar branch (fixed revision ID)
 branch_labels = None
 depends_on = None
 

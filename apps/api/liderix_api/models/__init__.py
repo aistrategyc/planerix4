@@ -48,3 +48,5 @@ from .tasks import (
 
 from .uploads import Upload
 from .users import User
+from .event_links import EventLink, LinkType
+from .calendar import CalendarEvent, EventAttendee
