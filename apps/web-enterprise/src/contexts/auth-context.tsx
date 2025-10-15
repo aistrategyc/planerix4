@@ -81,11 +81,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return; // Don't throw, just return
       }
 
-      // Success - store token
+      // Success - store token and fetch user data
       if (data.access_token) {
         setAccessToken(data.access_token);
         if (typeof window !== 'undefined') {
           localStorage.setItem('access_token', data.access_token);
+        }
+
+        // Immediately fetch user data after successful login
+        try {
+          const userResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/me`, {
+            headers: {
+              'Authorization': `Bearer ${data.access_token}`,
+              'Content-Type': 'application/json'
+            },
+            credentials: 'include',
+          });
+
+          if (userResponse.ok) {
+            const userData = await userResponse.json();
+            setUser(userData);
+          }
+        } catch (userError) {
+          console.error('Failed to fetch user after login:', userError);
         }
       }
 
