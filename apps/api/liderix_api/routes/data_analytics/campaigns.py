@@ -11,6 +11,8 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
+from liderix_api.services.auth import get_current_user
+from liderix_api.models.users import User
 from liderix_api.db import get_itstep_session
 from liderix_api.schemas.data_analytics import (
     CampaignsResponse,

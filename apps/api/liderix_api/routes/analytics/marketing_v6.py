@@ -8,6 +8,8 @@ from sqlalchemy import text
 from datetime import datetime, date
 from typing import Optional, Any
 from liderix_api.db import get_itstep_session
+from liderix_api.services.auth import get_current_user
+from liderix_api.models.users import User
 
 router = APIRouter(tags=["Analytics - Marketing v6"])
 
@@ -23,9 +25,10 @@ async def get_campaigns(
     date_to: str = Query(...),
     platform: Optional[str] = Query(None),
     campaign_key: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_itstep_session)
 ):
-    """Get campaign performance using v6_campaign_roi_daily"""
+    """Get campaign performance using v6_campaign_roi_daily - Requires authentication"""
     try:
         date_from_obj = parse_date(date_from)
         date_to_obj = parse_date(date_to)
@@ -107,9 +110,10 @@ async def get_creatives(
     date_to: str = Query(...),
     platform: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_itstep_session)
 ):
-    """Get creative performance using v6_creative_performance"""
+    """Get creative performance using v6_creative_performance - Requires authentication"""
     try:
         date_from_obj = parse_date(date_from)
         date_to_obj = parse_date(date_to)
@@ -198,9 +202,10 @@ async def get_channels_sources(
     date_from: str = Query(...),
     date_to: str = Query(...),
     platform: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_itstep_session)
 ):
-    """Get channel and source performance using fact_leads"""
+    """Get channel and source performance using fact_leads - Requires authentication"""
     try:
         date_from_obj = parse_date(date_from)
         date_to_obj = parse_date(date_to)
@@ -261,9 +266,10 @@ async def get_crm_outcomes(
     date_from: str = Query(...),
     date_to: str = Query(...),
     platform: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_itstep_session)
 ):
-    """Get CRM outcomes and funnel using fact_leads"""
+    """Get CRM outcomes and funnel using fact_leads - Requires authentication"""
     try:
         date_from_obj = parse_date(date_from)
         date_to_obj = parse_date(date_to)
@@ -346,9 +352,10 @@ async def get_attribution_funnel(
     date_from: str = Query(...),
     date_to: str = Query(...),
     platform: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_itstep_session)
 ):
-    """Get attribution funnel using v6_funnel_daily"""
+    """Get attribution funnel using v6_funnel_daily - Requires authentication"""
     try:
         date_from_obj = parse_date(date_from)
         date_to_obj = parse_date(date_to)
@@ -414,9 +421,10 @@ async def get_product_performance(
     date_from: str = Query(...),
     date_to: str = Query(...),
     platform: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_itstep_session)
 ):
-    """Get product performance using v6_product_performance"""
+    """Get product performance using v6_product_performance - Requires authentication"""
     try:
         date_from_obj = parse_date(date_from)
         date_to_obj = parse_date(date_to)
@@ -470,9 +478,10 @@ async def get_product_performance(
 async def get_data_quality(
     date_from: str = Query(...),
     date_to: str = Query(...),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_itstep_session)
 ):
-    """Get data quality metrics using v6_attribution_coverage"""
+    """Get data quality metrics using v6_attribution_coverage - Requires authentication"""
     try:
         date_from_obj = parse_date(date_from)
         date_to_obj = parse_date(date_to)

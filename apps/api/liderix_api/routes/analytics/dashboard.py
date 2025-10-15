@@ -2,6 +2,7 @@
 """
 Analytics Dashboard endpoints - v6 using real ITstep data
 Updated: October 14, 2025
+SECURITY: Added authentication to all endpoints - October 15, 2025
 """
 
 from fastapi import APIRouter, Depends, Query, HTTPException
@@ -11,6 +12,8 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime, date, timedelta
 
 from liderix_api.db import get_itstep_session
+from liderix_api.services.auth import get_current_user
+from liderix_api.models.users import User
 
 router = APIRouter(tags=["Analytics Dashboard"])
 
@@ -20,11 +23,13 @@ async def get_kpi_cards(
     date_from: str = Query(..., description="Start date (YYYY-MM-DD)"),
     date_to: str = Query(..., description="End date (YYYY-MM-DD)"),
     platforms: Optional[str] = Query(None, description="Platform filter: meta, google, direct, or comma-separated"),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_itstep_session)
 ):
     """
     Get KPI cards data: leads, contracts, revenue, spend, CPL, ROAS
     Frontend expects: { leads, n_contracts, revenue, spend, cpl, roas }
+    Requires authentication.
     """
     try:
         # Parse platforms filter
@@ -104,11 +109,13 @@ async def get_leads_trend(
     date_from: str = Query(..., description="Start date (YYYY-MM-DD)"),
     date_to: str = Query(..., description="End date (YYYY-MM-DD)"),
     platforms: Optional[str] = Query(None, description="Platform filter"),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_itstep_session)
 ):
     """
     Get daily leads trend
     Frontend expects: [{ dt: "YYYY-MM-DD", leads: number }]
+    Requires authentication.
     """
     try:
         # Parse platforms
@@ -156,15 +163,13 @@ async def get_leads_trend(
 
 @router.get("/v5/trend/spend")
 async def get_spend_trend(
-    date_from: str = Query(..., description="Start date (YYYY-MM-DD)"),
-    date_to: str = Query(..., description="End date (YYYY-MM-DD)"),
-    platforms: Optional[str] = Query(None, description="Platform filter"),
+    date_from: str = Query(...),
+    date_to: str = Query(...),
+    platforms: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_itstep_session)
 ):
-    """
-    Get daily spend trend
-    Frontend expects: [{ dt: "YYYY-MM-DD", spend: number }]
-    """
+    """Get daily spend trend - Requires authentication"""
     try:
         platform_list = None
         if platforms:
@@ -212,13 +217,12 @@ async def get_spend_trend(
 
 @router.get("/dashboard")
 async def get_analytics_dashboard(
-    date_from: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
-    date_to: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_itstep_session)
 ):
-    """
-    Get analytics dashboard summary data (legacy endpoint)
-    """
+    """Get analytics dashboard summary data - Requires authentication"""
     try:
         # Default dates
         if not date_from:
@@ -245,11 +249,10 @@ async def get_analytics_dashboard(
 
 @router.get("/realtime")
 async def get_realtime_analytics(
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_itstep_session)
 ):
-    """
-    Get real-time analytics data (today's data)
-    """
+    """Get real-time analytics data - Requires authentication"""
     try:
         today = datetime.now().strftime("%Y-%m-%d")
 

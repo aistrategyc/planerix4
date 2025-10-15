@@ -2,6 +2,7 @@
 """
 Sales Analytics endpoints - v5/v6 using real ITstep v6 data
 Updated: October 14, 2025
+SECURITY: Added authentication to all endpoints - October 15, 2025
 """
 
 from fastapi import APIRouter, Depends, Query, HTTPException
@@ -11,6 +12,8 @@ from datetime import datetime, date, timedelta
 from typing import Optional, List
 
 from liderix_api.db import get_itstep_session
+from liderix_api.services.auth import get_current_user
+from liderix_api.models.users import User
 
 router = APIRouter(tags=["Sales Analytics"])
 
@@ -26,12 +29,10 @@ async def get_campaigns(
     date_to: str = Query(..., description="End date (YYYY-MM-DD)"),
     platforms: Optional[str] = Query(None, description="Platform filter"),
     limit: int = Query(50, le=200, description="Limit results"),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_itstep_session)
 ):
-    """
-    Get campaign performance table
-    Frontend expects: [{ platform, campaign_name, leads, n_contracts, revenue, spend, cpl, roas }]
-    """
+    """Get campaign performance table - Requires authentication"""
     try:
         platform_list = None
         if platforms:
