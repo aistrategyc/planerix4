@@ -28,4 +28,5 @@ __all__ = [
     "data_analytics",
     "calendar_events",
     "event_links",
+    "onboarding",
 ]
