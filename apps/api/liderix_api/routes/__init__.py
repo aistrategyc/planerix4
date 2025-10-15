@@ -26,4 +26,6 @@ __all__ = [
     "okrs",
     "analytics",
     "data_analytics",
+    "calendar_events",
+    "event_links",
 ]

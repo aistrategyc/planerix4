@@ -48,6 +48,7 @@ def upgrade() -> None:
         sa.Column('created_at', sa.DateTime(timezone=True), nullable=False, server_default=sa.text('now()')),
         sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
         sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True),
+        sa.Column('is_deleted', sa.Boolean(), nullable=False, server_default='false'),
 
         # Primary key
         sa.PrimaryKeyConstraint('id'),

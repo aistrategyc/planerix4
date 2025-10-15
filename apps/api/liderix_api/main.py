@@ -272,6 +272,7 @@ from liderix_api.routes import (
     auth as auth_router,
     analytics as analytics_router,
     calendar_events as calendar_router,
+    event_links as event_links_router,
 )
 
 # --- клиентские (ITstep БД) ---
@@ -292,6 +293,7 @@ app.include_router(tasks_router.router, prefix=PREFIX, tags=["Tasks"])
 app.include_router(okrs_router.router, prefix=PREFIX, tags=["OKRs"])
 app.include_router(kpis_router.router, prefix=PREFIX, tags=["KPIs"])
 app.include_router(calendar_router.router, prefix=PREFIX, tags=["Calendar"])
+app.include_router(event_links_router.router, prefix=f"{PREFIX}/links", tags=["Event Links"])
 app.include_router(auth_router.router, prefix=PREFIX, tags=["Auth"])
 app.include_router(analytics_router.router, prefix=f"{PREFIX}/analytics", tags=["Analytics"])
 
