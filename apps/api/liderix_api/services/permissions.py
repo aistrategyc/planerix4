@@ -1,49 +1,30 @@
 """
 Production-ready permission checking service with role-based access control.
-Supports organization-level and project-level permissions.
+Supports organization-level and project-level permissions with hierarchical roles.
 """
 from __future__ import annotations
 
 import logging
 from typing import List, Dict, Any, Optional
-from enum import Enum
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_
 
-from liderix_api.models.users import User, UserRole
-from liderix_api.models.memberships import Membership, MembershipRole
+from liderix_api.models.users import User
+from liderix_api.models.memberships import Membership
 from liderix_api.models.projects import Project
 from liderix_api.models.project_members import ProjectMember
+from liderix_api.enums import (
+    Permission,
+    MembershipRole,
+    UserRole,
+    get_membership_role_permissions,
+    membership_has_permission,
+    get_role_permissions,
+    user_has_permission
+)
 
 logger = logging.getLogger(__name__)
-
-
-class Permission(str, Enum):
-    # User permissions
-    USERS_READ = "users:read"
-    USERS_WRITE = "users:write"
-    USERS_DELETE = "users:delete"
-    
-    # Organization permissions
-    ORG_READ = "org:read"
-    ORG_WRITE = "org:write"
-    ORG_DELETE = "org:delete"
-    ORG_ADMIN = "org:admin"
-    
-    # Project permissions
-    PROJECT_READ = "project:read"
-    PROJECT_WRITE = "project:write"
-    PROJECT_DELETE = "project:delete"
-    PROJECT_ADMIN = "project:admin"
-    
-    # Task permissions
-    TASK_READ = "task:read"
-    TASK_WRITE = "task:write"
-    TASK_DELETE = "task:delete"
-    
-    # System permissions
-    SYSTEM_ADMIN = "system:admin"
 
 
 async def check_task_permission(
@@ -140,17 +121,33 @@ async def check_project_permission(
                 return True
             return False
         
-        # Role-based permission check
-        role_permissions = {
-            "owner": ["read", "write", "delete", "admin"],
-            "admin": ["read", "write", "admin"],
-            "member": ["read", "write"],
-            "viewer": ["read"]
+        # Role-based permission check using hierarchical permission system
+        # Project members use simpler role structure, but we can still leverage the permission system
+        project_role = getattr(project_member, 'role', 'member')
+
+        # Map project-level roles to permission checks
+        permission_mapping = {
+            "read": Permission.PROJECT_VIEW,
+            "write": Permission.PROJECT_UPDATE,
+            "delete": Permission.PROJECT_DELETE,
+            "admin": Permission.PROJECT_MANAGE_MEMBERS
         }
-        
-        user_role = getattr(project_member, 'role', 'member')
-        allowed_permissions = role_permissions.get(user_role, [])
-        return permission in allowed_permissions
+
+        required_perm = permission_mapping.get(permission)
+        if not required_perm:
+            return False
+
+        # For project-level permissions, we use a simpler role mapping
+        # since projects have their own role structure
+        project_role_permissions = {
+            "owner": [Permission.PROJECT_VIEW, Permission.PROJECT_UPDATE, Permission.PROJECT_DELETE, Permission.PROJECT_MANAGE_MEMBERS],
+            "admin": [Permission.PROJECT_VIEW, Permission.PROJECT_UPDATE, Permission.PROJECT_MANAGE_MEMBERS],
+            "member": [Permission.PROJECT_VIEW, Permission.PROJECT_UPDATE],
+            "viewer": [Permission.PROJECT_VIEW]
+        }
+
+        allowed_perms = project_role_permissions.get(project_role, [])
+        return required_perm in allowed_perms
         
     except Exception as e:
         logger.error(f"Error checking project permission: {e}")
@@ -202,17 +199,26 @@ async def check_organization_permission(
             )
             
             if membership:
-                # Role-based permissions
-                role_permissions = {
-                    "owner": ["read", "write", "delete", "admin"],
-                    "admin": ["read", "write", "admin"],
-                    "member": ["read", "write"],
-                    "viewer": ["read"]
+                # Use hierarchical role-based permissions from enums
+                membership_role = membership.role
+
+                # Map simple permission strings to Permission enum values
+                permission_mapping = {
+                    "read": [Permission.PROJECT_VIEW, Permission.TASK_VIEW, Permission.OKR_VIEW, Permission.KPI_VIEW],
+                    "write": [Permission.PROJECT_UPDATE, Permission.TASK_UPDATE, Permission.OKR_UPDATE, Permission.KPI_UPDATE],
+                    "delete": [Permission.PROJECT_DELETE, Permission.TASK_DELETE, Permission.OKR_DELETE, Permission.KPI_DELETE],
+                    "admin": [Permission.ORG_MANAGE_MEMBERS, Permission.ADMIN_MANAGE]
                 }
-                
-                user_role = getattr(membership, 'role', 'member')
-                allowed_permissions = role_permissions.get(user_role, [])
-                return permission in allowed_permissions
+
+                # Check if the membership role has any of the required permissions
+                required_perms = permission_mapping.get(permission, [])
+                if required_perms:
+                    for perm in required_perms:
+                        if membership_has_permission(membership_role, perm):
+                            return True
+
+                # Fallback to basic check for non-mapped permissions
+                return False
             
         except Exception as e:
             logger.debug(f"Error checking organization membership: {e}")

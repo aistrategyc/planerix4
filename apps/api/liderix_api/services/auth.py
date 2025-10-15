@@ -148,7 +148,13 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     try:
-        user = (await session.execute(select(User).where(User.id == UUID(sub)))).scalar_one()
+        from sqlalchemy.orm import selectinload
+        # Load user with memberships to access org_id property
+        user = (await session.execute(
+            select(User)
+            .options(selectinload(User.memberships))
+            .where(User.id == UUID(sub))
+        )).scalar_one()
     except NoResultFound:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

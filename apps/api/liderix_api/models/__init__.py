@@ -25,7 +25,7 @@ from .organization import (
 
 from .feature_flags import FeatureFlag
 from .jwt_refresh_whitelists import JWTRefreshWhitelist
-from .kpi import KPI
+from .kpi import KPI, KPIIndicator, KPIMeasurement, MetricBinding
 from .memberships import Membership
 from .notifications import Notification
 from .okrs import Objective, KeyResult

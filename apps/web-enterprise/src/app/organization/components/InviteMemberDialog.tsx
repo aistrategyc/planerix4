@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/components/ui/use-toast";
 import { UserPlus, Mail, AlertCircle, CheckCircle } from "lucide-react";
 import type { Department } from "../hooks/useOrganization";
+import { MembershipRole, RoleLabels, RoleDescriptions } from "@/types/roles";
 
 interface InviteMemberDialogProps {
   orgId: string;
@@ -20,7 +21,7 @@ interface InviteMemberDialogProps {
 
 interface InviteFormData {
   email: string;
-  role: string;
+  role: MembershipRole;
   department_id: string;
 }
 
@@ -183,22 +184,46 @@ export function InviteMemberDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="viewer">
+                <SelectItem value="admin">
                   <div>
-                    <div className="font-medium">Наблюдатель</div>
-                    <div className="text-xs text-gray-500">Только чтение</div>
+                    <div className="font-medium">{RoleLabels.admin}</div>
+                    <div className="text-xs text-gray-500">Административный доступ</div>
+                  </div>
+                </SelectItem>
+                <SelectItem value="bu_manager">
+                  <div>
+                    <div className="font-medium">{RoleLabels.bu_manager}</div>
+                    <div className="text-xs text-gray-500">Управление бизнес-подразделением</div>
+                  </div>
+                </SelectItem>
+                <SelectItem value="hod">
+                  <div>
+                    <div className="font-medium">{RoleLabels.hod}</div>
+                    <div className="text-xs text-gray-500">Управление отделом</div>
+                  </div>
+                </SelectItem>
+                <SelectItem value="team_lead">
+                  <div>
+                    <div className="font-medium">{RoleLabels.team_lead}</div>
+                    <div className="text-xs text-gray-500">Управление командой</div>
                   </div>
                 </SelectItem>
                 <SelectItem value="member">
                   <div>
-                    <div className="font-medium">Участник</div>
-                    <div className="text-xs text-gray-500">Полный доступ к проектам</div>
+                    <div className="font-medium">{RoleLabels.member}</div>
+                    <div className="text-xs text-gray-500">Базовые права участника</div>
                   </div>
                 </SelectItem>
-                <SelectItem value="admin">
+                <SelectItem value="pmo">
                   <div>
-                    <div className="font-medium">Администратор</div>
-                    <div className="text-xs text-gray-500">Управление организацией</div>
+                    <div className="font-medium">{RoleLabels.pmo}</div>
+                    <div className="text-xs text-gray-500">Аналитика и отчетность</div>
+                  </div>
+                </SelectItem>
+                <SelectItem value="guest">
+                  <div>
+                    <div className="font-medium">{RoleLabels.guest}</div>
+                    <div className="text-xs text-gray-500">Только чтение</div>
                   </div>
                 </SelectItem>
               </SelectContent>

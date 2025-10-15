@@ -72,12 +72,30 @@ class UserRole(str, Enum):
 
 
 class MembershipRole(str, Enum):
-    """Organization membership role"""
-    OWNER = "owner"
-    ADMIN = "admin"
-    MANAGER = "manager"
-    MEMBER = "member"
-    GUEST = "guest"
+    """Organization membership role - hierarchical structure"""
+    OWNER = "owner"                    # Full organization access
+    ADMIN = "admin"                    # Administrative access
+    BU_MANAGER = "bu_manager"          # Business Unit Manager
+    HEAD_OF_DEPARTMENT = "hod"         # Head of Department
+    TEAM_LEAD = "team_lead"            # Team Lead
+    PMO = "pmo"                        # PMO/HR/Finance (scoped read-only)
+    MEMBER = "member"                  # Individual Contributor
+    GUEST = "guest"                    # Guest/Partner (read-only)
+
+    @classmethod
+    def get_management_roles(cls) -> List[str]:
+        """Returns roles with management capabilities"""
+        return [cls.OWNER, cls.ADMIN, cls.BU_MANAGER, cls.HEAD_OF_DEPARTMENT, cls.TEAM_LEAD]
+
+    @classmethod
+    def get_privileged_roles(cls) -> List[str]:
+        """Returns roles with full organizational access"""
+        return [cls.OWNER, cls.ADMIN]
+
+    @classmethod
+    def get_scoped_roles(cls) -> List[str]:
+        """Returns roles with scoped (limited) access"""
+        return [cls.BU_MANAGER, cls.HEAD_OF_DEPARTMENT, cls.TEAM_LEAD, cls.PMO]
 
 
 class MembershipStatus(str, Enum):
@@ -388,6 +406,7 @@ def validate_enum_value(enum_class: type, value: str) -> bool:
 
 # === ROLE PERMISSION MAPPING ===
 
+# Legacy UserRole permissions (kept for backward compatibility)
 ROLE_PERMISSIONS = {
     UserRole.ADMIN: [
         # Full access to everything
@@ -439,6 +458,107 @@ ROLE_PERMISSIONS = {
     ],
 }
 
+# MembershipRole permissions (hierarchical organization structure)
+MEMBERSHIP_ROLE_PERMISSIONS = {
+    MembershipRole.OWNER: [
+        # Full organizational access - can do everything
+        Permission.USER_VIEW, Permission.USER_CREATE, Permission.USER_UPDATE, Permission.USER_DELETE,
+        Permission.ORG_VIEW, Permission.ORG_CREATE, Permission.ORG_UPDATE, Permission.ORG_DELETE, Permission.ORG_MANAGE_MEMBERS,
+        Permission.PROJECT_VIEW, Permission.PROJECT_CREATE, Permission.PROJECT_UPDATE, Permission.PROJECT_DELETE, Permission.PROJECT_MANAGE_MEMBERS,
+        Permission.TASK_VIEW, Permission.TASK_CREATE, Permission.TASK_UPDATE, Permission.TASK_DELETE, Permission.TASK_ASSIGN,
+        Permission.OKR_VIEW, Permission.OKR_CREATE, Permission.OKR_UPDATE, Permission.OKR_DELETE,
+        Permission.KPI_VIEW, Permission.KPI_CREATE, Permission.KPI_UPDATE, Permission.KPI_DELETE,
+        Permission.ANALYTICS_VIEW, Permission.ANALYTICS_EXPORT,
+        Permission.CALENDAR_VIEW, Permission.CALENDAR_CREATE, Permission.CALENDAR_UPDATE, Permission.CALENDAR_DELETE,
+        Permission.FILE_VIEW, Permission.FILE_UPLOAD, Permission.FILE_DELETE,
+        Permission.ADMIN_VIEW, Permission.ADMIN_MANAGE,
+    ],
+    MembershipRole.ADMIN: [
+        # Administrative access - similar to owner but cannot delete org
+        Permission.USER_VIEW, Permission.USER_CREATE, Permission.USER_UPDATE, Permission.USER_DELETE,
+        Permission.ORG_VIEW, Permission.ORG_UPDATE, Permission.ORG_MANAGE_MEMBERS,
+        Permission.PROJECT_VIEW, Permission.PROJECT_CREATE, Permission.PROJECT_UPDATE, Permission.PROJECT_DELETE, Permission.PROJECT_MANAGE_MEMBERS,
+        Permission.TASK_VIEW, Permission.TASK_CREATE, Permission.TASK_UPDATE, Permission.TASK_DELETE, Permission.TASK_ASSIGN,
+        Permission.OKR_VIEW, Permission.OKR_CREATE, Permission.OKR_UPDATE, Permission.OKR_DELETE,
+        Permission.KPI_VIEW, Permission.KPI_CREATE, Permission.KPI_UPDATE, Permission.KPI_DELETE,
+        Permission.ANALYTICS_VIEW, Permission.ANALYTICS_EXPORT,
+        Permission.CALENDAR_VIEW, Permission.CALENDAR_CREATE, Permission.CALENDAR_UPDATE, Permission.CALENDAR_DELETE,
+        Permission.FILE_VIEW, Permission.FILE_UPLOAD, Permission.FILE_DELETE,
+        Permission.ADMIN_VIEW, Permission.ADMIN_MANAGE,
+    ],
+    MembershipRole.BU_MANAGER: [
+        # Business Unit Manager - manage projects, teams, and resources within BU
+        Permission.USER_VIEW,
+        Permission.ORG_VIEW,
+        Permission.PROJECT_VIEW, Permission.PROJECT_CREATE, Permission.PROJECT_UPDATE, Permission.PROJECT_MANAGE_MEMBERS,
+        Permission.TASK_VIEW, Permission.TASK_CREATE, Permission.TASK_UPDATE, Permission.TASK_DELETE, Permission.TASK_ASSIGN,
+        Permission.OKR_VIEW, Permission.OKR_CREATE, Permission.OKR_UPDATE,
+        Permission.KPI_VIEW, Permission.KPI_CREATE, Permission.KPI_UPDATE,
+        Permission.ANALYTICS_VIEW, Permission.ANALYTICS_EXPORT,
+        Permission.CALENDAR_VIEW, Permission.CALENDAR_CREATE, Permission.CALENDAR_UPDATE, Permission.CALENDAR_DELETE,
+        Permission.FILE_VIEW, Permission.FILE_UPLOAD, Permission.FILE_DELETE,
+    ],
+    MembershipRole.HEAD_OF_DEPARTMENT: [
+        # Head of Department - manage department projects and team members
+        Permission.USER_VIEW,
+        Permission.ORG_VIEW,
+        Permission.PROJECT_VIEW, Permission.PROJECT_CREATE, Permission.PROJECT_UPDATE, Permission.PROJECT_MANAGE_MEMBERS,
+        Permission.TASK_VIEW, Permission.TASK_CREATE, Permission.TASK_UPDATE, Permission.TASK_DELETE, Permission.TASK_ASSIGN,
+        Permission.OKR_VIEW, Permission.OKR_CREATE, Permission.OKR_UPDATE,
+        Permission.KPI_VIEW, Permission.KPI_CREATE, Permission.KPI_UPDATE,
+        Permission.ANALYTICS_VIEW, Permission.ANALYTICS_EXPORT,
+        Permission.CALENDAR_VIEW, Permission.CALENDAR_CREATE, Permission.CALENDAR_UPDATE, Permission.CALENDAR_DELETE,
+        Permission.FILE_VIEW, Permission.FILE_UPLOAD, Permission.FILE_DELETE,
+    ],
+    MembershipRole.TEAM_LEAD: [
+        # Team Lead - manage team tasks and projects
+        Permission.USER_VIEW,
+        Permission.ORG_VIEW,
+        Permission.PROJECT_VIEW, Permission.PROJECT_CREATE, Permission.PROJECT_UPDATE,
+        Permission.TASK_VIEW, Permission.TASK_CREATE, Permission.TASK_UPDATE, Permission.TASK_DELETE, Permission.TASK_ASSIGN,
+        Permission.OKR_VIEW, Permission.OKR_CREATE, Permission.OKR_UPDATE,
+        Permission.KPI_VIEW, Permission.KPI_UPDATE,
+        Permission.ANALYTICS_VIEW,
+        Permission.CALENDAR_VIEW, Permission.CALENDAR_CREATE, Permission.CALENDAR_UPDATE, Permission.CALENDAR_DELETE,
+        Permission.FILE_VIEW, Permission.FILE_UPLOAD, Permission.FILE_DELETE,
+    ],
+    MembershipRole.PMO: [
+        # PMO/HR/Finance - read-only access across organization for reporting
+        Permission.USER_VIEW,
+        Permission.ORG_VIEW,
+        Permission.PROJECT_VIEW,
+        Permission.TASK_VIEW,
+        Permission.OKR_VIEW,
+        Permission.KPI_VIEW,
+        Permission.ANALYTICS_VIEW, Permission.ANALYTICS_EXPORT,
+        Permission.CALENDAR_VIEW,
+        Permission.FILE_VIEW,
+    ],
+    MembershipRole.MEMBER: [
+        # Individual Contributor - basic work permissions
+        Permission.USER_VIEW,
+        Permission.ORG_VIEW,
+        Permission.PROJECT_VIEW,
+        Permission.TASK_VIEW, Permission.TASK_CREATE, Permission.TASK_UPDATE,
+        Permission.OKR_VIEW,
+        Permission.KPI_VIEW,
+        Permission.ANALYTICS_VIEW,
+        Permission.CALENDAR_VIEW, Permission.CALENDAR_CREATE, Permission.CALENDAR_UPDATE,
+        Permission.FILE_VIEW, Permission.FILE_UPLOAD,
+    ],
+    MembershipRole.GUEST: [
+        # Guest/Partner - read-only access to shared resources
+        Permission.USER_VIEW,
+        Permission.ORG_VIEW,
+        Permission.PROJECT_VIEW,
+        Permission.TASK_VIEW,
+        Permission.OKR_VIEW,
+        Permission.KPI_VIEW,
+        Permission.CALENDAR_VIEW,
+        Permission.FILE_VIEW,
+    ],
+}
+
 
 def get_role_permissions(role: UserRole) -> List[Permission]:
     """Get permissions for a specific role"""
@@ -448,3 +568,13 @@ def get_role_permissions(role: UserRole) -> List[Permission]:
 def user_has_permission(user_role: UserRole, permission: Permission) -> bool:
     """Check if user role has specific permission"""
     return permission in get_role_permissions(user_role)
+
+
+def get_membership_role_permissions(role: MembershipRole) -> List[Permission]:
+    """Get permissions for a specific membership role"""
+    return MEMBERSHIP_ROLE_PERMISSIONS.get(role, [])
+
+
+def membership_has_permission(membership_role: MembershipRole, permission: Permission) -> bool:
+    """Check if membership role has specific permission"""
+    return permission in get_membership_role_permissions(membership_role)

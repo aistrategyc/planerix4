@@ -1,5 +1,7 @@
 // types/onboarding.ts
 
+import type { MembershipRole } from './roles'
+
 export interface OrganizationCreatePayload {
   name: string
   slug?: string // будет автогенерирован если не указан
@@ -25,7 +27,7 @@ export interface OrganizationCreatePayload {
 
 export interface InviteItem {
   email: string
-  role: 'viewer' | 'member' | 'admin' | 'owner'
+  role: MembershipRole
   department_id?: string
 }
 

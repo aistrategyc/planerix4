@@ -6,19 +6,23 @@ from uuid import UUID
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any
 
-from liderix_api.models.kpi import KPI, KPIMeasurement, KPIStatus, KPIType, KPIPeriod
+from liderix_api.models.kpi import KPIIndicator, KPIMeasurement, MetricBinding
+# Import for backward compatibility
+KPI = KPIIndicator
 from liderix_api.schemas.kpis import (
     KPICreate, KPIUpdate, KPIRead, KPIListResponse,
     KPIMeasurementCreate, KPIMeasurementUpdate, KPIMeasurementRead,
     KPIDashboard, KPIAnalytics, KPITrendData,
     KPIBulkUpdateRequest, KPIBulkMeasurementRequest,
+    # Enums
+    KPIStatus, KPIType, KPIPeriod, KPISourceType, KPIAggregation,
     # Legacy schemas for backward compatibility
     KPICreateLegacy, KPIUpdateLegacy, KPIReadLegacy
 )
 from liderix_api.db import get_async_session
 from liderix_api.services.auth import get_current_user
 from liderix_api.models.users import User
-from liderix_api.services.permissions import check_organization_permission
+from liderix_api.services.permissions import check_organization_access
 
 router = APIRouter(prefix="", tags=["KPIs & Performance Metrics"])
 
@@ -41,7 +45,7 @@ async def get_kpis(
     current_user: User = Depends(get_current_user)
 ):
     """Get KPIs with advanced filtering, pagination and search."""
-    await check_organization_permission(session, current_user.org_id, current_user.id)
+    await check_organization_access(session, current_user.org_id, current_user)
 
     # Build base query
     query = select(KPI).where(
@@ -129,7 +133,7 @@ async def get_kpi(
     current_user: User = Depends(get_current_user)
 ):
     """Get a specific KPI with optional measurement history."""
-    await check_organization_permission(session, current_user.org_id, current_user.id)
+    await check_organization_access(session, current_user.org_id, current_user)
 
     query = select(KPI).options(
         selectinload(KPI.measurements) if include_all_measurements else selectinload(KPI.measurements).limit(10)
@@ -155,10 +159,23 @@ async def create_kpi(
     current_user: User = Depends(get_current_user)
 ):
     """Create a new KPI with optional initial measurements."""
-    await check_organization_permission(session, current_user.org_id, current_user.id)
+    await check_organization_access(session, current_user.org_id, current_user)
 
-    # Create KPI
-    kpi_data = data.model_dump(exclude={'initial_measurements'})
+    # Create KPI - map schema fields to model fields and convert enums to strings
+    kpi_data = data.model_dump(exclude={'initial_measurements', 'objective_id'}, mode='python')
+
+    # Convert enum values to strings
+    if 'source_type' in kpi_data and isinstance(kpi_data['source_type'], KPISourceType):
+        kpi_data['source_type'] = kpi_data['source_type'].value
+    if 'kpi_type' in kpi_data and isinstance(kpi_data['kpi_type'], KPIType):
+        kpi_data['kpi_type'] = kpi_data['kpi_type'].value
+    if 'period' in kpi_data and isinstance(kpi_data['period'], KPIPeriod):
+        kpi_data['period'] = kpi_data['period'].value
+    if 'aggregation' in kpi_data and isinstance(kpi_data['aggregation'], KPIAggregation):
+        kpi_data['aggregation'] = kpi_data['aggregation'].value
+    if 'status' in kpi_data and isinstance(kpi_data['status'], KPIStatus):
+        kpi_data['status'] = kpi_data['status'].value
+
     new_kpi = KPI(
         **kpi_data,
         org_id=current_user.org_id,
@@ -177,8 +194,7 @@ async def create_kpi(
         for measurement_data in data.initial_measurements:
             measurement = KPIMeasurement(
                 **measurement_data.model_dump(),
-                kpi_id=new_kpi.id,
-                measured_by=current_user.id,
+                indicator_id=new_kpi.id,
                 created_at=datetime.now(timezone.utc)
             )
             session.add(measurement)
@@ -191,8 +207,16 @@ async def create_kpi(
     new_kpi.update_status_based_on_progress()
 
     await session.commit()
-    await session.refresh(new_kpi)
-    return new_kpi
+
+    # Re-fetch with eager loading to avoid DetachedInstanceError
+    result = await session.execute(
+        select(KPI)
+        .options(selectinload(KPI.measurements))
+        .where(KPI.id == new_kpi.id)
+    )
+    refreshed_kpi = result.scalar_one()
+
+    return refreshed_kpi
 
 @router.put("/kpis/{kpi_id}", response_model=KPIRead)
 async def update_kpi(
@@ -203,7 +227,7 @@ async def update_kpi(
     current_user: User = Depends(get_current_user)
 ):
     """Update an existing KPI."""
-    await check_organization_permission(session, current_user.org_id, current_user.id)
+    await check_organization_access(session, current_user.org_id, current_user)
 
     result = await session.execute(
         select(KPI).options(
@@ -242,7 +266,7 @@ async def delete_kpi(
     current_user: User = Depends(get_current_user)
 ):
     """Delete a KPI (soft delete by default)."""
-    await check_organization_permission(session, current_user.org_id, current_user.id)
+    await check_organization_access(session, current_user.org_id, current_user)
 
     result = await session.execute(
         select(KPI).where(
@@ -276,7 +300,7 @@ async def add_kpi_measurement(
     current_user: User = Depends(get_current_user)
 ):
     """Add a new measurement to a KPI."""
-    await check_organization_permission(session, current_user.org_id, current_user.id)
+    await check_organization_access(session, current_user.org_id, current_user)
 
     # Verify KPI exists and belongs to organization
     kpi = await session.execute(
@@ -295,8 +319,7 @@ async def add_kpi_measurement(
     # Create measurement
     measurement = KPIMeasurement(
         **data.model_dump(),
-        kpi_id=kpi_id,
-        measured_by=current_user.id,
+        indicator_id=kpi_id,
         created_at=datetime.now(timezone.utc)
     )
     session.add(measurement)
@@ -304,6 +327,7 @@ async def add_kpi_measurement(
     # Update KPI current value if this is the latest measurement
     if auto_update_current:
         kpi.current_value = measurement.value
+        kpi.last_measured_at = measurement.measured_at
         kpi.update_status_based_on_progress()
         kpi.updated_at = datetime.now(timezone.utc)
 
@@ -321,7 +345,7 @@ async def get_kpi_measurements(
     current_user: User = Depends(get_current_user)
 ):
     """Get measurements for a specific KPI."""
-    await check_organization_permission(session, current_user.org_id, current_user.id)
+    await check_organization_access(session, current_user.org_id, current_user)
 
     # Verify KPI access
     kpi_check = await session.execute(
@@ -337,7 +361,7 @@ async def get_kpi_measurements(
         raise HTTPException(status_code=404, detail="KPI not found")
 
     # Build query
-    query = select(KPIMeasurement).where(KPIMeasurement.kpi_id == kpi_id)
+    query = select(KPIMeasurement).where(KPIMeasurement.indicator_id == kpi_id)
 
     if start_date:
         query = query.where(KPIMeasurement.measured_at >= start_date)
@@ -357,7 +381,7 @@ async def update_measurement(
     current_user: User = Depends(get_current_user)
 ):
     """Update a KPI measurement."""
-    await check_organization_permission(session, current_user.org_id, current_user.id)
+    await check_organization_access(session, current_user.org_id, current_user)
 
     result = await session.execute(
         select(KPIMeasurement).join(KPI).where(
@@ -388,7 +412,7 @@ async def delete_measurement(
     current_user: User = Depends(get_current_user)
 ):
     """Delete a KPI measurement."""
-    await check_organization_permission(session, current_user.org_id, current_user.id)
+    await check_organization_access(session, current_user.org_id, current_user)
 
     result = await session.execute(
         select(KPIMeasurement).join(KPI).where(
@@ -414,7 +438,7 @@ async def get_kpi_dashboard(
     current_user: User = Depends(get_current_user)
 ):
     """Get KPI dashboard overview."""
-    await check_organization_permission(session, current_user.org_id, current_user.id)
+    await check_organization_access(session, current_user.org_id, current_user)
 
     # Get all KPIs for the organization
     query = select(KPI).options(
@@ -486,7 +510,7 @@ async def get_kpi_trend(
     current_user: User = Depends(get_current_user)
 ):
     """Get trend data for a specific KPI."""
-    await check_organization_permission(session, current_user.org_id, current_user.id)
+    await check_organization_access(session, current_user.org_id, current_user)
 
     # Get KPI with measurements
     kpi_result = await session.execute(
@@ -563,7 +587,7 @@ async def bulk_update_kpis(
     current_user: User = Depends(get_current_user)
 ):
     """Update multiple KPIs at once."""
-    await check_organization_permission(session, current_user.org_id, current_user.id)
+    await check_organization_access(session, current_user.org_id, current_user)
 
     # Get KPIs to update
     result = await session.execute(

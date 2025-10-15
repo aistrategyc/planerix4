@@ -247,6 +247,21 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
         cascade="all, delete-orphan",
         back_populates="user",
         lazy="selectin")
-    
+
+    @property
+    def org_id(self):
+        """
+        Get the primary organization ID for this user.
+        Returns the first active membership's org_id.
+        """
+        if self.memberships:
+            # Return first active membership's org_id
+            for membership in self.memberships:
+                if membership.status == "active":
+                    return membership.org_id
+            # If no active, return first membership
+            return self.memberships[0].org_id if self.memberships else None
+        return None
+
     def __repr__(self) -> str:
         return f"<User id={self.id} username={self.username!r} email={self.email!r} role={self.role!r}>"

@@ -62,14 +62,14 @@ class CalendarEvent(Base, OrgFKMixin, TimestampMixin, SoftDeleteMixin):
     )
 
     event_type = Column(
-        SQLEnum(EventType),
-        default=EventType.MEETING,
+        String(50),
+        default="meeting",
         nullable=False
     )
 
     status = Column(
-        SQLEnum(EventStatus),
-        default=EventStatus.CONFIRMED,
+        String(50),
+        default="confirmed",
         nullable=False
     )
 
@@ -144,15 +144,15 @@ class CalendarEvent(Base, OrgFKMixin, TimestampMixin, SoftDeleteMixin):
 
     okr_id = Column(
         PG_UUID(as_uuid=True),
-        ForeignKey("okrs.id", ondelete="CASCADE"),
+        ForeignKey("objectives.id", ondelete="CASCADE"),
         nullable=True,
         index=True
     )
 
     # Recurrence
     recurrence_type = Column(
-        SQLEnum(RecurrenceType),
-        default=RecurrenceType.NONE,
+        String(50),
+        default="none",
         nullable=False
     )
 

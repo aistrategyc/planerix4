@@ -16,6 +16,11 @@ class KPIPeriod(PythonEnum):
     YEARLY = "yearly"
 
 class KPIType(PythonEnum):
+    """Type of KPI value measurement"""
+    COUNTER = "counter"      # Cumulative (e.g., total revenue, total tasks completed)
+    GAUGE = "gauge"          # Point-in-time (e.g., current customer count, server CPU usage)
+    PERCENTAGE = "percentage"  # Ratio as percentage (e.g., conversion rate, completion rate)
+    # Legacy types for backward compatibility
     REVENUE = "revenue"
     PERFORMANCE = "performance"
     QUALITY = "quality"
@@ -28,8 +33,24 @@ class KPIStatus(PythonEnum):
     ON_TRACK = "on_track"
     AT_RISK = "at_risk"
     OFF_TRACK = "off_track"
+    CRITICAL = "critical"
     ACHIEVED = "achieved"
+    COMPLETED = "completed"
     PAUSED = "paused"
+
+class KPISourceType(PythonEnum):
+    """How KPI value is collected"""
+    MANUAL = "manual"      # Manually entered by user
+    FORMULA = "formula"    # Auto-calculated from formula
+    EXTERNAL = "external"  # Fetched from external system/API
+
+class KPIAggregation(PythonEnum):
+    """How to aggregate measurements over time"""
+    SUM = "sum"      # Sum all values
+    AVG = "avg"      # Average of values
+    LAST = "last"    # Last recorded value
+    MIN = "min"      # Minimum value
+    MAX = "max"      # Maximum value
 
 # ==================== KPI MEASUREMENT SCHEMAS ====================
 
@@ -37,10 +58,10 @@ class KPIMeasurementBase(BaseModel):
     value: float
     measured_at: datetime = Field(default_factory=datetime.now)
     notes: Optional[str] = None
-    data_source: Optional[str] = None
-    confidence_level: Optional[float] = Field(None, ge=0.0, le=1.0)
+    source: Optional[str] = "manual"  # Changed from data_source to match model
+    confidence_score: Optional[float] = Field(None, ge=0.0, le=1.0)  # Changed from confidence_level to match model
     meta_data: Optional[Dict[str, Any]] = None
-    is_automated: bool = False
+    # Removed is_automated - not in model
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
@@ -51,16 +72,16 @@ class KPIMeasurementUpdate(BaseModel):
     value: Optional[float] = None
     measured_at: Optional[datetime] = None
     notes: Optional[str] = None
-    data_source: Optional[str] = None
-    confidence_level: Optional[float] = Field(None, ge=0.0, le=1.0)
+    source: Optional[str] = None  # Changed from data_source
+    confidence_score: Optional[float] = Field(None, ge=0.0, le=1.0)  # Changed from confidence_level
     meta_data: Optional[Dict[str, Any]] = None
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 class KPIMeasurementRead(KPIMeasurementBase):
     id: UUID
-    kpi_id: UUID
-    measured_by: Optional[UUID] = None
+    indicator_id: UUID  # Changed from kpi_id to match model
+    source: Optional[str] = None  # Changed from measured_by
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -71,26 +92,48 @@ class KPIMeasurementRead(KPIMeasurementBase):
 class KPIBase(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     description: Optional[str] = None
-    kpi_type: KPIType = KPIType.CUSTOM
+    unit: str = Field(default="units", max_length=50)
+
+    # Values and thresholds
     target_value: float
-    current_value: float = 0.0
-    baseline_value: Optional[float] = None
-    unit: Optional[str] = Field(None, max_length=50)
-    status: KPIStatus = KPIStatus.ON_TRACK
-    is_higher_better: bool = True
+    current_value: Optional[float] = 0.0
+    baseline_value: Optional[float] = None  # Starting value for comparison
+    warn_threshold: Optional[float] = None   # Warning level (yellow)
+    alarm_threshold: Optional[float] = None  # Critical level (red)
+
+    # Data source configuration
+    source_type: KPISourceType = KPISourceType.MANUAL
+    formula: Optional[str] = None  # Formula for auto-calculation
+    formula_metadata: Optional[Dict[str, Any]] = None  # Additional formula config
+
+    # KPI type and period
+    kpi_type: KPIType = KPIType.GAUGE
     period: KPIPeriod = KPIPeriod.MONTHLY
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
-    next_review_date: Optional[datetime] = None
+    aggregation: Optional[KPIAggregation] = KPIAggregation.LAST
+
+    # Status tracking
+    status: KPIStatus = KPIStatus.ON_TRACK
+    is_active: bool = True
+
+    # Relationships
     owner_id: Optional[UUID] = None
     project_id: Optional[UUID] = None
-    objective_id: Optional[UUID] = None
-    tags: Optional[List[str]] = Field(default_factory=list)
-    formula: Optional[str] = None
-    data_source: Optional[str] = None
-    automation_config: Optional[Dict[str, Any]] = None
+    objective_id: Optional[UUID] = None  # Link to OKR (backward compatibility)
 
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    # Tracking
+    last_measured_at: Optional[datetime] = None
+    next_review_date: Optional[datetime] = None
+
+    # Metadata - using meta_data to match model field name
+    meta_data: Optional[Dict[str, Any]] = Field(default_factory=dict)
+
+    # Legacy fields - removed since they don't exist in the model
+    # These fields are not in KPIIndicator model and will be ignored
+
+    model_config = ConfigDict(
+        extra="forbid",
+        str_strip_whitespace=True
+    )
 
 class KPICreate(KPIBase):
     initial_measurements: Optional[List[KPIMeasurementCreate]] = Field(default_factory=list)
@@ -98,26 +141,47 @@ class KPICreate(KPIBase):
 class KPIUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
-    kpi_type: Optional[KPIType] = None
+    unit: Optional[str] = Field(None, max_length=50)
+
+    # Values and thresholds
     target_value: Optional[float] = None
     current_value: Optional[float] = None
     baseline_value: Optional[float] = None
-    unit: Optional[str] = Field(None, max_length=50)
-    status: Optional[KPIStatus] = None
-    is_higher_better: Optional[bool] = None
+    warn_threshold: Optional[float] = None
+    alarm_threshold: Optional[float] = None
+
+    # Data source configuration
+    source_type: Optional[KPISourceType] = None
+    formula: Optional[str] = None
+    formula_metadata: Optional[Dict[str, Any]] = None
+
+    # KPI type and period
+    kpi_type: Optional[KPIType] = None
     period: Optional[KPIPeriod] = None
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
-    next_review_date: Optional[datetime] = None
+    aggregation: Optional[KPIAggregation] = None
+
+    # Status tracking
+    status: Optional[KPIStatus] = None
+    is_active: Optional[bool] = None
+
+    # Relationships
     owner_id: Optional[UUID] = None
     project_id: Optional[UUID] = None
     objective_id: Optional[UUID] = None
-    tags: Optional[List[str]] = None
-    formula: Optional[str] = None
-    data_source: Optional[str] = None
-    automation_config: Optional[Dict[str, Any]] = None
 
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    # Tracking
+    last_measured_at: Optional[datetime] = None
+    next_review_date: Optional[datetime] = None
+
+    # Metadata - using meta_data to match model field name
+    meta_data: Optional[Dict[str, Any]] = None
+
+    # Legacy fields removed since they don't exist in the model
+
+    model_config = ConfigDict(
+        extra="forbid",
+        str_strip_whitespace=True
+    )
 
 class KPIRead(KPIBase):
     id: UUID
@@ -126,38 +190,21 @@ class KPIRead(KPIBase):
     updated_at: Optional[datetime] = None
     deleted_at: Optional[datetime] = None
     measurements: List[KPIMeasurementRead] = Field(default_factory=list)
+    on_track: bool = True  # Added to match model field
 
     @computed_field
     @property
     def progress_percentage(self) -> float:
         """Calculate progress percentage based on current, baseline and target values."""
-        if self.baseline_value is not None:
-            if self.target_value == self.baseline_value:
-                return 100.0 if self.current_value == self.target_value else 0.0
-            progress = ((self.current_value - self.baseline_value) /
-                       (self.target_value - self.baseline_value)) * 100
-        else:
-            if self.target_value == 0:
-                return 100.0 if self.current_value == 0 else 0.0
-            progress = (self.current_value / self.target_value) * 100
-
-        if not self.is_higher_better:
-            if self.baseline_value is not None:
-                progress = ((self.baseline_value - self.current_value) /
-                           (self.baseline_value - self.target_value)) * 100
-            else:
-                progress = (self.target_value / self.current_value) * 100 if self.current_value > 0 else 0
-
-        return max(0.0, min(100.0, progress))
+        if self.target_value == 0:
+            return 100.0 if self.current_value == 0 else 0.0
+        return min(100.0, max(0.0, (self.current_value / self.target_value) * 100))
 
     @computed_field
     @property
     def is_achieved(self) -> bool:
-        """Check if target is achieved considering direction."""
-        if self.is_higher_better:
-            return self.current_value >= self.target_value
-        else:
-            return self.current_value <= self.target_value
+        """Check if target is achieved."""
+        return self.current_value >= self.target_value
 
     @computed_field
     @property
@@ -182,7 +229,10 @@ class KPIRead(KPIBase):
         """Get the latest measurement."""
         return self.measurements[0] if self.measurements else None
 
-    model_config = ConfigDict(from_attributes=True, extra="forbid")
+    model_config = ConfigDict(
+        from_attributes=True,
+        extra="forbid"
+    )
 
 class KPIListResponse(BaseModel):
     items: List[KPIRead]

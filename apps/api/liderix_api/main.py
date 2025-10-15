@@ -268,9 +268,10 @@ from liderix_api.routes import (
     projects as projects_router,
     tasks as tasks_router,
     okrs as okrs_router,
-    # kpis as kpis_router,  # DISABLED
+    kpis as kpis_router,
     auth as auth_router,
     analytics as analytics_router,
+    calendar_events as calendar_router,
 )
 
 # --- клиентские (ITstep БД) ---
@@ -289,7 +290,8 @@ app.include_router(client_router.router, prefix=PREFIX, tags=["Clients"])
 app.include_router(projects_router.router, prefix=PREFIX, tags=["Projects"])
 app.include_router(tasks_router.router, prefix=PREFIX, tags=["Tasks"])
 app.include_router(okrs_router.router, prefix=PREFIX, tags=["OKRs"])
-# app.include_router(kpis_router.router, prefix=PREFIX, tags=["KPIs"]) # DISABLED: KPI model issues
+app.include_router(kpis_router.router, prefix=PREFIX, tags=["KPIs"])
+app.include_router(calendar_router.router, prefix=PREFIX, tags=["Calendar"])
 app.include_router(auth_router.router, prefix=PREFIX, tags=["Auth"])
 app.include_router(analytics_router.router, prefix=f"{PREFIX}/analytics", tags=["Analytics"])
 
