@@ -22,8 +22,11 @@ except Exception:
 
 from liderix_api.db import get_async_session
 from liderix_api.models.users import User
+from liderix_api.models.organization import Organization
+from liderix_api.models.org_structure import Membership
 from liderix_api.schemas.auth import RegisterSchema, VerifySchema, ResendSchema
 from liderix_api.services.auth import hash_password
+from liderix_api.services.onboarding import OnboardingService
 from liderix_api.config.settings import settings
 from .utils import (
     now_utc,
@@ -284,6 +287,63 @@ async def _verify_email_logic(
                 updated_at=now_utc(),
             )
         )
+
+        # Create default organization for new user
+        # Check if user already has an organization
+        from sqlalchemy.orm import selectinload
+        user_with_memberships = await session.scalar(
+            select(User)
+            .options(selectinload(User.memberships))
+            .where(User.id == user.id)
+        )
+
+        if not user_with_memberships or not user_with_memberships.memberships:
+            # Create organization
+            org_name = f"{user.username}'s Workspace"
+            organization = Organization(
+                id=uuid4(),
+                name=org_name,
+                slug=user.username.lower().replace(" ", "-")[:50],
+                is_active=True,
+                created_at=now_utc(),
+            )
+            session.add(organization)
+            await session.flush()  # Get org.id
+
+            # Create membership
+            membership = Membership(
+                id=uuid4(),
+                user_id=user.id,
+                org_id=organization.id,
+                role="owner",
+                status="active",
+                created_at=now_utc(),
+            )
+            session.add(membership)
+            await session.flush()
+
+            # Create onboarding sample data (default business template)
+            try:
+                import logging
+                logger = logging.getLogger(__name__)
+
+                # Check if onboarding is enabled in settings
+                auto_seed = getattr(settings, "AUTO_SEED_SAMPLE_DATA", True)
+
+                if auto_seed:
+                    logger.info(f"Creating onboarding sample data for user {user.id}")
+                    await OnboardingService.create_sample_data_for_user(
+                        user_id=user.id,
+                        org_id=organization.id,
+                        session=session,
+                        template="business"  # Default template
+                    )
+                    logger.info(f"Onboarding sample data created successfully for user {user.id}")
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to create onboarding data for user {user.id}: {e}")
+                # Don't fail verification if onboarding fails
 
     await AuditLogger.log_event(session, user.id, "auth.verify.success", True, ip, user_agent, {"email": email})
     return MessageResponse(message="Email verified successfully! You can now log in to your account.")

@@ -82,6 +82,9 @@ class Settings(BaseSettings):
     ITSTEP_DB_USER: str = os.getenv("ITSTEP_DB_USER", "bi_app")
     ITSTEP_DB_PASSWORD: Optional[str] = os.getenv("ITSTEP_DB_PASSWORD")
 
+    # ---- Onboarding ----
+    AUTO_SEED_SAMPLE_DATA: bool = str(os.getenv("AUTO_SEED_SAMPLE_DATA", "true")).lower() in ("1", "true", "yes")
+
     model_config = SettingsConfigDict(
         case_sensitive=False,
         extra="ignore",
