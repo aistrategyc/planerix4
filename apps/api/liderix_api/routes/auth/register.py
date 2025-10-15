@@ -23,7 +23,7 @@ except Exception:
 from liderix_api.db import get_async_session
 from liderix_api.models.users import User
 from liderix_api.models.organization import Organization
-from liderix_api.models.org_structure import Membership
+from liderix_api.models.memberships import Membership
 from liderix_api.schemas.auth import RegisterSchema, VerifySchema, ResendSchema
 from liderix_api.services.auth import hash_password
 from liderix_api.services.onboarding import OnboardingService

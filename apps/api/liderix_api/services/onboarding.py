@@ -45,7 +45,6 @@ from liderix_api.enums import (
     EventType,
     EventStatus,
     OKRStatus,
-    KRStatus,
 )
 
 logger = logging.getLogger(__name__)
@@ -135,8 +134,6 @@ class DefaultTemplate(OnboardingTemplate):
         """Create user's default calendar"""
         calendar = Calendar(
             id=uuid.uuid4(),
-            org_id=self.org.id,
-            owner_id=self.user.id,
             name="My Calendar",
             description="Personal calendar for meetings and events",
             color="#3174ad",
@@ -154,11 +151,9 @@ class DefaultTemplate(OnboardingTemplate):
         """Create a sample project"""
         project = Project(
             id=uuid.uuid4(),
-            org_id=self.org.id,
             name="Welcome Project",
             description="This is your first project! You can edit or delete it anytime.",
             status=ProjectStatus.ACTIVE,
-            progress=0,
             created_by=self.user.id,
             is_public=False,
             start_date=self._now(),
@@ -198,7 +193,6 @@ class DefaultTemplate(OnboardingTemplate):
         for idx, task_data in enumerate(tasks_data):
             task = Task(
                 id=uuid.uuid4(),
-                org_id=self.org.id,
                 project_id=project.id,
                 title=task_data["title"],
                 description=task_data["description"],
@@ -253,7 +247,6 @@ class DefaultTemplate(OnboardingTemplate):
 
             event = CalendarEvent(
                 id=uuid.uuid4(),
-                org_id=self.org.id,
                 creator_id=self.user.id,
                 title=event_data["title"],
                 description=event_data["description"],
@@ -279,15 +272,11 @@ class DefaultTemplate(OnboardingTemplate):
         """Create a sample OKR with key results"""
         objective = Objective(
             id=uuid.uuid4(),
-            org_id=self.org.id,
             title="Get Started with Planerix",
             description="Learn the platform and set up your workspace",
-            owner_id=self.user.id,
             status=OKRStatus.ON_TRACK,
-            progress=0,
             start_date=self._now(),
             end_date=self._days_from_now(90),
-            is_public=True,
         )
         self.session.add(objective)
         self.created_entities["objectives"].append(objective)
@@ -315,18 +304,12 @@ class DefaultTemplate(OnboardingTemplate):
             key_result = KeyResult(
                 id=uuid.uuid4(),
                 objective_id=objective.id,
-                org_id=self.org.id,
                 title=kr["title"],
                 description=f"Key result {idx + 1} for getting started",
-                owner_id=self.user.id,
-                status=KRStatus.NOT_STARTED,
                 start_value=0,
                 current_value=0,
                 target_value=kr["target_value"],
                 unit=kr["unit"],
-                progress=0,
-                weight=1.0,
-                is_public=True,
             )
             self.session.add(key_result)
             key_results.append(key_result)
@@ -364,7 +347,6 @@ class DefaultTemplate(OnboardingTemplate):
         for kpi_data in kpis_data:
             kpi = KPIIndicator(
                 id=uuid.uuid4(),
-                org_id=self.org.id,
                 name=kpi_data["name"],
                 description=kpi_data["description"],
                 category=kpi_data["category"],
@@ -373,7 +355,6 @@ class DefaultTemplate(OnboardingTemplate):
                 current_value=0.0,
                 measurement_type="manual",
                 frequency="weekly",
-                owner_id=self.user.id,
                 is_active=True,
             )
             self.session.add(kpi)
@@ -449,13 +430,10 @@ class MarketingTemplate(DefaultTemplate):
         """Create marketing-focused project"""
         project = Project(
             id=uuid.uuid4(),
-            org_id=self.org.id,
             name="Q1 Marketing Campaign",
             description="Launch new product marketing campaign",
             status=ProjectStatus.ACTIVE,
-            progress=0,
             created_by=self.user.id,
-            is_public=True,
             start_date=self._now(),
             end_date=self._days_from_now(90),
         )
@@ -500,7 +478,6 @@ class MarketingTemplate(DefaultTemplate):
         for idx, task_data in enumerate(tasks_data):
             task = Task(
                 id=uuid.uuid4(),
-                org_id=self.org.id,
                 project_id=project.id,
                 title=task_data["title"],
                 description=task_data["description"],
@@ -521,15 +498,11 @@ class MarketingTemplate(DefaultTemplate):
         """Create marketing-focused OKR"""
         objective = Objective(
             id=uuid.uuid4(),
-            org_id=self.org.id,
             title="Grow Brand Awareness and Leads",
             description="Increase market presence and generate qualified leads",
-            owner_id=self.user.id,
             status=OKRStatus.ON_TRACK,
-            progress=0,
             start_date=self._now(),
             end_date=self._days_from_now(90),
-            is_public=True,
         )
         self.session.add(objective)
         self.created_entities["objectives"].append(objective)
@@ -545,17 +518,11 @@ class MarketingTemplate(DefaultTemplate):
             key_result = KeyResult(
                 id=uuid.uuid4(),
                 objective_id=objective.id,
-                org_id=self.org.id,
                 title=kr["title"],
-                owner_id=self.user.id,
-                status=KRStatus.NOT_STARTED,
                 start_value=0,
                 current_value=0,
                 target_value=kr["target_value"],
                 unit=kr["unit"],
-                progress=0,
-                weight=1.0,
-                is_public=True,
             )
             self.session.add(key_result)
             key_results.append(key_result)
@@ -571,11 +538,9 @@ class SoftwareTemplate(DefaultTemplate):
         """Create software project"""
         project = Project(
             id=uuid.uuid4(),
-            org_id=self.org.id,
             name="Product Feature Development",
             description="Sprint 1: User authentication and onboarding",
             status=ProjectStatus.ACTIVE,
-            progress=0,
             created_by=self.user.id,
             is_public=False,
             start_date=self._now(),
@@ -629,7 +594,6 @@ class SoftwareTemplate(DefaultTemplate):
         for idx, task_data in enumerate(tasks_data):
             task = Task(
                 id=uuid.uuid4(),
-                org_id=self.org.id,
                 project_id=project.id,
                 title=task_data["title"],
                 description=task_data["description"],
@@ -650,15 +614,11 @@ class SoftwareTemplate(DefaultTemplate):
         """Create software development OKR"""
         objective = Objective(
             id=uuid.uuid4(),
-            org_id=self.org.id,
             title="Deliver High-Quality Product Features",
             description="Ship features on time with minimal bugs",
-            owner_id=self.user.id,
             status=OKRStatus.ON_TRACK,
-            progress=0,
             start_date=self._now(),
             end_date=self._days_from_now(90),
-            is_public=True,
         )
         self.session.add(objective)
         self.created_entities["objectives"].append(objective)
@@ -674,17 +634,11 @@ class SoftwareTemplate(DefaultTemplate):
             key_result = KeyResult(
                 id=uuid.uuid4(),
                 objective_id=objective.id,
-                org_id=self.org.id,
                 title=kr["title"],
-                owner_id=self.user.id,
-                status=KRStatus.NOT_STARTED,
                 start_value=0,
                 current_value=0,
                 target_value=kr["target_value"],
                 unit=kr["unit"],
-                progress=0,
-                weight=1.0,
-                is_public=True,
             )
             self.session.add(key_result)
             key_results.append(key_result)
@@ -703,8 +657,6 @@ class EmptyTemplate(OnboardingTemplate):
         # Create only default calendar
         calendar = Calendar(
             id=uuid.uuid4(),
-            org_id=self.org.id,
-            owner_id=self.user.id,
             name="My Calendar",
             description="Personal calendar",
             color="#3174ad",
@@ -741,13 +693,10 @@ class SalesTemplate(DefaultTemplate):
         """Create sales-focused project"""
         project = Project(
             id=uuid.uuid4(),
-            org_id=self.org.id,
             name="Q1 Sales Pipeline",
             description="Grow revenue and close key deals",
             status=ProjectStatus.ACTIVE,
-            progress=0,
             created_by=self.user.id,
-            is_public=True,
             start_date=self._now(),
             end_date=self._days_from_now(90),
         )
@@ -792,7 +741,6 @@ class SalesTemplate(DefaultTemplate):
         for idx, task_data in enumerate(tasks_data):
             task = Task(
                 id=uuid.uuid4(),
-                org_id=self.org.id,
                 project_id=project.id,
                 title=task_data["title"],
                 description=task_data["description"],
@@ -813,15 +761,11 @@ class SalesTemplate(DefaultTemplate):
         """Create sales-focused OKR"""
         objective = Objective(
             id=uuid.uuid4(),
-            org_id=self.org.id,
             title="Accelerate Revenue Growth",
             description="Increase MRR and expand customer base",
-            owner_id=self.user.id,
             status=OKRStatus.ON_TRACK,
-            progress=0,
             start_date=self._now(),
             end_date=self._days_from_now(90),
-            is_public=True,
         )
         self.session.add(objective)
         self.created_entities["objectives"].append(objective)
@@ -837,17 +781,11 @@ class SalesTemplate(DefaultTemplate):
             key_result = KeyResult(
                 id=uuid.uuid4(),
                 objective_id=objective.id,
-                org_id=self.org.id,
                 title=kr["title"],
-                owner_id=self.user.id,
-                status=KRStatus.NOT_STARTED,
                 start_value=0,
                 current_value=0,
                 target_value=kr["target_value"],
                 unit=kr["unit"],
-                progress=0,
-                weight=1.0,
-                is_public=True,
             )
             self.session.add(key_result)
             key_results.append(key_result)
@@ -885,7 +823,6 @@ class SalesTemplate(DefaultTemplate):
         for kpi_data in kpis_data:
             kpi = KPIIndicator(
                 id=uuid.uuid4(),
-                org_id=self.org.id,
                 name=kpi_data["name"],
                 description=kpi_data["description"],
                 category=kpi_data["category"],
@@ -894,7 +831,6 @@ class SalesTemplate(DefaultTemplate):
                 current_value=0.0,
                 measurement_type="manual",
                 frequency="weekly",
-                owner_id=self.user.id,
                 is_active=True,
             )
             self.session.add(kpi)
