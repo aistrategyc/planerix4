@@ -9,6 +9,8 @@ from typing import Optional
 from datetime import date
 
 from liderix_api.db import get_itstep_session
+from liderix_api.services.dependencies import get_current_user
+from liderix_api.models.users import User
 
 router = APIRouter()
 
@@ -17,6 +19,7 @@ router = APIRouter()
 async def get_paid_split_platforms(
     date_from: date = Query(..., description="Start date (YYYY-MM-DD)"),
     date_to: date = Query(..., description="End date (YYYY-MM-DD)"),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_itstep_session),
 ):
     """
@@ -111,6 +114,7 @@ async def get_paid_split_campaigns(
     date_to: date = Query(..., description="End date (YYYY-MM-DD)"),
     platform: str = Query(..., description="Platform (google/meta)"),
     limit: int = Query(20, description="Limit results"),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_itstep_session),
 ):
     """

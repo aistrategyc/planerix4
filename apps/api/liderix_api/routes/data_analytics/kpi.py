@@ -11,6 +11,8 @@ from sqlalchemy import text
 
 from liderix_api.db import get_itstep_session
 from liderix_api.schemas.data_analytics import KPICardsResponse
+from liderix_api.services.dependencies import get_current_user
+from liderix_api.models.users import User
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -24,6 +26,7 @@ async def get_kpi_cards(
         "google,meta",
         description="Comma-separated platforms (google,meta,email)"
     ),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_itstep_session),
 ):
     """
@@ -100,6 +103,7 @@ async def get_kpi_compare(
     compare_mode: str = Query("auto", description="auto|custom|disabled"),
     prev_from: Optional[date] = Query(None, description="Previous period start (for custom)"),
     prev_to: Optional[date] = Query(None, description="Previous period end (for custom)"),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_itstep_session),
 ):
     """

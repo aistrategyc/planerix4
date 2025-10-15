@@ -12,6 +12,8 @@ from sqlalchemy import text
 
 from liderix_api.db import get_itstep_session
 from liderix_api.schemas.data_analytics import BudgetRecommendationsResponse, BudgetRecommendationItem
+from liderix_api.services.dependencies import get_current_user
+from liderix_api.models.users import User
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -33,6 +35,7 @@ async def get_budget_recommendations(
     min_leads: Optional[int] = Query(5, description="Minimum leads for scale action"),
     prev_from: Optional[date] = Query(None, description="Previous period start (for custom mode)"),
     prev_to: Optional[date] = Query(None, description="Previous period end (for custom mode)"),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_itstep_session),
 ):
     """

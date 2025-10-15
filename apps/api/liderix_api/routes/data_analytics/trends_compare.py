@@ -11,8 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
 from liderix_api.db import get_itstep_session
+from liderix_api.services.dependencies import get_current_user
+from liderix_api.models.users import User
 from liderix_api.schemas.data_analytics import (
-    LeadsTrendCompareResponse,
+LeadsTrendCompareResponse,
     LeadsTrendCompareItem,
     SpendTrendCompareResponse,
     SpendTrendCompareItem,
@@ -32,6 +34,7 @@ async def get_leads_trend_compare(
     ),
     prev_from: Optional[date] = Query(None, description="Previous period start (for custom mode)"),
     prev_to: Optional[date] = Query(None, description="Previous period end (for custom mode)"),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_itstep_session),
 ):
     """
@@ -129,6 +132,7 @@ async def get_spend_trend_compare(
     ),
     prev_from: Optional[date] = Query(None, description="Previous period start (for custom mode)"),
     prev_to: Optional[date] = Query(None, description="Previous period end (for custom mode)"),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_itstep_session),
 ):
     """

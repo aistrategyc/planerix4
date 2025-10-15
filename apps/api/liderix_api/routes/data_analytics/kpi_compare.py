@@ -28,6 +28,7 @@ async def get_kpi_compare(
     compare_mode: str = Query("auto", description="auto|disabled|custom"),
     prev_from: Optional[date] = Query(None, description="Previous period start (for custom mode)"),
     prev_to: Optional[date] = Query(None, description="Previous period end (for custom mode)"),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_itstep_session),
 ):
     """

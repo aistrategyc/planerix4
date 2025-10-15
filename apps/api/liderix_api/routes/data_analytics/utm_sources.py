@@ -11,6 +11,8 @@ from sqlalchemy import text
 
 from liderix_api.db import get_itstep_session
 from liderix_api.schemas.data_analytics import UTMSourcesResponse, UTMSourceItem
+from liderix_api.services.dependencies import get_current_user
+from liderix_api.models.users import User
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -25,6 +27,7 @@ async def get_utm_sources(
         description="Comma-separated platforms (google,meta,email)"
     ),
     limit: Optional[int] = Query(1000, description="Results limit"),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_itstep_session),
 ):
     """

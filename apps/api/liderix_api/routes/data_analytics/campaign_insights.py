@@ -11,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
 from liderix_api.db import get_itstep_session
+from liderix_api.services.dependencies import get_current_user
+from liderix_api.models.users import User
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -21,6 +23,7 @@ async def get_campaign_insights(
     date_from: date = Query(..., description="Start date (YYYY-MM-DD)"),
     date_to: date = Query(..., description="End date (YYYY-MM-DD)"),
     min_leads: int = Query(5, description="Minimum leads to include"),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_itstep_session),
 ):
     """
@@ -106,6 +109,7 @@ async def get_campaign_insights(
 async def get_campaigns_metrics_trend(
     date_from: date = Query(..., description="Start date (YYYY-MM-DD)"),
     date_to: date = Query(..., description="End date (YYYY-MM-DD)"),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_itstep_session),
 ):
     """

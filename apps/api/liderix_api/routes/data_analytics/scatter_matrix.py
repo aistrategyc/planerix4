@@ -9,6 +9,8 @@ from typing import Optional
 from datetime import date
 
 from liderix_api.db import get_itstep_session
+from liderix_api.services.dependencies import get_current_user
+from liderix_api.models.users import User
 
 router = APIRouter()
 
@@ -20,6 +22,7 @@ async def get_scatter_matrix(
     platform: Optional[str] = Query(None, description="Platform filter (google/meta)"),
     min_leads: int = Query(5, description="Minimum leads to include"),
     min_spend: float = Query(100, description="Minimum spend to include"),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_itstep_session),
 ):
     """

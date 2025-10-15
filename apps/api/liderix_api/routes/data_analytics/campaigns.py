@@ -14,6 +14,8 @@ from sqlalchemy import text
 from liderix_api.services.auth import get_current_user
 from liderix_api.models.users import User
 from liderix_api.db import get_itstep_session
+from liderix_api.services.dependencies import get_current_user
+from liderix_api.models.users import User
 from liderix_api.schemas.data_analytics import (
     CampaignsResponse,
     CampaignItem,
@@ -35,6 +37,7 @@ async def get_campaigns(
     ),
     min_spend: Optional[float] = Query(0.0, description="Minimum spend filter"),
     limit: Optional[int] = Query(500, description="Results limit"),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_itstep_session),
 ):
     """
@@ -116,6 +119,7 @@ async def get_wow_campaigns(
         description="Comma-separated platforms (google,meta,email)"
     ),
     limit: Optional[int] = Query(200, description="Results limit"),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_itstep_session),
 ):
     """

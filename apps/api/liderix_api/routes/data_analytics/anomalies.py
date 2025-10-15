@@ -9,6 +9,8 @@ from typing import Optional
 from datetime import date, timedelta
 
 from liderix_api.db import get_itstep_session
+from liderix_api.services.dependencies import get_current_user
+from liderix_api.models.users import User
 
 router = APIRouter()
 
@@ -20,6 +22,7 @@ async def get_campaign_anomalies(
     platform: Optional[str] = Query(None, description="Platform filter (google/meta)"),
     anomaly_type: Optional[str] = Query(None, description="Type: spike_cpl, drop_leads, spike_spend"),
     severity: Optional[str] = Query(None, description="Severity: high, medium, low"),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_itstep_session),
 ):
     """

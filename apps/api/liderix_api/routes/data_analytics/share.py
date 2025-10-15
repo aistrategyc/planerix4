@@ -12,8 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
 from liderix_api.db import get_itstep_session
+from liderix_api.services.dependencies import get_current_user
+from liderix_api.models.users import User
 from liderix_api.schemas.data_analytics import (
-    PlatformShareResponse,
+PlatformShareResponse,
     PlatformShareItem,
     TopCampaignsResponse,
     TopCampaignItem,
@@ -27,6 +29,7 @@ router = APIRouter()
 async def get_platform_share(
     date_from: date = Query(..., description="Start date (YYYY-MM-DD)"),
     date_to: date = Query(..., description="End date (YYYY-MM-DD)"),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_itstep_session),
 ):
     """
@@ -69,6 +72,7 @@ async def get_top_campaigns(
     date_from: date = Query(..., description="Start date (YYYY-MM-DD)"),
     date_to: date = Query(..., description="End date (YYYY-MM-DD)"),
     limit: Optional[int] = Query(5, description="Number of top campaigns (default 5)"),
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_itstep_session),
 ):
     """
