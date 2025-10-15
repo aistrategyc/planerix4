@@ -5,8 +5,8 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import {
 import ProtectedRoute from "@/components/auth/ProtectedRoute"
+import {
   BarChart3,
   Megaphone,
   MessageCircle,
