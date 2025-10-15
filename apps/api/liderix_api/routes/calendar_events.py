@@ -35,7 +35,7 @@ from liderix_api.services.auth import get_current_user
 from liderix_api.services.audit import AuditLogger
 from liderix_api.services.permissions import check_organization_permission
 
-router = APIRouter(prefix="/calendar/events", tags=["Calendar Events"])
+router = APIRouter(tags=["Calendar Events"])
 logger = logging.getLogger(__name__)
 
 

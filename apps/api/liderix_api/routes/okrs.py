@@ -16,7 +16,7 @@ from liderix_api.services.auth import get_current_user
 from liderix_api.models.users import User
 from liderix_api.services.permissions import check_organization_access
 
-router = APIRouter(prefix="/okrs", tags=["OKRs & Objectives"])
+router = APIRouter(tags=["OKRs & Objectives"])
 
 # 🔹 Получить все цели организации с пагинацией и фильтрами
 @router.get("/objectives", response_model=ObjectiveListResponse)

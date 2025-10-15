@@ -33,7 +33,7 @@ from liderix_api.services.audit import AuditLogger
 from liderix_api.services.notifications import send_project_notification
 from liderix_api.services.permissions import check_project_permission
 
-router = APIRouter(prefix="/projects", tags=["Projects"])
+router = APIRouter(tags=["Projects"])
 logger = logging.getLogger(__name__)
 
 class ProjectStatus(str, Enum):
