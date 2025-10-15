@@ -228,44 +228,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const initAuth = async () => {
       setIsLoading(true);
 
-      // TEMPORARY DEV MODE: Auto-login as ITstep user for analytics development
-      if (process.env.NODE_ENV === 'development') {
-        try {
-          // Auto-login with ITstep credentials
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({
-              email: 'itstep@itstep.com',
-              password: 'ITstep2025!'
-            }),
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            if (data.access_token) {
-              setAccessToken(data.access_token);
-
-              // Mock ITstep user data for development
-              setUser({
-                id: 'dev-itstep-user',
-                email: 'itstep@itstep.com',
-                username: 'itstep_admin',
-                full_name: 'ITstep Admin',
-                is_active: true,
-                is_verified: true,
-              });
-
-              console.log('🔧 DEV MODE: Auto-logged in as ITstep user');
-              setIsLoading(false);
-              return;
-            }
-          }
-        } catch (error) {
-          console.warn('🔧 DEV MODE: Auto-login failed, trying normal flow');
-        }
-      }
+      // SECURITY FIX (Oct 15, 2025): Removed dev mode auto-login
+      // Auth must work properly in all environments
 
       // Normal production flow
       // First try to refresh using httpOnly cookie

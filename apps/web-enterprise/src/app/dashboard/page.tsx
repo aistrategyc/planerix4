@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
+import ProtectedRoute from "@/components/auth/ProtectedRoute"
   BarChart3, 
   Target, 
   Users, 
@@ -33,7 +34,7 @@ import {
   Star
 } from "lucide-react";
 
-export default function DashboardHome() {
+function DashboardHomeContentContent() {
   const [currentTime, setCurrentTime] = useState(new Date());
 
   // Обновление времени каждую минуту
@@ -477,4 +478,13 @@ export default function DashboardHome() {
       </div>
     </div>
   );
+}
+
+// Wrap with authentication protection
+export default function DashboardHomeContent() {
+  return (
+    <ProtectedRoute requireAuth={true}>
+      <DashboardHomeContentContent />
+    </ProtectedRoute>
+  )
 }

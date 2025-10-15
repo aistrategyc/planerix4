@@ -26,11 +26,8 @@ export default function ProtectedRoute({
   const [orgLoading, setOrgLoading] = useState(false)
   const [hasOrganization, setHasOrganization] = useState<boolean | null>(null)
 
-  // TEMPORARY DEV MODE: Skip all checks for analytics development
-  if (process.env.NODE_ENV === 'development') {
-    console.log('🔧 DEV MODE: Skipping auth checks for development')
-    return <>{children}</>
-  }
+  // SECURITY FIX (Oct 15, 2025): Removed dev mode bypass
+  // Auth checks must run in ALL environments for security
 
   // ✅ Проверка организации если требуется
   useEffect(() => {

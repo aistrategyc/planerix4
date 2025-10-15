@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import {
+import ProtectedRoute from "@/components/auth/ProtectedRoute"
   BarChart3,
   Megaphone,
   MessageCircle,
@@ -14,7 +15,7 @@ import {
   Search,
 } from "lucide-react"
 
-export default function AIHomePage() {
+function AIHomePageContentContent() {
   const [search, setSearch] = useState("")
 
   return (
@@ -158,5 +159,14 @@ function AgentCard({
         </CardContent>
       </Card>
     </Link>
+  )
+}
+
+// Wrap with authentication protection
+export default function AIHomePageContent() {
+  return (
+    <ProtectedRoute requireAuth={true}>
+      <AIHomePageContentContent />
+    </ProtectedRoute>
   )
 }

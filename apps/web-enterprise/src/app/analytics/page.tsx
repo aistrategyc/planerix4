@@ -28,6 +28,7 @@ import { useDynamicDateRange } from "@/hooks/useDynamicDateRange"
 
 // Import analytics hooks
 import {
+import ProtectedRoute from "@/components/auth/ProtectedRoute"
   useDashboardOverview,
   useRealTimeMetrics,
   useKPIs,
@@ -99,7 +100,7 @@ function LoadingSkeleton() {
 
 // ==================== MAIN COMPONENT ====================
 
-export default function AnalyticsPage() {
+function AnalyticsPageContentContent() {
   const [activeTab, setActiveTab] = useState("overview")
 
   // Date range management with calendar filter - dynamically load from database
@@ -390,5 +391,14 @@ export default function AnalyticsPage() {
         </TabsContent>
       </Tabs>
     </div>
+  )
+}
+
+// Wrap with authentication protection
+export default function AnalyticsPageContent() {
+  return (
+    <ProtectedRoute requireAuth={true}>
+      <AnalyticsPageContentContent />
+    </ProtectedRoute>
   )
 }

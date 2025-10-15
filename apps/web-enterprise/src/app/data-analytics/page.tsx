@@ -7,10 +7,11 @@ import { Input } from "@/components/ui/input"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, ScatterChart, Scatter, ZAxis, BarChart, Bar } from "recharts"
 import { TrendingUp, DollarSign, Users, FileText, Target, RefreshCcw, AlertCircle, AlertTriangle, ArrowUpRight, ArrowDownRight } from "lucide-react"
 import * as dataAnalyticsApi from "@/lib/api/data-analytics"
+import ProtectedRoute from "@/components/auth/ProtectedRoute"
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"]
 
-export default function DataAnalyticsPage() {
+function DataAnalyticsPageContent() {
   // Filters - Updated Oct 14, 2025 for Contracts Attribution
   const [dateFrom, setDateFrom] = useState("2025-09-01")
   const [dateTo, setDateTo] = useState("2025-10-14")
@@ -1629,5 +1630,14 @@ export default function DataAnalyticsPage() {
         </>
       )}
     </div>
+  )
+}
+
+// Wrap with authentication protection
+export default function DataAnalyticsPage() {
+  return (
+    <ProtectedRoute requireAuth={true}>
+      <DataAnalyticsPageContent />
+    </ProtectedRoute>
   )
 }

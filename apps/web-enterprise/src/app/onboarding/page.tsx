@@ -20,6 +20,7 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/components/ui/use-toast'
 import { cn } from '@/lib/utils'
+import ProtectedRoute from "@/components/auth/ProtectedRoute"
 
 type StepKey = 'company' | 'prefs' | 'team' | 'departments' | 'review'
 
@@ -47,7 +48,7 @@ const validateEmail = (email: string) => {
   return emailRegex.test(email)
 }
 
-export default function OnboardingPage() {
+function OnboardingPageContentContent() {
   const router = useRouter()
   const { toast } = useToast()
 
@@ -626,5 +627,14 @@ export default function OnboardingPage() {
         )}
       </Card>
     </div>
+  )
+}
+
+// Wrap with authentication protection
+export default function OnboardingPageContent() {
+  return (
+    <ProtectedRoute requireAuth={true}>
+      <OnboardingPageContentContent />
+    </ProtectedRoute>
   )
 }
