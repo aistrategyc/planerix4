@@ -126,7 +126,7 @@ function ContractsAnalyticsPageContent() {
             </div>
             <div>
               <label className="text-sm font-medium mb-2 block">Platform</label>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {["all", "Meta", "Google Ads", "Direct"].map((platform) => (
                   <Button
                     key={platform}
