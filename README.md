@@ -1,6 +1,10 @@
 # Planerix - Enterprise Analytics Platform
 
+🚀 **Production Status**: ✅ **LIVE** (Launched Oct 15, 2025)
+
 A comprehensive enterprise analytics platform built with Next.js, FastAPI, and PostgreSQL.
+
+**Live URL**: https://app.planerix.com
 
 ## 🏗️ Architecture
 
@@ -240,11 +244,47 @@ docker system prune -af
    - Run production script: `./start-prod.sh`
    - Monitor logs and health checks
 
-## 📚 Additional Resources
+## 📚 Documentation
 
-- [Deployment Guide](./DEPLOYMENT_AND_CONFIGURATION_GUIDE.md) - Detailed deployment instructions
+### Current Documentation (Oct 15, 2025)
+
+#### Master Status & Audit
+- **[MASTER_STATUS_OCT15_2025.md](./MASTER_STATUS_OCT15_2025.md)** - Complete production status, API inventory, security audit
+- **[DETAILED_IMPLEMENTATION_PLAN.md](./DETAILED_IMPLEMENTATION_PLAN.md)** - Full task breakdown and completion status
+- **[CLAUDE.md](./CLAUDE.md)** - Project configuration, critical fixes, and historical issues
+
+#### Security & Authentication
+- **[FRONTEND_AUTH_COMPLETE_OCT15.md](./FRONTEND_AUTH_COMPLETE_OCT15.md)** - Frontend authentication implementation
+- **[PRODUCTION_SECURITY_OCT15.md](./PRODUCTION_SECURITY_OCT15.md)** - Backend security status
+- **[AUTHENTICATION_RULES.md](./AUTHENTICATION_RULES.md)** - Authentication system documentation
+
+#### Deployment & Configuration
+- **[PRODUCTION_SETUP_COMPLETE_OCT15.md](./PRODUCTION_SETUP_COMPLETE_OCT15.md)** - Production deployment guide
+- **[DEPLOYMENT_AND_CONFIGURATION_GUIDE.md](./DEPLOYMENT_AND_CONFIGURATION_GUIDE.md)** - Detailed deployment procedures
+- **[DEPLOYMENT_CHECKLIST.md](./DEPLOYMENT_CHECKLIST.md)** - Pre-deployment verification
+
+#### Technical References
+- **[CALENDAR_API_IMPLEMENTATION_COMPLETE.md](./CALENDAR_API_IMPLEMENTATION_COMPLETE.md)** - Calendar system documentation
+- **[database-schema.md](./database-schema.md)** - Database schema reference
+- **[FRONTEND_BACKEND_API_SPECIFICATION.md](./FRONTEND_BACKEND_API_SPECIFICATION.md)** - API contracts
+
+#### Additional Resources
 - [API Documentation](http://localhost:8001/docs) - Interactive API docs (development)
-- [Frontend Specification](./FRONTEND_SPECIFICATION.md) - UI/UX guidelines
+- [Archive](./archive/README.md) - Historical documentation (Oct 14 reports, keyword research)
+
+### Quick Documentation Index by Topic
+
+**Need to understand the current state?**
+→ Start with [MASTER_STATUS_OCT15_2025.md](./MASTER_STATUS_OCT15_2025.md)
+
+**Need to deploy to production?**
+→ Read [PRODUCTION_SETUP_COMPLETE_OCT15.md](./PRODUCTION_SETUP_COMPLETE_OCT15.md)
+
+**Need to implement authentication?**
+→ See [FRONTEND_AUTH_COMPLETE_OCT15.md](./FRONTEND_AUTH_COMPLETE_OCT15.md)
+
+**Need to know what's left to do?**
+→ Check [DETAILED_IMPLEMENTATION_PLAN.md](./DETAILED_IMPLEMENTATION_PLAN.md)
 
 ## 🛡️ Security
 
