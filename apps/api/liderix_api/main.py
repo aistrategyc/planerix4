@@ -280,6 +280,7 @@ from liderix_api.routes import (
 from liderix_api.routes import data_analytics as data_analytics_router
 from liderix_api.routes import ads_manager as ads_manager_router
 from liderix_api.routes import marketing_campaigns as marketing_campaigns_router
+from liderix_api.routes import ads as ads_router
 
 # Import test analytics endpoint
 try:
@@ -324,6 +325,13 @@ app.include_router(
     marketing_campaigns_router.router,
     prefix=PREFIX,
     tags=["Marketing Campaigns"],
+)
+
+# Ads Analytics router (v6 with creative visualization)
+app.include_router(
+    ads_router.router,
+    prefix=PREFIX,
+    tags=["Ads Analytics"],
 )
 
 # Direct test endpoints for ITstep analytics

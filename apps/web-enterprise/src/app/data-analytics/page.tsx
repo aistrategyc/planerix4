@@ -12,9 +12,9 @@ import ProtectedRoute from "@/components/auth/ProtectedRoute"
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"]
 
 function DataAnalyticsPageContent() {
-  // Filters - Updated Oct 14, 2025 for Contracts Attribution
-  const [dateFrom, setDateFrom] = useState("2025-09-01")
-  const [dateTo, setDateTo] = useState("2025-10-14")
+  // Filters - Oct 19, 2025 - Updated start date to match RAW data availability
+  const [dateFrom, setDateFrom] = useState("2025-09-10")
+  const [dateTo, setDateTo] = useState("2025-10-19")
   const [selectedPlatform, setSelectedPlatform] = useState<string>("")
 
   // Data states (11 working endpoints)

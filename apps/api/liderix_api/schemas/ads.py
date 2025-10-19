@@ -157,3 +157,119 @@ class CampaignStatsResponse(BaseModel):
     total_leads: int = Field(..., description="Total leads generated")
     avg_cpl: float = Field(..., description="Average cost per lead in UAH")
     avg_ctr: float = Field(..., description="Average CTR percentage")
+
+
+# ============================================================================
+# New Ads Analytics Schemas (v6 with creative visualization)
+# ============================================================================
+
+class AdsOverviewResponse(BaseModel):
+    """Summary KPIs for ads across platforms"""
+    total_spend: float
+    total_impressions: int
+    total_clicks: int
+    crm_leads: int
+    platform_leads: int
+    contracts: int
+    revenue: float
+    roas: Optional[float] = None
+    cpl: Optional[float] = None
+    ctr: Optional[float] = None
+    conversion_rate: Optional[float] = None
+    match_rate: Optional[float] = None
+
+
+class CampaignPerformanceItem(BaseModel):
+    """Campaign-level performance metrics"""
+    platform: str
+    campaign_id: str
+    campaign_name: Optional[str] = None
+    campaign_status: Optional[str] = None
+    spend: float
+    impressions: int
+    clicks: int
+    crm_leads: int
+    platform_leads: Optional[int] = None
+    contracts: int
+    revenue: float
+    roas: Optional[float] = None
+    cpl: Optional[float] = None
+    ctr: Optional[float] = None
+    conversion_rate: Optional[float] = None
+    match_rate: Optional[float] = None
+    ad_count: Optional[int] = None
+
+
+class CampaignsResponse(BaseModel):
+    """List of campaigns with performance metrics"""
+    data: List[CampaignPerformanceItem]
+    total: int
+
+
+class AdCreativeInfo(BaseModel):
+    """Creative details for an ad"""
+    ad_creative_id: Optional[str] = None
+    media_image_src: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    video_id: Optional[str] = None
+    permalink_url: Optional[str] = None
+    title: Optional[str] = None
+    body: Optional[str] = None
+    description: Optional[str] = None
+    cta_type: Optional[str] = None
+    link_url: Optional[str] = None
+
+
+class AdPerformanceItem(BaseModel):
+    """Ad-level performance metrics"""
+    ad_id: str
+    ad_name: Optional[str] = None
+    ad_status: Optional[str] = None
+    adset_id: Optional[str] = None
+    adset_name: Optional[str] = None
+    campaign_id: str
+    campaign_name: Optional[str] = None
+    spend: float
+    impressions: int
+    clicks: int
+    crm_leads: int
+    platform_leads: Optional[int] = None
+    contracts: int
+    revenue: float
+    roas: Optional[float] = None
+    cpl: Optional[float] = None
+    ctr: Optional[float] = None
+    conversion_rate: Optional[float] = None
+    match_rate: Optional[float] = None
+    creative: Optional[AdCreativeInfo] = None
+
+
+class AdsByCampaignResponse(BaseModel):
+    """Ads grouped by campaign"""
+    campaign: CampaignPerformanceItem
+    ads: List[AdPerformanceItem]
+    total_ads: int
+
+
+class CreativeLibraryItem(BaseModel):
+    """Creative card for library view"""
+    ad_id: str
+    ad_name: Optional[str] = None
+    campaign_name: Optional[str] = None
+    campaign_id: str
+    media_image_src: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    title: Optional[str] = None
+    crm_leads: int
+    contracts: int
+    revenue: float
+    spend: float
+    roas: Optional[float] = None
+    cpl: Optional[float] = None
+
+
+class CreativeLibraryResponse(BaseModel):
+    """Creative library with pagination"""
+    data: List[CreativeLibraryItem]
+    total: int
+    has_more: bool

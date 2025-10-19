@@ -140,3 +140,196 @@ export const CampaignsAPI = {
     return response.data
   }
 }
+
+// ============================================================================
+// New Ads Analytics API (v6 with Creative Visualization)
+// ============================================================================
+
+export interface AdsOverview {
+  total_spend: number
+  total_impressions: number
+  total_clicks: number
+  crm_leads: number
+  platform_leads: number
+  contracts: number
+  revenue: number
+  roas: number | null
+  cpl: number | null
+  ctr: number | null
+  conversion_rate: number | null
+  match_rate: number | null
+}
+
+export interface CampaignPerformance {
+  platform: string
+  campaign_id: string
+  campaign_name: string | null
+  campaign_status: string | null
+  spend: number
+  impressions: number
+  clicks: number
+  crm_leads: number
+  platform_leads: number | null
+  contracts: number
+  revenue: number
+  roas: number | null
+  cpl: number | null
+  ctr: number | null
+  conversion_rate: number | null
+  match_rate: number | null
+  ad_count: number | null
+}
+
+export interface AdCreative {
+  ad_creative_id: string | null
+  media_image_src: string | null
+  thumbnail_url: string | null
+  video_id: string | null
+  permalink_url: string | null
+  title: string | null
+  body: string | null
+  description: string | null
+  cta_type: string | null
+  link_url: string | null
+}
+
+export interface AdPerformance {
+  ad_id: string
+  ad_name: string | null
+  ad_status: string | null
+  adset_id: string | null
+  adset_name: string | null
+  campaign_id: string
+  campaign_name: string | null
+  spend: number
+  impressions: number
+  clicks: number
+  crm_leads: number
+  platform_leads: number | null
+  contracts: number
+  revenue: number
+  roas: number | null
+  cpl: number | null
+  ctr: number | null
+  conversion_rate: number | null
+  match_rate: number | null
+  creative: AdCreative | null
+}
+
+export interface CreativeLibraryItem {
+  ad_id: string
+  ad_name: string | null
+  campaign_name: string | null
+  campaign_id: string
+  media_image_src: string | null
+  thumbnail_url: string | null
+  title: string | null
+  crm_leads: number
+  contracts: number
+  revenue: number
+  spend: number
+  roas: number | null
+  cpl: number | null
+}
+
+export const AdsAnalyticsAPI = {
+  /**
+   * Get ads overview (summary KPIs)
+   */
+  async getOverview(params: {
+    date_from: string
+    date_to: string
+    platform?: string
+  }): Promise<AdsOverview> {
+    const response = await api.get('/ads/overview', { params })
+    return response.data
+  },
+
+  /**
+   * Get campaigns list with performance metrics
+   */
+  async getCampaigns(params: {
+    date_from: string
+    date_to: string
+    platform?: string
+    status?: string
+    sort?: 'spend' | 'leads' | 'roas' | 'cpl'
+    limit?: number
+  }): Promise<{ data: CampaignPerformance[]; total: number }> {
+    const response = await api.get('/ads/campaigns', { params })
+    return response.data
+  },
+
+  /**
+   * Get ads by campaign (with creatives)
+   */
+  async getAdsByCampaign(
+    campaignId: string,
+    params: {
+      date_from: string
+      date_to: string
+      platform: string
+    }
+  ): Promise<{
+    campaign: CampaignPerformance
+    ads: AdPerformance[]
+    total_ads: number
+  }> {
+    const response = await api.get(`/ads/campaigns/${campaignId}/ads`, { params })
+    return response.data
+  },
+
+  /**
+   * Get creative library
+   */
+  async getCreatives(params: {
+    date_from: string
+    date_to: string
+    platform?: string
+    campaign_id?: string
+    has_image?: boolean
+    sort?: 'best_roas' | 'most_leads' | 'lowest_cpl' | 'recent'
+    limit?: number
+    offset?: number
+  }): Promise<{
+    data: CreativeLibraryItem[]
+    total: number
+    has_more: boolean
+  }> {
+    const response = await api.get('/ads/creatives', { params })
+    return response.data
+  }
+}
+
+// ============================================================================
+// Helper functions
+// ============================================================================
+
+export function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('uk-UA', {
+    style: 'currency',
+    currency: 'UAH',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount)
+}
+
+export function formatNumber(num: number): string {
+  if (num >= 1000000) {
+    return (num / 1000000).toFixed(1) + 'M'
+  }
+  if (num >= 1000) {
+    return (num / 1000).toFixed(1) + 'K'
+  }
+  return num.toString()
+}
+
+export function formatPercent(value: number | null): string {
+  if (value === null || value === undefined) return '—'
+  return `${value.toFixed(2)}%`
+}
+
+export function formatROAS(value: number | null): string {
+  if (value === null || value === undefined) return '—'
+  return `${value.toFixed(2)}x`
+}
