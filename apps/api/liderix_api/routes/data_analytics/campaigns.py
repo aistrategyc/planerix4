@@ -1,8 +1,7 @@
 """
 Campaigns endpoints for Data Analytics
 Sources:
-- dashboards.v5_leads_campaign_daily (campaigns aggregated)
-- dashboards.v5_leads_campaign_weekly (week-over-week)
+- dashboards.v8_campaigns_daily_full (campaigns aggregated, ALL sources + full ad metrics)
 """
 import logging
 from typing import Optional
@@ -32,8 +31,8 @@ async def get_campaigns(
     date_from: date = Query(..., description="Start date (YYYY-MM-DD)"),
     date_to: date = Query(..., description="End date (YYYY-MM-DD)"),
     platforms: Optional[str] = Query(
-        "google,meta",
-        description="Comma-separated platforms (google,meta,email)"
+        None,
+        description="Comma-separated platforms (google,meta,direct,organic,email,other) or empty for all"
     ),
     min_spend: Optional[float] = Query(0.0, description="Minimum spend filter"),
     limit: Optional[int] = Query(500, description="Results limit"),
@@ -41,7 +40,7 @@ async def get_campaigns(
     session: AsyncSession = Depends(get_itstep_session),
 ):
     """
-    Get campaigns aggregated metrics for the period
+    Get campaigns aggregated metrics for the period (ALL sources)
 
     Returns: Array of campaigns with platform, campaign_id, campaign_name, leads, contracts, revenue, spend, CPL, ROAS
     """
@@ -60,16 +59,16 @@ async def get_campaigns(
                 campaign_id,
                 campaign_name,
                 SUM(leads) AS leads,
-                SUM(n_contracts) AS n_contracts,
-                SUM(sum_contracts) AS revenue,
+                SUM(contracts) AS n_contracts,
+                SUM(revenue) AS revenue,
                 SUM(spend) AS spend,
                 CASE WHEN SUM(leads) > 0
                     THEN SUM(spend)::numeric / NULLIF(SUM(leads), 0)
                 END AS cpl,
                 CASE WHEN SUM(spend) > 0
-                    THEN SUM(sum_contracts)::numeric / NULLIF(SUM(spend), 0)
+                    THEN SUM(revenue)::numeric / NULLIF(SUM(spend), 0)
                 END AS roas
-            FROM dashboards.v5_leads_campaign_daily
+            FROM dashboards.v8_campaigns_daily_full
             WHERE dt BETWEEN :date_from AND :date_to
                 {platform_filter}
             GROUP BY platform, campaign_id, campaign_name
@@ -115,49 +114,92 @@ async def get_campaigns(
 @router.get("/wow", response_model=WoWCampaignsResponse)
 async def get_wow_campaigns(
     platforms: Optional[str] = Query(
-        "google,meta",
-        description="Comma-separated platforms (google,meta,email)"
+        None,
+        description="Comma-separated platforms (google,meta,direct,organic,email,other) or empty for all"
     ),
     limit: Optional[int] = Query(200, description="Results limit"),
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_itstep_session),
 ):
     """
-    Get week-over-week campaigns comparison
+    Get week-over-week campaigns comparison (ALL sources)
 
     Returns: Array of campaigns with current week vs previous week metrics
-    Source: dashboards.v5_leads_campaign_weekly (view with pre-calculated WoW)
+    Source: dashboards.v8_campaigns_daily_full (dynamic WoW calculation)
     """
     try:
         # Parse platforms
         platforms_list = [p.strip() for p in platforms.split(",")] if platforms else []
 
         if platforms_list:
-            platform_filter = "WHERE dominant_platform = ANY(:platforms)"
+            platform_filter = "AND platform = ANY(:platforms)"
         else:
             platform_filter = ""
 
+        # Dynamic WoW calculation from v6_campaign_daily_full
         query = text(f"""
+            WITH week_bounds AS (
+                SELECT
+                    DATE_TRUNC('week', CURRENT_DATE)::date AS cur_start,
+                    CURRENT_DATE AS cur_end,
+                    DATE_TRUNC('week', CURRENT_DATE - INTERVAL '7 days')::date AS prev_start,
+                    (DATE_TRUNC('week', CURRENT_DATE) - INTERVAL '1 day')::date AS prev_end
+            ),
+            cur_week AS (
+                SELECT
+                    platform,
+                    campaign_id,
+                    campaign_name,
+                    SUM(leads) as leads,
+                    SUM(spend) as spend,
+                    SUM(n_contracts) as contracts
+                FROM dashboards.v8_campaigns_daily_full, week_bounds
+                WHERE dt BETWEEN cur_start AND cur_end
+                    {platform_filter}
+                GROUP BY platform, campaign_id, campaign_name
+            ),
+            prev_week AS (
+                SELECT
+                    platform,
+                    campaign_id,
+                    campaign_name,
+                    SUM(leads) as leads,
+                    SUM(spend) as spend
+                FROM dashboards.v8_campaigns_daily_full, week_bounds
+                WHERE dt BETWEEN prev_start AND prev_end
+                    {platform_filter}
+                GROUP BY platform, campaign_id, campaign_name
+            )
             SELECT
-                dominant_platform as platform,
-                campaign_id,
-                campaign_name,
-                leads as leads_cur,
-                prev_week_leads as leads_prev,
-                (leads - COALESCE(prev_week_leads, 0)) AS leads_diff,
-                CASE WHEN COALESCE(prev_week_leads, 0) > 0
-                    THEN (leads - COALESCE(prev_week_leads, 0))::numeric * 100.0 / prev_week_leads
+                COALESCE(c.platform, p.platform) as platform,
+                COALESCE(c.campaign_id, p.campaign_id) as campaign_id,
+                COALESCE(c.campaign_name, p.campaign_name) as campaign_name,
+                COALESCE(c.leads, 0) as leads_cur,
+                COALESCE(p.leads, 0) as leads_prev,
+                (COALESCE(c.leads, 0) - COALESCE(p.leads, 0)) AS leads_diff,
+                CASE WHEN COALESCE(p.leads, 0) > 0
+                    THEN (COALESCE(c.leads, 0) - COALESCE(p.leads, 0))::numeric * 100.0 / p.leads
                     ELSE NULL
                 END AS leads_diff_pct,
-                0.0 as spend_cur,
-                0.0 as spend_prev,
-                0.0 AS spend_diff,
-                NULL AS spend_diff_pct,
-                revenue_per_lead as cpl_cur,
-                NULL as cpl_prev
-            FROM dashboards.v5_leads_campaign_weekly
-            {platform_filter}
-            ORDER BY (leads - COALESCE(prev_week_leads, 0)) DESC
+                COALESCE(c.spend, 0.0) as spend_cur,
+                COALESCE(p.spend, 0.0) as spend_prev,
+                (COALESCE(c.spend, 0.0) - COALESCE(p.spend, 0.0)) AS spend_diff,
+                CASE WHEN COALESCE(p.spend, 0.0) > 0
+                    THEN (COALESCE(c.spend, 0.0) - COALESCE(p.spend, 0.0))::numeric * 100.0 / p.spend
+                    ELSE NULL
+                END AS spend_diff_pct,
+                CASE WHEN COALESCE(c.leads, 0) > 0
+                    THEN c.spend / NULLIF(c.leads, 0)
+                    ELSE NULL
+                END as cpl_cur,
+                CASE WHEN COALESCE(p.leads, 0) > 0
+                    THEN p.spend / NULLIF(p.leads, 0)
+                    ELSE NULL
+                END as cpl_prev
+            FROM cur_week c
+            FULL OUTER JOIN prev_week p USING (platform, campaign_id, campaign_name)
+            WHERE COALESCE(c.leads, 0) > 0 OR COALESCE(p.leads, 0) > 0
+            ORDER BY (COALESCE(c.leads, 0) - COALESCE(p.leads, 0)) DESC
             LIMIT :limit
         """)
 

@@ -1,6 +1,6 @@
 """
 Trends endpoints for Data Analytics
-Source: dashboards.v5_bi_platform_daily
+Source: dashboards.v8_platform_daily_full (includes ALL traffic sources + full ad metrics)
 """
 import logging
 from typing import List, Optional
@@ -28,14 +28,14 @@ async def get_leads_trend(
     date_from: date = Query(..., description="Start date (YYYY-MM-DD)"),
     date_to: date = Query(..., description="End date (YYYY-MM-DD)"),
     platforms: Optional[str] = Query(
-        "google,meta",
-        description="Comma-separated platforms (google,meta,email)"
+        None,
+        description="Comma-separated platforms (google,meta,direct,organic,email,other) or empty for all"
     ),
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_itstep_session),
 ):
     """
-    Get daily leads trend for the period
+    Get daily leads trend for the period (ALL sources)
 
     Returns: Array of {dt, leads} by day
     """
@@ -50,7 +50,7 @@ async def get_leads_trend(
 
         query = text(f"""
             SELECT dt, SUM(leads) AS leads
-            FROM dashboards.v5_bi_platform_daily
+            FROM dashboards.v8_platform_daily_full
             WHERE dt BETWEEN :date_from AND :date_to
                 {platform_filter}
             GROUP BY dt
@@ -84,14 +84,14 @@ async def get_spend_trend(
     date_from: date = Query(..., description="Start date (YYYY-MM-DD)"),
     date_to: date = Query(..., description="End date (YYYY-MM-DD)"),
     platforms: Optional[str] = Query(
-        "google,meta",
-        description="Comma-separated platforms (google,meta,email)"
+        None,
+        description="Comma-separated platforms (google,meta,direct,organic,email,other) or empty for all"
     ),
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_itstep_session),
 ):
     """
-    Get daily spend trend for the period
+    Get daily spend trend for the period (ALL sources)
 
     Returns: Array of {dt, spend} by day
     """
@@ -106,7 +106,7 @@ async def get_spend_trend(
 
         query = text(f"""
             SELECT dt, SUM(spend) AS spend
-            FROM dashboards.v5_bi_platform_daily
+            FROM dashboards.v8_platform_daily_full
             WHERE dt BETWEEN :date_from AND :date_to
                 {platform_filter}
             GROUP BY dt

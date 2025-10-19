@@ -1,6 +1,6 @@
 """
 KPI Cards endpoint for Data Analytics
-Source: dashboards.v5_bi_platform_daily
+Source: dashboards.v8_platform_daily_full (includes ALL traffic sources + full ad metrics)
 """
 import logging
 from typing import List, Optional
@@ -23,8 +23,8 @@ async def get_kpi_cards(
     date_from: date = Query(..., description="Start date (YYYY-MM-DD)"),
     date_to: date = Query(..., description="End date (YYYY-MM-DD)"),
     platforms: Optional[str] = Query(
-        "google,meta",
-        description="Comma-separated platforms (google,meta,email)"
+        None,
+        description="Comma-separated platforms (google,meta,direct,organic,email,other) or empty for all"
     ),
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_itstep_session),
@@ -47,16 +47,16 @@ async def get_kpi_cards(
         query = text(f"""
             SELECT
                 SUM(leads) AS leads,
-                SUM(n_contracts) AS n_contracts,
-                SUM(sum_contracts) AS revenue,
+                SUM(contracts) AS n_contracts,
+                SUM(revenue) AS revenue,
                 SUM(spend) AS spend,
                 CASE WHEN SUM(leads) > 0
                     THEN SUM(spend)::numeric / NULLIF(SUM(leads), 0)
                 END AS cpl,
                 CASE WHEN SUM(spend) > 0
-                    THEN SUM(sum_contracts)::numeric / NULLIF(SUM(spend), 0)
+                    THEN SUM(revenue)::numeric / NULLIF(SUM(spend), 0)
                 END AS roas
-            FROM dashboards.v5_bi_platform_daily
+            FROM dashboards.v8_platform_daily_full
             WHERE dt BETWEEN :date_from AND :date_to
                 {platform_filter}
         """)
@@ -99,7 +99,7 @@ async def get_kpi_cards(
 async def get_kpi_compare(
     date_from: date = Query(..., description="Start date (YYYY-MM-DD)"),
     date_to: date = Query(..., description="End date (YYYY-MM-DD)"),
-    platforms: Optional[str] = Query("google,meta", description="Comma-separated platforms"),
+    platforms: Optional[str] = Query(None, description="Comma-separated platforms or empty for all"),
     compare_mode: str = Query("auto", description="auto|custom|disabled"),
     prev_from: Optional[date] = Query(None, description="Previous period start (for custom)"),
     prev_to: Optional[date] = Query(None, description="Previous period end (for custom)"),
@@ -114,7 +114,7 @@ async def get_kpi_compare(
     - custom: use prev_from/prev_to
     - disabled: only current period (no comparison)
 
-    Source: dashboards.v5_bi_platform_daily
+    Source: dashboards.v8_platform_daily_full (includes ALL traffic sources + full ad metrics)
     """
     try:
         platforms_list = [p.strip() for p in platforms.split(",")] if platforms else []
@@ -139,16 +139,16 @@ async def get_kpi_compare(
             ),
             win AS ( SELECT df, dt, (dt - df + 1) AS days FROM bounds ),
             cur AS (
-              SELECT SUM(leads) leads, SUM(n_contracts) n_contracts,
-                     SUM(sum_contracts) revenue, SUM(spend) spend
-              FROM dashboards.v5_bi_platform_daily d
+              SELECT SUM(leads) leads, SUM(contracts) n_contracts,
+                     SUM(revenue) revenue, SUM(spend) spend
+              FROM dashboards.v8_platform_daily_full d
               WHERE d.dt BETWEEN (SELECT df FROM bounds) AND (SELECT dt FROM bounds)
                 {platform_filter}
             ),
             prev AS (
-              SELECT SUM(leads) leads, SUM(n_contracts) n_contracts,
-                     SUM(sum_contracts) revenue, SUM(spend) spend
-              FROM dashboards.v5_bi_platform_daily d
+              SELECT SUM(leads) leads, SUM(contracts) n_contracts,
+                     SUM(revenue) revenue, SUM(spend) spend
+              FROM dashboards.v8_platform_daily_full d
               WHERE d.dt BETWEEN :prev_from::date AND :prev_to::date
                 {platform_filter}
             )
