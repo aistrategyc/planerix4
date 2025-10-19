@@ -1,6 +1,6 @@
 """
 UTM Sources endpoint for Data Analytics
-Source: dashboards.v5_leads_source_daily_vw
+Source: dashboards.v7_contracts_with_attribution (includes ALL leads + contract attribution)
 """
 import logging
 from typing import Optional
@@ -46,17 +46,27 @@ async def get_utm_sources(
             platform_filter = ""
 
         query = text(f"""
+            WITH lead_counts AS (
+                SELECT
+                    COALESCE(platform, 'Unknown') as platform,
+                    COALESCE(utm_source, 'direct') as utm_source,
+                    COUNT(DISTINCT id_source) AS leads,
+                    COUNT(DISTINCT contract_id) AS n_contracts,
+                    SUM(COALESCE(contract_amount, 0)) AS revenue
+                FROM dashboards.v7_contracts_with_attribution
+                WHERE request_date BETWEEN :date_from AND :date_to
+                    {platform_filter}
+                GROUP BY COALESCE(platform, 'Unknown'), COALESCE(utm_source, 'direct')
+            )
             SELECT
                 platform,
                 utm_source,
-                SUM(leads) AS leads,
-                SUM(n_contracts) AS n_contracts,
-                SUM(sum_contracts) AS revenue,
-                SUM(spend) AS spend
-            FROM dashboards.v5_leads_source_daily_vw
-            WHERE dt BETWEEN :date_from AND :date_to
-                {platform_filter}
-            GROUP BY platform, utm_source
+                leads,
+                n_contracts,
+                revenue,
+                0.0 AS spend
+            FROM lead_counts
+            WHERE leads > 0
             ORDER BY leads DESC
             LIMIT :limit
         """)

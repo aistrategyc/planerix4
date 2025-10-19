@@ -1,8 +1,8 @@
 """
 Share/Distribution endpoints for Data Analytics
 Sources:
-- dashboards.v5_bi_platform_daily (platform shares)
-- dashboards.v5_leads_campaign_daily (top campaigns)
+- dashboards.v8_platform_daily_full (platform shares with 90% data coverage)
+- dashboards.v8_campaigns_daily_full (top campaigns with full metrics)
 """
 import logging
 from typing import Optional
@@ -40,7 +40,7 @@ async def get_platform_share(
     try:
         query = text("""
             SELECT platform, SUM(leads) AS leads
-            FROM dashboards.v5_bi_platform_daily
+            FROM dashboards.v8_platform_daily_full
             WHERE dt BETWEEN :date_from AND :date_to
             GROUP BY platform
             ORDER BY leads DESC
@@ -83,8 +83,9 @@ async def get_top_campaigns(
     try:
         query = text("""
             SELECT campaign_name, SUM(leads) AS leads
-            FROM dashboards.v5_leads_campaign_daily
+            FROM dashboards.v8_campaigns_daily_full
             WHERE dt BETWEEN :date_from AND :date_to
+                AND campaign_name IS NOT NULL
             GROUP BY campaign_name
             ORDER BY leads DESC
             LIMIT :limit

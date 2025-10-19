@@ -14,6 +14,7 @@ import {
   Calendar,
   BrainCircuit,
   TrendingUp,
+  FileText,
 } from 'lucide-react';
 
 type NavItem = {
@@ -33,6 +34,7 @@ const MAIN: NavItem[] = [
   { href: '/teams', label: 'Teams', icon: Users },
   { href: '/analytics', label: 'Analytics', icon: PieChart },
   { href: '/data-analytics', label: 'DataAnalytics', icon: TrendingUp },
+  { href: '/contracts-analytics', label: 'Contracts', icon: FileText, badge: 'New' },
   { href: '/calendar', label: 'Calendar', icon: Calendar },
   { href: '/ai', label: 'AI', icon: BrainCircuit },
 ];

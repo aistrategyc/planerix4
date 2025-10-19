@@ -295,3 +295,61 @@ class DataAnalyticsFilters(BaseModel):
         default=0.0,
         description="Minimum spend filter for campaigns table"
     )
+
+# ============================================================================
+# Contracts Attribution Schemas (NEW)
+# ============================================================================
+
+class ContractPlatformItem(BaseModel):
+    """Contract metrics by platform"""
+    platform: str
+    total_leads: int
+    contracts: int
+    revenue: float
+    avg_contract_value: float
+    conversion_rate: float
+
+
+class ContractsByPlatformResponse(BaseModel):
+    """Contracts breakdown by platform"""
+    data: List[ContractPlatformItem]
+
+
+class ContractSourceItem(BaseModel):
+    """Contract metrics by traffic source"""
+    platform: str
+    traffic_source: str
+    campaign: str
+    total_leads: int
+    contracts: int
+    revenue: float
+    avg_contract_value: float
+    conversion_rate: float
+
+
+class ContractsBySourceResponse(BaseModel):
+    """Contracts breakdown by traffic source"""
+    data: List[ContractSourceItem]
+
+
+class ContractTimelineItem(BaseModel):
+    """Contract metrics timeline item"""
+    dt: date
+    total_leads: int
+    contracts: int
+    revenue: float
+    conversion_rate: float
+
+
+class ContractsTimelineResponse(BaseModel):
+    """Contracts timeline data"""
+    data: List[ContractTimelineItem]
+
+
+class ContractsAttributionSummary(BaseModel):
+    """Contracts attribution summary"""
+    data: List[dict]
+    total_leads: int
+    total_contracts: int
+    total_revenue: float
+    overall_conversion_rate: float
