@@ -7,11 +7,15 @@ import { Input } from "@/components/ui/input"
 import { RefreshCcw } from "lucide-react"
 import * as dataAnalyticsApi from "@/lib/api/data-analytics"
 import ProtectedRoute from "@/components/auth/ProtectedRoute"
-// V9 Enhanced Components - Oct 23, 2025
+// V9 Enhanced Components - Oct 23, 2025 - ALL V9 COMPONENTS
 import { PlatformKPICards } from "@/components/analytics/PlatformKPICards"
 import { PlatformPerformanceTrends } from "@/components/analytics/PlatformPerformanceTrends"
 import { WeekOverWeekComparison } from "@/components/analytics/WeekOverWeekComparison"
 import { AttributionBreakdown } from "@/components/analytics/AttributionBreakdown"
+import { FacebookCreativeAnalytics } from "@/components/analytics/FacebookCreativeAnalytics"
+import { ContractsSourceAnalytics } from "@/components/analytics/ContractsSourceAnalytics"
+import { FacebookAdsPerformance } from "@/components/analytics/FacebookAdsPerformance"
+import { GoogleAdsPerformance } from "@/components/analytics/GoogleAdsPerformance"
 
 function DataAnalyticsPageContent() {
   // Filters - Oct 23, 2025 - V9 ONLY VERSION
@@ -19,10 +23,13 @@ function DataAnalyticsPageContent() {
   const [dateTo, setDateTo] = useState("2025-10-19")
   const [selectedPlatform, setSelectedPlatform] = useState<string>("")
 
-  // V9 ONLY Data States - 1000% Verified with SK_LEAD Keys (Oct 23, 2025)
+  // V9 ONLY Data States - ALL V9 COMPONENTS (1000% Verified with SK_LEAD Keys - Oct 23, 2025)
   const [v9PlatformComparison, setV9PlatformComparison] = useState<dataAnalyticsApi.V9PlatformComparison[]>([])
   const [v9MonthlyCohorts, setV9MonthlyCohorts] = useState<dataAnalyticsApi.V9MonthlyCohort[]>([])
   const [v9AttributionQuality, setV9AttributionQuality] = useState<dataAnalyticsApi.V9AttributionQuality[]>([])
+  const [v9ContractsEnriched, setV9ContractsEnriched] = useState<any[]>([])
+  const [v9FacebookWeekly, setV9FacebookWeekly] = useState<any[]>([])
+  const [v9GoogleWeekly, setV9GoogleWeekly] = useState<any[]>([])
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -32,18 +39,24 @@ function DataAnalyticsPageContent() {
     setLoading(true)
     setError(null)
     try {
-      // V9 ONLY - 1000% Verified Data with SK_LEAD Keys (Oct 23, 2025)
+      // V9 ONLY - ALL 6 V9 ENDPOINTS (1000% Verified Data with SK_LEAD Keys - Oct 23, 2025)
       // REMOVED: All V5/V6 endpoints that caused 404/500 errors
       const results = await Promise.allSettled([
         dataAnalyticsApi.getV9PlatformComparison(dateFrom, dateTo),
         dataAnalyticsApi.getV9MonthlyCohorts(selectedPlatform || undefined),
         dataAnalyticsApi.getV9AttributionQuality(selectedPlatform || undefined),
+        dataAnalyticsApi.getV9ContractsEnriched(dateFrom, dateTo),
+        dataAnalyticsApi.getV9FacebookWeekly(dateFrom, dateTo),
+        dataAnalyticsApi.getV9GoogleWeekly(dateFrom, dateTo),
       ])
 
-      // V9 Data Assignment (ONLY 3 endpoints now)
+      // V9 Data Assignment (ALL 6 endpoints)
       if (results[0].status === "fulfilled") setV9PlatformComparison(results[0].value)
       if (results[1].status === "fulfilled") setV9MonthlyCohorts(results[1].value)
       if (results[2].status === "fulfilled") setV9AttributionQuality(results[2].value)
+      if (results[3].status === "fulfilled") setV9ContractsEnriched(results[3].value)
+      if (results[4].status === "fulfilled") setV9FacebookWeekly(results[4].value)
+      if (results[5].status === "fulfilled") setV9GoogleWeekly(results[5].value)
 
       // Log failures
       const failed = results.filter((r) => r.status === "rejected")
@@ -245,6 +258,45 @@ function DataAnalyticsPageContent() {
               }))}
               title="Attribution Quality by Platform"
               groupBy="platform"
+              loading={loading}
+            />
+          )}
+
+          {/* V9.8: Facebook Weekly Performance */}
+          {v9FacebookWeekly.length > 0 && (
+            <FacebookAdsPerformance
+              data={v9FacebookWeekly}
+              title="Facebook Ads Weekly Performance (V9)"
+              showTop={10}
+              loading={loading}
+            />
+          )}
+
+          {/* V9.9: Google Ads Weekly Performance */}
+          {v9GoogleWeekly.length > 0 && (
+            <GoogleAdsPerformance
+              data={v9GoogleWeekly}
+              title="Google Ads Weekly Performance (V9)"
+              showTop={10}
+              loading={loading}
+            />
+          )}
+
+          {/* V9.10: Facebook Creative Analytics - ВАШЕ ТРЕБОВАНИЕ! */}
+          {v9ContractsEnriched.length > 0 && (
+            <FacebookCreativeAnalytics
+              data={v9ContractsEnriched.filter((c: any) => c.platform === "facebook" || c.platform === "instagram")}
+              title="Meta Creative Performance - Contracts by Creative (V9)"
+              showTop={12}
+              loading={loading}
+            />
+          )}
+
+          {/* V9.11: Contracts Source Analytics - ВАШЕ ТРЕБОВАНИЕ! */}
+          {v9ContractsEnriched.length > 0 && (
+            <ContractsSourceAnalytics
+              data={v9ContractsEnriched}
+              title="Contracts by Source - Organic, Events, Meta Platforms (V9)"
               loading={loading}
             />
           )}
