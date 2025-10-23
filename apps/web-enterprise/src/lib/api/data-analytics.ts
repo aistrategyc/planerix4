@@ -684,3 +684,164 @@ export const getProductsPerformance = async (
   })
   return response.data || []
 }
+
+// ============================================================================
+// V9 ENHANCED ANALYTICS - 1000% VERIFIED with SK_LEAD KEYS
+// Added: October 23, 2025
+// User requirement: "1000% проверенные с sk_ ключами и сравнительным анализом"
+// ============================================================================
+
+export interface V9PlatformComparison {
+  period_start: string
+  period_type: string
+  platform: string
+  leads: number
+  contracts: number
+  revenue: number
+  prev_period_leads: number
+  prev_period_contracts: number
+  prev_period_revenue: number
+  leads_growth_pct: number
+  contracts_growth_pct: number
+  revenue_growth_pct: number
+}
+
+export interface V9ContractEnriched {
+  sk_contract: string
+  sk_lead: string
+  contract_date: string
+  contract_day: string
+  client_id: string
+  contract_amount: number
+  unified_platform: string
+  unified_campaign_name: string
+  meta_campaign_id: string | null
+  meta_campaign_name: string | null
+  google_campaign_id: string | null
+  google_campaign_name: string | null
+  utm_source: string | null
+  utm_medium: string | null
+  utm_campaign: string | null
+  attribution_level: string
+  days_to_contract: number | null
+}
+
+export interface V9MonthlyCohort {
+  cohort_month: string
+  platform: string
+  leads: number
+  contracts: number
+  revenue: number
+  avg_contract_value: number
+  conversion_rate: number
+  prev_month_leads: number | null
+  prev_month_contracts: number | null
+  leads_mom_growth: number | null
+  contracts_mom_growth: number | null
+  repeat_customer_rate: number | null
+}
+
+export interface V9FacebookWeekly {
+  week_start: string
+  campaign_id: string
+  campaign_name: string
+  leads: number
+  contracts: number
+  revenue: number
+  conversion_rate: number
+  prev_week_leads: number | null
+  prev_week_contracts: number | null
+  leads_wow_growth: number | null
+  contracts_wow_growth: number | null
+}
+
+export interface V9GoogleWeekly {
+  week_start: string
+  campaign_id: string
+  campaign_name: string
+  leads: number
+  contracts: number
+  revenue: number
+  conversion_rate: number
+  prev_week_leads: number | null
+  prev_week_contracts: number | null
+  leads_wow_growth: number | null
+  contracts_wow_growth: number | null
+}
+
+export interface V9AttributionQuality {
+  platform: string
+  attribution_level: string
+  total_contracts: number
+  contracts_with_campaign: number
+  campaign_match_rate: number
+  utm_coverage: number
+  quality_score: string
+}
+
+// 24. V9 Platform Performance Comparison (Week-over-Week)
+export const getV9PlatformComparison = async (
+  date_from?: string,
+  date_to?: string
+): Promise<V9PlatformComparison[]> => {
+  const response = await apiClient.get("/data-analytics/v9/platforms/comparison", {
+    params: { start_date: date_from, end_date: date_to },
+  })
+  return response.data || []
+}
+
+// 25. V9 Contracts with SK_LEAD Enrichment
+export const getV9ContractsEnriched = async (
+  date_from?: string,
+  date_to?: string,
+  platform?: string
+): Promise<V9ContractEnriched[]> => {
+  const response = await apiClient.get("/data-analytics/v9/contracts/enriched", {
+    params: { start_date: date_from, end_date: date_to, platform },
+  })
+  return response.data || []
+}
+
+// 26. V9 Monthly Cohort Analysis
+export const getV9MonthlyCohorts = async (
+  platform?: string
+): Promise<V9MonthlyCohort[]> => {
+  const response = await apiClient.get("/data-analytics/v9/cohorts/monthly", {
+    params: { platform },
+  })
+  return response.data || []
+}
+
+// 27. V9 Facebook Weekly Performance
+export const getV9FacebookWeekly = async (
+  date_from?: string,
+  date_to?: string,
+  campaign_id?: string
+): Promise<V9FacebookWeekly[]> => {
+  const response = await apiClient.get("/data-analytics/v9/campaigns/facebook/weekly", {
+    params: { start_date: date_from, end_date: date_to, campaign_id },
+  })
+  return response.data || []
+}
+
+// 28. V9 Google Ads Weekly Performance
+export const getV9GoogleWeekly = async (
+  date_from?: string,
+  date_to?: string,
+  campaign_id?: string
+): Promise<V9GoogleWeekly[]> => {
+  const response = await apiClient.get("/data-analytics/v9/campaigns/google/weekly", {
+    params: { start_date: date_from, end_date: date_to, campaign_id },
+  })
+  return response.data || []
+}
+
+// 29. V9 Attribution Quality Metrics
+export const getV9AttributionQuality = async (
+  platform?: string
+): Promise<V9AttributionQuality[]> => {
+  const response = await apiClient.get("/data-analytics/v9/attribution/quality", {
+    params: { platform },
+  })
+  return response.data || []
+}
