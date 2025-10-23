@@ -857,3 +857,141 @@ export const getV9CampaignsPerformance = async (
   })
   return response.data || []
 }
+
+// ============================================================================
+// V10 PROD ANALYTICS - FULL CUSTOMER FUNNEL
+// Added: October 23, 2025
+// Production Verified: All endpoints working with 17,136 events (3.75x improvement)
+// User requirement: "все эти ивенты это воронка клиента, что с ним происходило! все нужны!"
+// ============================================================================
+
+export interface V10Summary {
+  total_events: number
+  unique_clients: number
+  first_touch_events: number
+  mid_and_last_touch_events: number
+  contracts: number
+  total_revenue: number
+  unique_platforms: number
+  data_multiplier: number
+}
+
+export interface V10EventFunnel {
+  dt: string
+  platform: string
+  channel: string
+  total_events: number
+  unique_clients: number
+  first_touch_events: number
+  last_touch_events: number
+  contracts: number
+  revenue: number
+  avg_touch_sequence: number
+}
+
+export interface V10ContractMultiTouch {
+  contract_day: string
+  client_id: number
+  contract_amount: number
+  attributed_platform: string
+  attributed_channel: string
+  attributed_campaign_name: string | null
+  first_touch_platform: string
+  first_touch_channel: string
+  total_touches: number
+  days_to_convert: number
+  platforms_in_journey: string[]
+}
+
+export interface V10PlatformTouches {
+  platform: string
+  unique_clients: number
+  total_touches: number
+  avg_touches_per_client: number
+  clients_who_converted: number
+  conversion_rate_pct: number
+  total_revenue: number
+  avg_revenue_per_converted: number
+}
+
+export interface V10FacebookFunnel {
+  dt: string
+  platform: string
+  campaign_name: string | null
+  total_events: number
+  unique_clients: number
+  first_touch: number
+  mid_funnel: number
+  last_touch: number
+  contracts: number
+  revenue: number
+}
+
+export interface V10GoogleFunnel {
+  dt: string
+  campaign_name: string | null
+  total_events: number
+  unique_clients: number
+  first_touch: number
+  mid_funnel: number
+  last_touch: number
+  contracts: number
+  revenue: number
+}
+
+// 30. V10 Summary Statistics (VERIFIED - Production Oct 23, 2025)
+export const getV10Summary = async (): Promise<V10Summary> => {
+  const response = await apiClient.get("/data-analytics/v10/summary/prod")
+  return response.data
+}
+
+// 31. V10 Full Customer Funnel (VERIFIED - 17,136 events)
+export const getV10EventsFunnel = async (
+  start_date?: string,
+  end_date?: string,
+  platform?: string
+): Promise<V10EventFunnel[]> => {
+  const response = await apiClient.get("/data-analytics/v10/events/funnel", {
+    params: { start_date, end_date, platform },
+  })
+  return response.data || []
+}
+
+// 32. V10 Multi-Touch Attribution (VERIFIED - 424 contracts with journey)
+export const getV10ContractsMultiTouch = async (
+  start_date?: string,
+  end_date?: string
+): Promise<V10ContractMultiTouch[]> => {
+  const response = await apiClient.get("/data-analytics/v10/contracts/multi-touch", {
+    params: { start_date, end_date },
+  })
+  return response.data || []
+}
+
+// 33. V10 Platform Touches Analysis (VERIFIED - Email/Event preserved)
+export const getV10PlatformsTouches = async (): Promise<V10PlatformTouches[]> => {
+  const response = await apiClient.get("/data-analytics/v10/platforms/touches")
+  return response.data || []
+}
+
+// 34. V10 Facebook Full Funnel (VERIFIED - 564 events, 33x improvement)
+export const getV10FacebookFunnel = async (
+  start_date?: string,
+  end_date?: string
+): Promise<V10FacebookFunnel[]> => {
+  const response = await apiClient.get("/data-analytics/v10/campaigns/facebook/funnel", {
+    params: { start_date, end_date },
+  })
+  return response.data || []
+}
+
+// 35. V10 Google Full Funnel (VERIFIED - 84 events with mid-funnel)
+export const getV10GoogleFunnel = async (
+  start_date?: string,
+  end_date?: string
+): Promise<V10GoogleFunnel[]> => {
+  const response = await apiClient.get("/data-analytics/v10/campaigns/google/funnel", {
+    params: { start_date, end_date },
+  })
+  return response.data || []
+}

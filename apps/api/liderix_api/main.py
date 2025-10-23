@@ -280,6 +280,7 @@ from liderix_api.routes import (
 from liderix_api.routes import data_analytics as data_analytics_router
 from liderix_api.routes.data_analytics import v9_analytics as v9_analytics_router
 from liderix_api.routes.data_analytics import analytics_v9 as analytics_v9_router
+from liderix_api.routes.data_analytics import analytics_v10_prod as analytics_v10_router
 from liderix_api.routes import ads_manager as ads_manager_router
 from liderix_api.routes import marketing_campaigns as marketing_campaigns_router
 from liderix_api.routes import ads as ads_router
@@ -327,6 +328,13 @@ app.include_router(
     analytics_v9_router.router,
     prefix=f"{PREFIX}/data-analytics/v9",
     tags=["V9 Analytics"],
+)
+
+# V10 PROD Analytics router (FULL FUNNEL with multi-touch attribution - NEW!)
+app.include_router(
+    analytics_v10_router.router,
+    prefix=f"{PREFIX}/data-analytics/v10",
+    tags=["V10 PROD Analytics - Full Funnel"],
 )
 
 # Ads Manager router (Real ads data from ITstep)
