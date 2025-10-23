@@ -1990,17 +1990,17 @@ function DataAnalyticsPageContent() {
             />
           )}
 
-          {/* V9.6: Platform Performance Trends (Multi-line) */}
-          {platformShare.length > 0 && leadsTrend.length > 0 && (
+          {/* V9.6: Platform Performance Trends (Multi-line) - USES V9 DATA ONLY */}
+          {v9PlatformComparison.length > 0 && (
             <PlatformPerformanceTrends
-              data={leadsTrend.map((item, index) => ({
-                dt: item.dt,
+              data={v9PlatformComparison.map((item) => ({
+                dt: item.period_start,
                 leads: item.leads,
-                contracts: campaigns[index]?.n_contracts || 0,
-                revenue: campaigns[index]?.revenue || 0,
+                contracts: item.contracts,
+                revenue: item.revenue,
               }))}
               metrics={["leads", "contracts", "revenue"]}
-              title="Multi-Metric Performance Trends"
+              title="Multi-Metric Performance Trends (V9 Data)"
               loading={loading}
             />
           )}
