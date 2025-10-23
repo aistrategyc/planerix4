@@ -1,0 +1,31 @@
+            table_name            |                                                                                                                                                                                                                                                                                                                                                              columns                                                                                                                                                                                                                                                                                                                                                              
+----------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ itcrm_analytics                  | id, analytic_id, internet_request_id, code, request_created_at, phone, email, load_timestamp, gclid
+ itcrm_course_relations           | course_relation_id, id_source, id_course, load_timestamp, date_key
+ itcrm_courses                    | id_course, name_course, load_timestamp
+ itcrm_docs_clients               | contract_id, id_source, external_user_id, external_profile_id, customer, payment_doc, type_contract, short_contract, short_contract_flag, payment_site, image, gender, datebirth, cpasport, cpassissued, cindnumber, lpasport, lpassissued, lindnumber, education, work, address, stream, special, timeless, group_name, okpo, currentdate, sum_total, sum_semester, sum_final, sum2, code1c, other_code, discount_sum, promocode_id, discount_description, payment_form, first_sum, date_start_lesson, total_cost_of_the_contract, cost_diploma_design, class_number, extension_status, extension_datetime, entrance_fee, exchange_rate, customer_type, created_at, updated_at, created_by, updated_by, load_timestamp, date_key
+ itcrm_events                     | id_event, name_event, full_name_event, date_event, parent_id, status_event, type_event, format_event, target, auditory, remind, autocall, link_youtube, link_presentation, link_youtube_work, translate_name, advertising_costs, load_timestamp, date_key
+ itcrm_events_relations           | id, id_source, id_event, date_key, load_timestamp
+ itcrm_form_cost                  | id_form_cost, id_form_public, product, months, id_city, status_active, id_form_cost_etalon, etalon_form_id, etalon_index, sum_first_pay, months_fact, short_name, cost_diploma_design, currency_id, validity_start, validity_end, comment, created_at, entrance_fee_type, translate_key, created_by, currency_code, is_trial_lesson, load_timestamp, date_key
+ itcrm_form_cost_city             | id, form_cost_etalon_id, city_id, load_timestamp
+ itcrm_form_cost_type             | id, id_form_cost, type, amount, status_edit, load_timestamp
+ itcrm_internet_request           | request_id, phone, request_type, form_request, comment, fio, email, analytic_info, created_date, date_no_answer, no_active, form_name, landing_path, event_date, id_form, load_timestamp, date_key
+ itcrm_internet_request_analytics | id_request, id_source, analytic_info_raw, analytic_info, load_timestamp, date_key
+ itcrm_internet_request_relation  | id, id_request, id_source, request, relation_date, load_timestamp
+ itcrm_new_form                   | form_relation_id, id_source, id_form, load_timestamp
+ itcrm_new_form_name              | id_form, name_form, short_form, sort_form, load_timestamp
+ itcrm_new_payment                | payment_id, id_source, payment, reissuance, date_payment, date_fail, date_prepayment, load_timestamp
+ itcrm_new_result                 | result_id, id_source, id_result, load_timestamp
+ itcrm_new_result_name            | id_result, name_result, img_result, id_type, sort_result, visibility, load_timestamp
+ itcrm_new_source                 | id_source, id_user, id_uniq, type, days, date_time, wait_call, date2, no_answer, dogovor, rejection, at_event, vizit_time, meet_time, no_active, date_no_active, hidden, updated_at, load_timestamp, date_key
+ itcrm_new_source_w_names         | id_source, id_uniq, id_user, user_name, type, type_name, date_time, dogovor, at_event, no_active, hidden, updated_at, load_timestamp, date_key
+ itcrm_new_types                  | id_type, types_descr, load_timestamp
+ itcrm_product_form_relations     | id, id_form, id_product, id_source, is_old_source, load_timestamp, date_key
+ itcrm_promo_source_relations     | promo_relation_id, id_source, id_promo, old_promo, load_timestamp, date_key
+ itcrm_promo_sources              | promo_id, promo_name, parent_id, status, load_timestamp
+ itcrm_source_events              | participant_id, id_event, id_source, id_uniq, status, count_children, age_children, load_timestamp, date_key
+ itcrm_study_form                 | id, name_form, base_study_form_id, short_form, sort_form, id_from_cron_get_cost, load_timestamp
+ itcrm_study_form_relation        | id, id_form, base_study_form_id, load_timestamp
+ itcrm_users_ua                   | id_user, name_user, email_user, login_user, phone_user, arc_user, flag_enter, external_user_id, external_profile_id, position_id, load_timestamp, id_city
+(27 rows)
+

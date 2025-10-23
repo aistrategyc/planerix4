@@ -1,0 +1,2345 @@
+{
+  "name": "1.1 CRM RAW",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  ns.id_source,\n  ns.id_user,\n  ns.id_uniq,\n  ns.type,\n  ns.days,\n  ns.date_time,\n  ns.wait_call,\n  ns.date2,\n  ns.no_answer,\n  ns.dogovor,\n  ns.rejection,\n  ns.at_event,\n  ns.vizit_time,\n  ns.meet_time,\n  ns.no_active,\n  ns.date_no_active,\n  ns.hidden,\n  ns.updated_at,\n  CURRENT_TIMESTAMP AS load_timestamp,\n  DATE(ns.date_time) AS date_key\nFROM itcrm_new_kiev.new_source ns\nWHERE (ns.date_time  >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND ns.date_time  < CURDATE())\n   OR (ns.updated_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND ns.updated_at < CURDATE());",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -9872,
+        -1392
+      ],
+      "id": "9e0f434c-0c67-4aa0-a69c-5dcf13ff58d8",
+      "name": "stg_new_sources1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  ir.id AS request_id,\n  ir.phone,\n  ir.type AS request_type,\n  ir.form_request,\n  ir.comment,\n  ir.fio,\n  ir.email,\n  ir.analytic_info,\n  ir.date AS created_date,\n  ir.date_no_answer,\n  ir.no_active,\n  ir.name AS form_name,\n  ir.path AS landing_path,\n  ir.event_date,\n  ir.id_form,\n  CURRENT_TIMESTAMP AS load_timestamp,\n  DATE(ir.date) AS date_key\nFROM itcrm_new_kiev.internet_request ir\nWHERE ir.date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)\n  AND ir.date <  CURDATE();",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -9872,
+        -1600
+      ],
+      "id": "0008d630-2c20-4e21-ba4f-c720498162ff",
+      "name": "stg_internet_requests1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  irr.id,\n  irr.id_request,\n  irr.id_source,\n  irr.request,\n  irr.date AS relation_date,\n  CURRENT_TIMESTAMP AS load_timestamp\nFROM itcrm_new_kiev.internet_request_relation irr\nWHERE (irr.date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND irr.date < CURDATE())\n   OR EXISTS (\n     SELECT 1\n     FROM itcrm_new_kiev.internet_request ir\n     WHERE ir.id = irr.id_request\n       AND ir.date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)\n       AND ir.date <  CURDATE()\n   );",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -9872,
+        -1184
+      ],
+      "id": "329701ab-4ad4-4857-9bd6-795f31441d84",
+      "name": "stg_internet_request_relation1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  dc.id AS contract_id,\n  dc.id_source,\n  dc.external_user_id,\n  dc.external_profile_id,\n  dc.customer,\n  dc.payment_doc,\n  dc.type_contract,\n  dc.short_contract,\n  dc.short_contract_flag,\n  dc.payment_site,\n  dc.image,\n  dc.gender,\n  dc.datebirth,\n  dc.cpasport,\n  dc.cpassissued,\n  dc.cindnumber,\n  dc.lpasport,\n  dc.lpassissued,\n  dc.lindnumber,\n  dc.education,\n  dc.work,\n  dc.address,\n  dc.stream,\n  dc.special,\n  dc.timeless,\n  dc.`group`,\n  dc.okpo,\n  dc.currentdate,\n  dc.sum,\n  dc.sum_semester,\n  dc.sum_final,\n  dc.sum2,\n  dc.code1c,\n  dc.other_code,\n  dc.discount_sum,\n  dc.promocode_id,\n  dc.discount_description,\n  dc.payment_form,\n  dc.first_sum,\n  dc.date_start_lesson,\n  dc.total_cost_of_the_contract,\n  dc.cost_diploma_design,\n  dc.class_number,\n  dc.extension_status,\n  dc.extension_datetime,\n  dc.entrance_fee,\n  dc.exchange_rate,\n  dc.customer_type,\n  dc.created_at,\n  dc.updated_at,\n  dc.created_by,\n  dc.updated_by,\n  CURRENT_TIMESTAMP AS load_timestamp,\n  DATE(dc.created_at) AS date_key\nFROM itcrm_new_kiev.docs_clients dc\nWHERE (dc.created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND dc.created_at < CURDATE())\n   OR (dc.updated_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND dc.updated_at < CURDATE());",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -9872,
+        -976
+      ],
+      "id": "7737a27a-1834-4f51-917e-34c058860d58",
+      "name": "stg_docs_clients1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  np.id AS payment_id,\n  np.id_source,\n  np.payment,\n  np.reissuance,\n  np.date_payment,\n  np.date_fail,\n  np.date_prepayment,\n  CURRENT_TIMESTAMP AS load_timestamp\nFROM itcrm_new_kiev.new_payment np\nWHERE (np.date_payment    >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND np.date_payment    < CURDATE())\n   OR (np.date_prepayment >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND np.date_prepayment < CURDATE())\n   OR np.id_source IN (\n     SELECT ns.id_source\n     FROM itcrm_new_kiev.new_source ns\n     WHERE ns.date_time >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)\n       AND ns.date_time <  CURDATE()\n   );",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -9872,
+        64
+      ],
+      "id": "50ff9684-59cb-47a6-9e4b-27611f1f8144",
+      "name": "stg_new_payments",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  r.id_result,\n  r.name_result,\n  r.img_result,\n  r.id_type,\n  r.sort_result,\n  r.visibility,\n  CURRENT_TIMESTAMP AS load_timestamp\nFROM itcrm_new_kiev.new_result_name r;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -9872,
+        -144
+      ],
+      "id": "6584f7bf-fa32-4857-93c1-9de19567d612",
+      "name": "stg_new_result_names1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  nr.id AS result_id,\n  nr.id_source,\n  nr.id_result,\n  CURRENT_TIMESTAMP AS load_timestamp\nFROM itcrm_new_kiev.new_result nr\nWHERE nr.id_source IN (\n  SELECT ns.id_source\n  FROM itcrm_new_kiev.new_source ns\n  WHERE ns.date_time >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)\n    AND ns.date_time <  CURDATE()\n);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -9872,
+        -352
+      ],
+      "id": "1df0a278-5146-4112-a11a-56a8f9fb2153",
+      "name": "stg_new_results1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  f.id_form,\n  f.name_form,\n  f.short_form,\n  f.sort_form,\n  CURRENT_TIMESTAMP AS load_timestamp\nFROM itcrm_new_kiev.new_form_name f;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -9872,
+        -560
+      ],
+      "id": "c2017bc4-004f-4574-b893-354dccca095e",
+      "name": "stg_new_form_names1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  nf.id AS form_relation_id,\n  nf.id_source,\n  nf.id_form,\n  CURRENT_TIMESTAMP AS load_timestamp\nFROM itcrm_new_kiev.new_form nf\nWHERE nf.id_source IN (\n  SELECT ns.id_source\n  FROM itcrm_new_kiev.new_source ns\n  WHERE ns.date_time >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)\n    AND ns.date_time < CURDATE()\n);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -9872,
+        -768
+      ],
+      "id": "484aa016-6467-4e0c-b7d5-1a36c600bfc2",
+      "name": "new_form",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtMinute": 1
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -10976,
+        -1904
+      ],
+      "id": "f3202f1b-bb9f-4c54-84d0-fa299db5b410",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH src AS (\n  SELECT *\n  FROM json_to_recordset($1::json) AS x(\n      request_id      INT,\n      phone           TEXT,\n      request_type    TEXT,\n      form_request    INT,\n      comment         TEXT,\n      fio             TEXT,\n      email           TEXT,\n      analytic_info   TEXT,\n      created_date    TEXT,   -- было TIMESTAMP → делаем TEXT\n      date_no_answer  TEXT,   -- было DATE → делаем TEXT\n      no_active       INT,\n      form_name       TEXT,\n      landing_path    TEXT,\n      event_date      TEXT,   -- было TIMESTAMP → делаем TEXT\n      id_form         INT,\n      load_timestamp  TEXT,   -- как TEXT, приведём ниже\n      date_key        TEXT    -- как TEXT, приведём ниже\n  )\n)\nINSERT INTO raw.itcrm_internet_request AS t (\n  request_id,\n  phone,\n  request_type,\n  form_request,\n  comment,\n  fio,\n  email,\n  analytic_info,\n  created_date,\n  date_no_answer,\n  no_active,\n  form_name,\n  landing_path,\n  event_date,\n  id_form,\n  load_timestamp,\n  date_key\n)\nSELECT\n  request_id,\n  phone,\n  request_type,\n  form_request,\n  comment,\n  fio,\n  email,\n  analytic_info,\n\n  /* created_date: TIMESTAMP или NULL, если «нулевая» или пустая */\n  CASE\n    WHEN created_date IS NULL OR created_date IN ('', '0000-00-00', '0000-00-00 00:00:00') THEN NULL\n    ELSE created_date::timestamp\n  END AS created_date,\n\n  /* date_no_answer: DATE или NULL */\n  CASE\n    WHEN date_no_answer IS NULL OR date_no_answer IN ('', '0000-00-00', '0000-00-00 00:00:00') THEN NULL\n    ELSE date_no_answer::date\n  END AS date_no_answer,\n\n  no_active,\n  form_name,\n  landing_path,\n\n  /* event_date: TIMESTAMP или NULL */\n  CASE\n    WHEN event_date IS NULL OR event_date IN ('', '0000-00-00', '0000-00-00 00:00:00') THEN NULL\n    ELSE event_date::timestamp\n  END AS event_date,\n\n  id_form,\n\n  /* load_timestamp: TIMESTAMPTZ или NOW() */\n  COALESCE(\n    NULLIF(load_timestamp, '')::timestamptz,\n    NOW()\n  ) AS load_timestamp,\n\n  /* date_key: DATE или NULL */\n  CASE\n    WHEN date_key IS NULL OR date_key = '' THEN NULL\n    ELSE date_key::date\n  END AS date_key\nFROM src\nON CONFLICT (request_id) DO UPDATE\nSET\n  phone          = EXCLUDED.phone,\n  request_type   = EXCLUDED.request_type,\n  form_request   = EXCLUDED.form_request,\n  comment        = EXCLUDED.comment,\n  fio            = EXCLUDED.fio,\n  email          = EXCLUDED.email,\n  analytic_info  = EXCLUDED.analytic_info,\n  created_date   = EXCLUDED.created_date,\n  date_no_answer = EXCLUDED.date_no_answer,\n  no_active      = EXCLUDED.no_active,\n  form_name      = EXCLUDED.form_name,\n  landing_path   = EXCLUDED.landing_path,\n  event_date     = EXCLUDED.event_date,\n  id_form        = EXCLUDED.id_form,\n  load_timestamp = EXCLUDED.load_timestamp,\n  date_key       = EXCLUDED.date_key;",
+        "options": {
+          "queryReplacement": "=$1 = {{$json.rows}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -9392,
+        -1600
+      ],
+      "id": "ea63fdc2-264c-45e9-aa01-80615aa871d8",
+      "name": "raw.internet_request",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  a.id,\n  a.analytic_id,\n  a.internet_request_id,\n  a.code,\n  ir.date           AS request_created_at,\n  ir.phone,\n  ir.email,\n  CURRENT_TIMESTAMP AS load_timestamp\nFROM itcrm_new_kiev.analytics a\nJOIN itcrm_new_kiev.internet_request ir\n  ON ir.id = a.internet_request_id\nWHERE ir.date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)\n  AND ir.date <  CURDATE()\nORDER BY a.id ASC;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -9872,
+        -1824
+      ],
+      "id": "f1de7fce-5181-48ac-b9b8-8c2522247d83",
+      "name": "stg_analytics1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Name: Prepare Analytics with Error Handling\n\nfunction clean(s) {\n  if (s == null) return null;\n  s = String(s);\n  // убрать BOM и мусор\n  s = s.replace(/^\\uFEFF/, '').replace(/[\\x00-\\x1F\\x7F]/g, '').trim();\n  return s || null;\n}\n\nfunction safeJsonParse(raw) {\n  if (!raw) return null;\n  \n  try {\n    // Если начинается с { или [, пытаемся парсить\n    if (/^[\\[{]/.test(raw)) {\n      return JSON.parse(raw);\n    }\n    // Иначе возвращаем как строку\n    return raw;\n  } catch (e) {\n    // Логируем ошибку для мониторинга\n    console.warn(`JSON parse failed for value: ${raw.substring(0, 100)}... Error: ${e.message}`);\n    // Возвращаем сырую строку при ошибке\n    return raw;\n  }\n}\n\nconst processedRows = items.map((i, index) => {\n  try {\n    const raw = clean(i.json.code);\n    const code_json = safeJsonParse(raw);\n\n    return {\n      id: i.json.id,\n      analytic_id: i.json.analytic_id,\n      internet_request_id: i.json.internet_request_id,\n      code_json,\n      request_created_at: i.json.request_created_at,\n      phone: i.json.phone != null ? String(i.json.phone) : null,\n      email: i.json.email ?? null,\n      load_timestamp: i.json.load_timestamp ?? null\n    };\n  } catch (error) {\n    console.error(`Error processing row ${index}, id=${i.json.id}: ${error.message}`);\n    // Возвращаем запись с null code_json при критической ошибке\n    return {\n      id: i.json.id,\n      analytic_id: i.json.analytic_id,\n      internet_request_id: i.json.internet_request_id,\n      code_json: null,\n      request_created_at: i.json.request_created_at,\n      phone: i.json.phone != null ? String(i.json.phone) : null,\n      email: i.json.email ?? null,\n      load_timestamp: i.json.load_timestamp ?? null\n    };\n  }\n});\n\nreturn [{\n  json: {\n    rows: processedRows\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -9664,
+        -1824
+      ],
+      "id": "c7a4aa5b-a5e8-4dfb-a3ee-5332a09bbe92",
+      "name": "Code1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Name: Prepare Bulk JSON (internet_request)\n\nfunction emptyToNull(v) {\n  if (v === undefined || v === null) return null;\n  const s = String(v).trim();\n  return s === '' ? null : s;\n}\n\nreturn [\n  {\n    json: {\n      rows: items.map(({ json: r }) => ({\n        request_id:        r.request_id != null ? Number(r.request_id) : null,\n        phone:              r.phone != null ? String(r.phone) : null,      // номер храним строкой\n        request_type:       emptyToNull(r.request_type),\n        form_request:       r.form_request != null ? Number(r.form_request) : null,\n        comment:            emptyToNull(r.comment),\n        fio:                emptyToNull(r.fio),\n        email:              emptyToNull(r.email),\n        analytic_info:      emptyToNull(r.analytic_info),\n\n        // Даты/время — передаем как пришло (Postgres сам приведет TIMESTAMP/DATE)\n        created_date:       r.created_date ?? null,       // 'YYYY-MM-DD HH:MM:SS' или ISO\n        date_no_answer:     r.date_no_answer ?? null,     // может быть '0000-00-00' — обработаем в SQL NULLIF\n        no_active:          r.no_active != null ? Number(r.no_active) : null,\n\n        form_name:          emptyToNull(r.form_name),\n        landing_path:       emptyToNull(r.landing_path),\n        event_date:         r.event_date ?? null,         // может быть null\n        id_form:            r.id_form != null ? Number(r.id_form) : null,\n\n        load_timestamp:     r.load_timestamp ?? null,     // если нет — в SQL подставим NOW()\n        date_key:           r.date_key ?? null            // 'YYYY-MM-DD'\n      }))\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -9664,
+        -1600
+      ],
+      "id": "7fef3682-11fa-4dc8-9f55-f9a10b44f3f5",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Name: Prepare Bulk JSON (new_source)\n\nfunction emptyToNull(v) {\n  if (v === undefined || v === null) return null;\n  const s = String(v).trim();\n  return s === '' ? null : s;\n}\n\nfunction toNumOrNull(v, toInt = true) {\n  if (v === undefined || v === null || v === '') return null;\n  \n  // Безопасное преобразование\n  try {\n    const n = toInt ? parseInt(v, 10) : Number(v);\n    \n    // Проверка на валидность\n    if (!Number.isFinite(n)) {\n      console.warn(`Invalid number conversion: \"${v}\" -> ${n}`);\n      return null;\n    }\n    \n    return n;\n  } catch (error) {\n    console.error(`Number conversion error for value \"${v}\": ${error.message}`);\n    return null;\n  }\n}\n\nreturn [\n  {\n    json: {\n      rows: items.map(({ json: r }) => ({\n        id_source:      toNumOrNull(r.id_source),\n        id_user:        toNumOrNull(r.id_user),\n        id_uniq:        toNumOrNull(r.id_uniq),\n        type:           toNumOrNull(r.type),\n\n        // даты/время передаем как строку — приведём в SQL\n        days:           r.days ?? null,           // 'YYYY-MM-DD'\n        date_time:      r.date_time ?? null,      // 'YYYY-MM-DD HH:MM:SS' / ISO / '0000-00-00 00:00:00'\n        wait_call:      r.wait_call ?? null,\n        date2:          r.date2 ?? null,\n        no_answer:      toNumOrNull(r.no_answer),\n        dogovor:        toNumOrNull(r.dogovor),\n        rejection:      toNumOrNull(r.rejection),\n        at_event:       toNumOrNull(r.at_event),\n        vizit_time:     r.vizit_time ?? null,\n        meet_time:      r.meet_time ?? null,\n        no_active:      toNumOrNull(r.no_active),\n        date_no_active: r.date_no_active ?? null,\n        hidden:         toNumOrNull(r.hidden),\n\n        updated_at:     r.updated_at ?? null,\n        load_timestamp: r.load_timestamp ?? null,\n        date_key:       r.date_key ?? null\n      }))\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -9664,
+        -1392
+      ],
+      "id": "9e8d97a6-80f1-4d19-864b-545ef1fe3967",
+      "name": "Code2"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH src AS (\n  SELECT *\n  FROM json_to_recordset($1::json) AS x(\n      id_source       TEXT,\n      id_user         TEXT,\n      id_uniq         TEXT,\n      type            TEXT,\n      days            TEXT,\n      date_time       TEXT,\n      wait_call       TEXT,\n      date2           TEXT,\n      no_answer       TEXT,\n      dogovor         TEXT,\n      rejection       TEXT,\n      at_event        TEXT,\n      vizit_time      TEXT,\n      meet_time       TEXT,\n      no_active       TEXT,\n      date_no_active  TEXT,\n      hidden          TEXT,\n      updated_at      TEXT,\n      load_timestamp  TEXT,\n      date_key        TEXT\n  )\n)\nINSERT INTO raw.itcrm_new_source AS t (\n  id_source,\n  id_user,\n  id_uniq,\n  type,\n  days,\n  date_time,\n  wait_call,\n  date2,\n  no_answer,\n  dogovor,\n  rejection,\n  at_event,\n  vizit_time,\n  meet_time,\n  no_active,\n  date_no_active,\n  hidden,\n  updated_at,\n  load_timestamp,\n  date_key\n)\nSELECT\n  -- числовые\n  NULLIF(id_source,'')::bigint,\n  NULLIF(id_user,'')::bigint,\n  NULLIF(id_uniq,'')::bigint,\n  NULLIF(type,'')::int,\n\n  -- даты (DATE): пустые/нулевые -> NULL\n  CASE WHEN days IS NULL OR days IN ('', '0000-00-00') THEN NULL ELSE days::date END AS days,\n\n  -- таймстемпы (TIMESTAMP): пустые/нулевые -> NULL\n  CASE WHEN date_time      IS NULL OR date_time      IN ('', '0000-00-00 00:00:00','0000-00-00') THEN NULL ELSE date_time::timestamp END AS date_time,\n  CASE WHEN wait_call      IS NULL OR wait_call      IN ('', '0000-00-00 00:00:00','0000-00-00') THEN NULL ELSE wait_call::timestamp END AS wait_call,\n  CASE WHEN date2          IS NULL OR date2          IN ('', '0000-00-00')                         THEN NULL ELSE date2::date END AS date2,\n\n  -- флаги/счетчики\n  CASE WHEN NULLIF(no_answer,'') IS NULL THEN NULL ELSE no_answer::int END AS no_answer,\n  CASE WHEN NULLIF(dogovor,'')   IS NULL THEN NULL ELSE dogovor::int   END AS dogovor,\n  CASE WHEN NULLIF(rejection,'') IS NULL THEN NULL ELSE rejection::int END AS rejection,\n  CASE WHEN NULLIF(at_event,'')  IS NULL THEN NULL ELSE at_event::int  END AS at_event,\n\n  CASE WHEN vizit_time     IS NULL OR vizit_time     IN ('', '0000-00-00 00:00:00','0000-00-00') THEN NULL ELSE vizit_time::timestamp END AS vizit_time,\n  CASE WHEN meet_time      IS NULL OR meet_time      IN ('', '0000-00-00 00:00:00','0000-00-00') THEN NULL ELSE meet_time::timestamp  END AS meet_time,\n\n  CASE WHEN NULLIF(no_active,'') IS NULL THEN NULL ELSE no_active::int END AS no_active,\n  CASE WHEN date_no_active IS NULL OR date_no_active IN ('', '0000-00-00') THEN NULL ELSE date_no_active::date END AS date_no_active,\n\n  CASE WHEN NULLIF(hidden,'') IS NULL THEN NULL ELSE hidden::int END AS hidden,\n\n  CASE WHEN updated_at     IS NULL OR updated_at     IN ('', '0000-00-00 00:00:00','0000-00-00') THEN NULL ELSE updated_at::timestamp END AS updated_at,\n\n  COALESCE(NULLIF(load_timestamp,'')::timestamptz, NOW()) AS load_timestamp,\n\n  CASE WHEN date_key IS NULL OR date_key IN ('') THEN NULL ELSE date_key::date END AS date_key\nFROM src\nON CONFLICT (id_source) DO UPDATE\nSET\n  id_user        = EXCLUDED.id_user,\n  id_uniq        = EXCLUDED.id_uniq,\n  type           = EXCLUDED.type,\n  days           = EXCLUDED.days,\n  date_time      = EXCLUDED.date_time,\n  wait_call      = EXCLUDED.wait_call,\n  date2          = EXCLUDED.date2,\n  no_answer      = EXCLUDED.no_answer,\n  dogovor        = EXCLUDED.dogovor,\n  rejection      = EXCLUDED.rejection,\n  at_event       = EXCLUDED.at_event,\n  vizit_time     = EXCLUDED.vizit_time,\n  meet_time      = EXCLUDED.meet_time,\n  no_active      = EXCLUDED.no_active,\n  date_no_active = EXCLUDED.date_no_active,\n  hidden         = EXCLUDED.hidden,\n  updated_at     = EXCLUDED.updated_at,\n  load_timestamp = EXCLUDED.load_timestamp,\n  date_key       = EXCLUDED.date_key;",
+        "options": {
+          "queryReplacement": "=$1 = {{$json.rows}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -9392,
+        -1392
+      ],
+      "id": "cb7fde12-d2e4-4880-9d8a-f97a530b4bcb",
+      "name": "raw.itcrm_new_source",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Name: Prepare Bulk JSON (internet_request_relation)\n\nfunction toNumOrNull(v, toInt = true) {\n  if (v === undefined || v === null || v === '') return null;\n  \n  // Безопасное преобразование\n  try {\n    const n = toInt ? parseInt(v, 10) : Number(v);\n    \n    // Проверка на валидность\n    if (!Number.isFinite(n)) {\n      console.warn(`Invalid number conversion: \"${v}\" -> ${n}`);\n      return null;\n    }\n    \n    return n;\n  } catch (error) {\n    console.error(`Number conversion error for value \"${v}\": ${error.message}`);\n    return null;\n  }\n}\n\nreturn [\n  {\n    json: {\n      rows: items.map(({ json: r }) => ({\n        id:            toNumOrNull(r.id),\n        id_request:    toNumOrNull(r.id_request),\n        id_source:     toNumOrNull(r.id_source),\n        request:       toNumOrNull(r.request),\n        // даты передаём как строку - парсим в SQL с защитой от '0000-00-00'\n        relation_date: r.relation_date ?? null,\n        load_timestamp: r.load_timestamp ?? null\n      }))\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -9664,
+        -1184
+      ],
+      "id": "3ef76661-9886-4381-b5b8-6ffb87bea8b9",
+      "name": "Code3"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH src AS (\n  SELECT *\n  FROM json_to_recordset($1::json) AS x(\n    id             TEXT,\n    id_request     TEXT,\n    id_source      TEXT,\n    request        TEXT,\n    relation_date  TEXT,\n    load_timestamp TEXT\n  )\n)\nINSERT INTO raw.itcrm_internet_request_relation AS t (\n  id,\n  id_request,\n  id_source,\n  request,\n  relation_date,\n  load_timestamp\n)\nSELECT\n  NULLIF(id,'')::bigint,\n  NULLIF(id_request,'')::bigint,\n  NULLIF(id_source,'')::bigint,\n  CASE WHEN NULLIF(request,'') IS NULL THEN NULL ELSE request::int END,\n  CASE\n    WHEN relation_date IS NULL OR relation_date IN ('', '0000-00-00', '0000-00-00 00:00:00')\n      THEN NULL\n    ELSE relation_date::date\n  END,\n  COALESCE(NULLIF(load_timestamp,'')::timestamptz, NOW())\nFROM src\nON CONFLICT (id) DO UPDATE\nSET\n  id_request     = EXCLUDED.id_request,\n  id_source      = EXCLUDED.id_source,\n  request        = EXCLUDED.request,\n  relation_date  = EXCLUDED.relation_date,\n  load_timestamp = EXCLUDED.load_timestamp;",
+        "options": {
+          "queryReplacement": "=$1 = {{$json.rows}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -9392,
+        -1184
+      ],
+      "id": "b66d7a13-85dd-4665-9398-ef0d03f65667",
+      "name": "raw.itcrm_internet_request_relation",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Name: Prepare Bulk JSON (docs_clients)\n\nfunction toNumOrNull(v, toInt = true) {\n  if (v === undefined || v === null || v === '') return null;\n  \n  // Безопасное преобразование\n  try {\n    const n = toInt ? parseInt(v, 10) : Number(v);\n    \n    // Проверка на валидность\n    if (!Number.isFinite(n)) {\n      console.warn(`Invalid number conversion: \"${v}\" -> ${n}`);\n      return null;\n    }\n    \n    return n;\n  } catch (error) {\n    console.error(`Number conversion error for value \"${v}\": ${error.message}`);\n    return null;\n  }\n}\n\nfunction emptyToNull(v) {\n  if (v === undefined || v === null) return null;\n  const s = String(v).trim();\n  return s === '' ? null : s;\n}\n\nreturn [\n  {\n    json: {\n      rows: items.map(({ json: r }) => ({\n        contract_id:                 toNumOrNull(r.contract_id),\n        id_source:                   toNumOrNull(r.id_source),\n        external_user_id:            toNumOrNull(r.external_user_id),\n        external_profile_id:         toNumOrNull(r.external_profile_id),\n        customer:                    emptyToNull(r.customer),\n        payment_doc:                 emptyToNull(r.payment_doc),\n        type_contract:               emptyToNull(r.type_contract),\n        short_contract:              emptyToNull(r.short_contract),\n        short_contract_flag:         toNumOrNull(r.short_contract_flag),\n        payment_site:                toNumOrNull(r.payment_site),\n        image:                       emptyToNull(r.image),\n        gender:                      toNumOrNull(r.gender),\n\n        datebirth:                   r.datebirth ?? null,\n        cpasport:                    emptyToNull(r.cpasport),\n        cpassissued:                 r.cpassissued ?? null,\n        cindnumber:                  emptyToNull(r.cindnumber),\n        lpasport:                    emptyToNull(r.lpasport),\n        lpassissued:                 r.lpassissued ?? null,\n        lindnumber:                  emptyToNull(r.lindnumber),\n        education:                   emptyToNull(r.education),\n        work:                        emptyToNull(r.work),\n        address:                     emptyToNull(r.address),\n        stream:                      emptyToNull(r.stream),\n        special:                     emptyToNull(r.special),\n        timeless:                    toNumOrNull(r.timeless),\n\n        // MySQL поле `group` попадает как r.group — маппим в group_name\n        group_name:                  emptyToNull(r.group),\n\n        okpo:                        emptyToNull(r.okpo),\n        currentdate:                 r.currentdate ?? null,\n\n        // деньги и числа — строками, приведём в SQL в NUMERIC\n        sum_total:                   r.sum ?? null,                 // dc.sum\n        sum_semester:                r.sum_semester ?? null,\n        sum_final:                   r.sum_final ?? null,\n        sum2:                        r.sum2 ?? null,\n        code1c:                      emptyToNull(r.code1c),\n        other_code:                  emptyToNull(r.other_code),\n        discount_sum:                r.discount_sum ?? null,\n        promocode_id:                toNumOrNull(r.promocode_id),\n        discount_description:        emptyToNull(r.discount_description),\n        payment_form:                emptyToNull(r.payment_form),\n        first_sum:                   r.first_sum ?? null,\n        date_start_lesson:           r.date_start_lesson ?? null,\n        total_cost_of_the_contract:  r.total_cost_of_the_contract ?? null,\n        cost_diploma_design:         r.cost_diploma_design ?? null,\n        class_number:                toNumOrNull(r.class_number),\n        extension_status:            toNumOrNull(r.extension_status),\n        extension_datetime:          r.extension_datetime ?? null,\n        entrance_fee:                r.entrance_fee ?? null,\n        exchange_rate:               r.exchange_rate ?? null,\n        customer_type:               toNumOrNull(r.customer_type),\n\n        created_at:                  r.created_at ?? null,\n        updated_at:                  r.updated_at ?? null,\n        created_by:                  toNumOrNull(r.created_by),\n        updated_by:                  toNumOrNull(r.updated_by),\n\n        load_timestamp:              r.load_timestamp ?? null,\n        date_key:                    r.date_key ?? null\n      }))\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -9664,
+        -976
+      ],
+      "id": "f548b27b-db55-4d2c-b7c3-926ae4acb8b0",
+      "name": "Code4"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH src AS (\n  SELECT *\n  FROM json_to_recordset($1::json) AS x(\n    contract_id                   TEXT,\n    id_source                     TEXT,\n    external_user_id              TEXT,\n    external_profile_id           TEXT,\n    customer                      TEXT,\n    payment_doc                   TEXT,\n    type_contract                 TEXT,\n    short_contract                TEXT,\n    short_contract_flag           TEXT,\n    payment_site                  TEXT,\n    image                         TEXT,\n    gender                        TEXT,\n    datebirth                     TEXT,\n    cpasport                      TEXT,\n    cpassissued                   TEXT,\n    cindnumber                    TEXT,\n    lpasport                      TEXT,\n    lpassissued                   TEXT,\n    lindnumber                    TEXT,\n    education                     TEXT,\n    work                          TEXT,\n    address                       TEXT,\n    stream                        TEXT,\n    special                       TEXT,\n    timeless                      TEXT,\n    group_name                    TEXT,\n    okpo                          TEXT,\n    currentdate                   TEXT,\n    sum_total                     TEXT,\n    sum_semester                  TEXT,\n    sum_final                     TEXT,\n    sum2                          TEXT,\n    code1c                        TEXT,\n    other_code                    TEXT,\n    discount_sum                  TEXT,\n    promocode_id                  TEXT,\n    discount_description          TEXT,\n    payment_form                  TEXT,\n    first_sum                     TEXT,\n    date_start_lesson             TEXT,\n    total_cost_of_the_contract    TEXT,\n    cost_diploma_design           TEXT,\n    class_number                  TEXT,\n    extension_status              TEXT,\n    extension_datetime            TEXT,\n    entrance_fee                  TEXT,\n    exchange_rate                 TEXT,\n    customer_type                 TEXT,\n    created_at                    TEXT,\n    updated_at                    TEXT,\n    created_by                    TEXT,\n    updated_by                    TEXT,\n    load_timestamp                TEXT,\n    date_key                      TEXT\n  )\n)\nINSERT INTO raw.itcrm_docs_clients AS t (\n  contract_id,\n  id_source,\n  external_user_id,\n  external_profile_id,\n  customer,\n  payment_doc,\n  type_contract,\n  short_contract,\n  short_contract_flag,\n  payment_site,\n  image,\n  gender,\n  datebirth,\n  cpasport,\n  cpassissued,\n  cindnumber,\n  lpasport,\n  lpassissued,\n  lindnumber,\n  education,\n  work,\n  address,\n  stream,\n  special,\n  timeless,\n  group_name,\n  okpo,\n  currentdate,\n  sum_total,\n  sum_semester,\n  sum_final,\n  sum2,\n  code1c,\n  other_code,\n  discount_sum,\n  promocode_id,\n  discount_description,\n  payment_form,\n  first_sum,\n  date_start_lesson,\n  total_cost_of_the_contract,\n  cost_diploma_design,\n  class_number,\n  extension_status,\n  extension_datetime,\n  entrance_fee,\n  exchange_rate,\n  customer_type,\n  created_at,\n  updated_at,\n  created_by,\n  updated_by,\n  load_timestamp,\n  date_key\n)\nSELECT\n  NULLIF(contract_id,'')::bigint,\n  NULLIF(id_source,'')::bigint,\n  NULLIF(external_user_id,'')::bigint,\n  NULLIF(external_profile_id,'')::bigint,\n  customer,\n  payment_doc,\n  type_contract,\n  short_contract,\n  CASE WHEN NULLIF(short_contract_flag,'') IS NULL THEN NULL ELSE short_contract_flag::int END,\n  CASE WHEN NULLIF(payment_site,'')      IS NULL THEN NULL ELSE payment_site::int      END,\n  image,\n  CASE WHEN NULLIF(gender,'')           IS NULL THEN NULL ELSE gender::int            END,\n\n  /* ===== DATE: поддержка YYYY-MM-DD и DD.MM.YYYY ===== */\n  CASE\n    WHEN datebirth IS NULL OR datebirth = '' OR datebirth LIKE '0000-00-00%' THEN NULL\n    WHEN datebirth ~ '^\\d{4}-\\d{2}-\\d{2}$'                      THEN datebirth::date\n    WHEN datebirth ~ '^\\d{2}\\.\\d{2}\\.\\d{4}$'                    THEN to_date(datebirth,'DD.MM.YYYY')\n    ELSE NULL\n  END AS datebirth,\n\n  cpasport,\n\n  CASE\n    WHEN cpassissued IS NULL OR cpassissued = '' OR cpassissued LIKE '0000-00-00%' THEN NULL\n    WHEN cpassissued ~ '^\\d{4}-\\d{2}-\\d{2}$'                    THEN cpassissued::date\n    WHEN cpassissued ~ '^\\d{2}\\.\\d{2}\\.\\d{4}$'                  THEN to_date(cpassissued,'DD.MM.YYYY')\n    ELSE NULL\n  END AS cpassissued,\n\n  cindnumber,\n  lpasport,\n\n  CASE\n    WHEN lpassissued IS NULL OR lpassissued = '' OR lpassissued LIKE '0000-00-00%' THEN NULL\n    WHEN lpassissued ~ '^\\d{4}-\\d{2}-\\d{2}$'                    THEN lpassissued::date\n    WHEN lpassissued ~ '^\\d{2}\\.\\d{2}\\.\\d{4}$'                  THEN to_date(lpassissued,'DD.MM.YYYY')\n    ELSE NULL\n  END AS lpassissued,\n\n  lindnumber,\n  education,\n  work,\n  address,\n  stream,\n  special,\n  CASE WHEN NULLIF(timeless,'')         IS NULL THEN NULL ELSE timeless::int          END,\n  group_name,\n  okpo,\n\n  CASE\n    WHEN currentdate IS NULL OR currentdate = '' OR currentdate LIKE '0000-00-00%' THEN NULL\n    WHEN currentdate ~ '^\\d{4}-\\d{2}-\\d{2}$'                    THEN currentdate::date\n    WHEN currentdate ~ '^\\d{2}\\.\\d{2}\\.\\d{4}$'                  THEN to_date(currentdate,'DD.MM.YYYY')\n    ELSE NULL\n  END AS currentdate,\n\n  /* ===== NUMERIC ===== */\n  NULLIF(sum_total,'')::numeric(18,2),\n  NULLIF(sum_semester,'')::numeric(18,2),\n  NULLIF(sum_final,'')::numeric(18,2),\n  NULLIF(sum2,'')::numeric(18,2),\n  code1c,\n  other_code,\n  NULLIF(discount_sum,'')::numeric(18,2),\n  NULLIF(promocode_id,'')::bigint,\n  discount_description,\n  payment_form,\n  NULLIF(first_sum,'')::numeric(18,2),\n\n  CASE\n    WHEN date_start_lesson IS NULL OR date_start_lesson = '' OR date_start_lesson LIKE '0000-00-00%' THEN NULL\n    WHEN date_start_lesson ~ '^\\d{4}-\\d{2}-\\d{2}$'             THEN date_start_lesson::date\n    WHEN date_start_lesson ~ '^\\d{2}\\.\\d{2}\\.\\d{4}$'           THEN to_date(date_start_lesson,'DD.MM.YYYY')\n    ELSE NULL\n  END AS date_start_lesson,\n\n  NULLIF(total_cost_of_the_contract,'')::numeric(18,2),\n  NULLIF(cost_diploma_design,'')::numeric(18,2),\n\n  CASE WHEN NULLIF(class_number,'')      IS NULL THEN NULL ELSE class_number::int      END,\n  CASE WHEN NULLIF(extension_status,'')  IS NULL THEN NULL ELSE extension_status::int  END,\n\n  /* ===== TIMESTAMP: поддержка YYYY-MM-DD HH:MM:SS и DD.MM.YYYY HH:MM:SS (а также чистой даты) ===== */\n  CASE\n    WHEN extension_datetime IS NULL OR extension_datetime = '' OR extension_datetime IN ('0000-00-00','0000-00-00 00:00:00') THEN NULL\n    WHEN extension_datetime ~ '^\\d{4}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2}:\\d{2}$' THEN extension_datetime::timestamp\n    WHEN extension_datetime ~ '^\\d{2}\\.\\d{2}\\.\\d{4}\\s+\\d{2}:\\d{2}:\\d{2}$' THEN to_timestamp(extension_datetime,'DD.MM.YYYY HH24:MI:SS')\n    WHEN extension_datetime ~ '^\\d{4}-\\d{2}-\\d{2}$' THEN (extension_datetime::date)::timestamp\n    WHEN extension_datetime ~ '^\\d{2}\\.\\d{2}\\.\\d{4}$' THEN to_date(extension_datetime,'DD.MM.YYYY')::timestamp\n    ELSE NULL\n  END AS extension_datetime,\n\n  NULLIF(entrance_fee,'')::numeric(18,2),\n  NULLIF(exchange_rate,'')::numeric(18,6),\n  CASE WHEN NULLIF(customer_type,'')     IS NULL THEN NULL ELSE customer_type::int     END,\n\n  CASE\n    WHEN created_at IS NULL OR created_at = '' OR created_at IN ('0000-00-00','0000-00-00 00:00:00') THEN NULL\n    WHEN created_at ~ '^\\d{4}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2}:\\d{2}$' THEN created_at::timestamp\n    WHEN created_at ~ '^\\d{2}\\.\\d{2}\\.\\d{4}\\s+\\d{2}:\\d{2}:\\d{2}$' THEN to_timestamp(created_at,'DD.MM.YYYY HH24:MI:SS')\n    WHEN created_at ~ '^\\d{4}-\\d{2}-\\d{2}$' THEN (created_at::date)::timestamp\n    WHEN created_at ~ '^\\d{2}\\.\\d{2}\\.\\d{4}$' THEN to_date(created_at,'DD.MM.YYYY')::timestamp\n    ELSE NULL\n  END AS created_at,\n\n  CASE\n    WHEN updated_at IS NULL OR updated_at = '' OR updated_at IN ('0000-00-00','0000-00-00 00:00:00') THEN NULL\n    WHEN updated_at ~ '^\\d{4}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2}:\\d{2}$' THEN updated_at::timestamp\n    WHEN updated_at ~ '^\\d{2}\\.\\d{2}\\.\\d{4}\\s+\\d{2}:\\d{2}:\\d{2}$' THEN to_timestamp(updated_at,'DD.MM.YYYY HH24:MI:SS')\n    WHEN updated_at ~ '^\\d{4}-\\d{2}-\\d{2}$' THEN (updated_at::date)::timestamp\n    WHEN updated_at ~ '^\\d{2}\\.\\d{2}\\.\\d{4}$' THEN to_date(updated_at,'DD.MM.YYYY')::timestamp\n    ELSE NULL\n  END AS updated_at,\n\n  NULLIF(created_by,'')::bigint,\n  NULLIF(updated_by,'')::bigint,\n\n  COALESCE(NULLIF(load_timestamp,'')::timestamptz, NOW()) AS load_timestamp,\n\n  CASE\n    WHEN date_key IS NULL OR date_key = '' OR date_key LIKE '0000-00-00%' THEN NULL\n    WHEN date_key ~ '^\\d{4}-\\d{2}-\\d{2}$'                   THEN date_key::date\n    WHEN date_key ~ '^\\d{2}\\.\\d{2}\\.\\d{4}$'                 THEN to_date(date_key,'DD.MM.YYYY')\n    ELSE NULL\n  END AS date_key\nFROM src\nON CONFLICT (contract_id) DO UPDATE\nSET\n  id_source                     = EXCLUDED.id_source,\n  external_user_id              = EXCLUDED.external_user_id,\n  external_profile_id           = EXCLUDED.external_profile_id,\n  customer                      = EXCLUDED.customer,\n  payment_doc                   = EXCLUDED.payment_doc,\n  type_contract                 = EXCLUDED.type_contract,\n  short_contract                = EXCLUDED.short_contract,\n  short_contract_flag           = EXCLUDED.short_contract_flag,\n  payment_site                  = EXCLUDED.payment_site,\n  image                         = EXCLUDED.image,\n  gender                        = EXCLUDED.gender,\n  datebirth                     = EXCLUDED.datebirth,\n  cpasport                      = EXCLUDED.cpasport,\n  cpassissued                   = EXCLUDED.cpassissued,\n  cindnumber                    = EXCLUDED.cindnumber,\n  lpasport                      = EXCLUDED.lpasport,\n  lpassissued                   = EXCLUDED.lpassissued,\n  lindnumber                    = EXCLUDED.lindnumber,\n  education                     = EXCLUDED.education,\n  work                          = EXCLUDED.work,\n  address                       = EXCLUDED.address,\n  stream                        = EXCLUDED.stream,\n  special                       = EXCLUDED.special,\n  timeless                      = EXCLUDED.timeless,\n  group_name                    = EXCLUDED.group_name,\n  okpo                          = EXCLUDED.okpo,\n  currentdate                   = EXCLUDED.currentdate,\n  sum_total                     = EXCLUDED.sum_total,\n  sum_semester                  = EXCLUDED.sum_semester,\n  sum_final                     = EXCLUDED.sum_final,\n  sum2                          = EXCLUDED.sum2,\n  code1c                        = EXCLUDED.code1c,\n  other_code                    = EXCLUDED.other_code,\n  discount_sum                  = EXCLUDED.discount_sum,\n  promocode_id                  = EXCLUDED.promocode_id,\n  discount_description          = EXCLUDED.discount_description,\n  payment_form                  = EXCLUDED.payment_form,\n  first_sum                     = EXCLUDED.first_sum,\n  date_start_lesson             = EXCLUDED.date_start_lesson,\n  total_cost_of_the_contract    = EXCLUDED.total_cost_of_the_contract,\n  cost_diploma_design           = EXCLUDED.cost_diploma_design,\n  class_number                  = EXCLUDED.class_number,\n  extension_status              = EXCLUDED.extension_status,\n  extension_datetime            = EXCLUDED.extension_datetime,\n  entrance_fee                  = EXCLUDED.entrance_fee,\n  exchange_rate                 = EXCLUDED.exchange_rate,\n  customer_type                 = EXCLUDED.customer_type,\n  created_at                    = EXCLUDED.created_at,\n  updated_at                    = EXCLUDED.updated_at,\n  created_by                    = EXCLUDED.created_by,\n  updated_by                    = EXCLUDED.updated_by,\n  load_timestamp                = EXCLUDED.load_timestamp,\n  date_key                      = EXCLUDED.date_key;",
+        "options": {
+          "queryReplacement": "=$1 = {{$json.rows}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -9392,
+        -976
+      ],
+      "id": "bc191ba7-0b6f-4cc7-9d07-ceb622eea80a",
+      "name": "raw.itcrm_docs_clients",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Name: Prepare Bulk JSON (new_form)\n\nfunction toNumOrNull(v, toInt = true) {\n  if (v === undefined || v === null || v === '') return null;\n  \n  // Безопасное преобразование\n  try {\n    const n = toInt ? parseInt(v, 10) : Number(v);\n    \n    // Проверка на валидность\n    if (!Number.isFinite(n)) {\n      console.warn(`Invalid number conversion: \"${v}\" -> ${n}`);\n      return null;\n    }\n    \n    return n;\n  } catch (error) {\n    console.error(`Number conversion error for value \"${v}\": ${error.message}`);\n    return null;\n  }\n}\n\nreturn [\n  {\n    json: {\n      rows: items.map(({ json: r }) => ({\n        form_relation_id: toNumOrNull(r.form_relation_id),\n        id_source:        toNumOrNull(r.id_source),\n        id_form:          toNumOrNull(r.id_form),\n        load_timestamp:   r.load_timestamp ?? null\n      }))\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -9664,
+        -768
+      ],
+      "id": "db721c2a-c7ca-4274-bcbe-b367c4357dcf",
+      "name": "Code5"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH src AS (\n  SELECT *\n  FROM json_to_recordset($1::json) AS x(\n    form_relation_id TEXT,\n    id_source        TEXT,\n    id_form          TEXT,\n    load_timestamp   TEXT\n  )\n)\nINSERT INTO raw.itcrm_new_form AS t (\n  form_relation_id,\n  id_source,\n  id_form,\n  load_timestamp\n)\nSELECT\n  NULLIF(form_relation_id,'')::bigint,\n  NULLIF(id_source,'')::bigint,\n  CASE WHEN NULLIF(id_form,'') IS NULL THEN NULL ELSE id_form::int END,\n  COALESCE(NULLIF(load_timestamp,'')::timestamptz, NOW())\nFROM src\nON CONFLICT (form_relation_id) DO UPDATE\nSET\n  id_source      = EXCLUDED.id_source,\n  id_form        = EXCLUDED.id_form,\n  load_timestamp = EXCLUDED.load_timestamp;",
+        "options": {
+          "queryReplacement": "=$1 = {{$json.rows}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -9392,
+        -768
+      ],
+      "id": "4e5fcc83-1ba3-4469-acf6-e2400cdadcb5",
+      "name": "raw.itcrm_new_form",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function toNumOrNull(v, toInt = true) {\n  if (v === undefined || v === null || v === '') return null;\n  \n  // Безопасное преобразование\n  try {\n    const n = toInt ? parseInt(v, 10) : Number(v);\n    \n    // Проверка на валидность\n    if (!Number.isFinite(n)) {\n      console.warn(`Invalid number conversion: \"${v}\" -> ${n}`);\n      return null;\n    }\n    \n    return n;\n  } catch (error) {\n    console.error(`Number conversion error for value \"${v}\": ${error.message}`);\n    return null;\n  }\n}\n\nfunction emptyToNull(v) {\n  if (v === undefined || v === null) return null;\n  const s = String(v).trim();\n  return s === '' ? null : s;\n}\n\nreturn [\n  {\n    json: {\n      rows: items.map(({ json: r }) => ({\n        id_form:        toNumOrNull(r.id_form),\n        name_form:      emptyToNull(r.name_form),\n        short_form:     toNumOrNull(r.short_form),\n        sort_form:      toNumOrNull(r.sort_form),\n        load_timestamp: r.load_timestamp ?? null\n      }))\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -9664,
+        -560
+      ],
+      "id": "e7e01422-a324-4e43-af60-fe0ef1337864",
+      "name": "Code7"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH src AS (\n  SELECT *\n  FROM json_to_recordset($1::json) AS x(\n    id_form        TEXT,\n    name_form      TEXT,\n    short_form     TEXT,\n    sort_form      TEXT,\n    load_timestamp TEXT\n  )\n)\nINSERT INTO raw.itcrm_new_form_name AS t (\n  id_form,\n  name_form,\n  short_form,\n  sort_form,\n  load_timestamp\n)\nSELECT\n  NULLIF(id_form,'')::int,\n  name_form,\n  CASE WHEN NULLIF(short_form,'') IS NULL THEN NULL ELSE short_form::int END,\n  CASE WHEN NULLIF(sort_form,'')  IS NULL THEN NULL ELSE sort_form::int  END,\n  COALESCE(NULLIF(load_timestamp,'')::timestamptz, NOW())\nFROM src\nON CONFLICT (id_form) DO UPDATE\nSET\n  name_form      = EXCLUDED.name_form,\n  short_form     = EXCLUDED.short_form,\n  sort_form      = EXCLUDED.sort_form,\n  load_timestamp = EXCLUDED.load_timestamp;",
+        "options": {
+          "queryReplacement": "=$1 = {{$json.rows}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -9392,
+        -560
+      ],
+      "id": "c864d396-70c9-4131-86f8-9ed52de081ef",
+      "name": "raw.itcrm_new_form1",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Name: Prepare Bulk JSON (new_result)\n\nfunction toNumOrNull(v, toInt = true) {\n  if (v === undefined || v === null || v === '') return null;\n  \n  // Безопасное преобразование\n  try {\n    const n = toInt ? parseInt(v, 10) : Number(v);\n    \n    // Проверка на валидность\n    if (!Number.isFinite(n)) {\n      console.warn(`Invalid number conversion: \"${v}\" -> ${n}`);\n      return null;\n    }\n    \n    return n;\n  } catch (error) {\n    console.error(`Number conversion error for value \"${v}\": ${error.message}`);\n    return null;\n  }\n}\n\nreturn [\n  {\n    json: {\n      rows: items.map(({ json: r }) => ({\n        result_id:     toNumOrNull(r.result_id),\n        id_source:     toNumOrNull(r.id_source),\n        id_result:     toNumOrNull(r.id_result),\n        load_timestamp: r.load_timestamp ?? null\n      }))\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -9664,
+        -352
+      ],
+      "id": "cc69a2ea-677a-4f0e-81be-5c21f6e83408",
+      "name": "Code6"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH src AS (\n  SELECT *\n  FROM json_to_recordset($1::json) AS x(\n    result_id      TEXT,\n    id_source      TEXT,\n    id_result      TEXT,\n    load_timestamp TEXT\n  )\n)\nINSERT INTO raw.itcrm_new_result AS t (\n  result_id,\n  id_source,\n  id_result,\n  load_timestamp\n)\nSELECT\n  NULLIF(result_id,'')::bigint,\n  NULLIF(id_source,'')::bigint,\n  CASE WHEN NULLIF(id_result,'') IS NULL THEN NULL ELSE id_result::int END,\n  COALESCE(NULLIF(load_timestamp,'')::timestamptz, NOW())\nFROM src\nON CONFLICT (result_id) DO UPDATE\nSET\n  id_source      = EXCLUDED.id_source,\n  id_result      = EXCLUDED.id_result,\n  load_timestamp = EXCLUDED.load_timestamp;",
+        "options": {
+          "queryReplacement": "=$1 = {{$json.rows}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -9392,
+        -352
+      ],
+      "id": "d90a3887-159d-44bb-b7c2-e541ad62a1a8",
+      "name": "raw.itcrm_new_result",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Name: Prepare Bulk JSON (new_result_name)\n\nfunction toNumOrNull(v, toInt = true) {\n  if (v === undefined || v === null || v === '') return null;\n  \n  // Безопасное преобразование\n  try {\n    const n = toInt ? parseInt(v, 10) : Number(v);\n    \n    // Проверка на валидность\n    if (!Number.isFinite(n)) {\n      console.warn(`Invalid number conversion: \"${v}\" -> ${n}`);\n      return null;\n    }\n    \n    return n;\n  } catch (error) {\n    console.error(`Number conversion error for value \"${v}\": ${error.message}`);\n    return null;\n  }\n}\n\nfunction emptyToNull(v) {\n  if (v === undefined || v === null) return null;\n  const s = String(v).trim();\n  return s === '' ? null : s;\n}\n\nreturn [\n  {\n    json: {\n      rows: items.map(({ json: r }) => ({\n        id_result:     toNumOrNull(r.id_result),\n        name_result:   emptyToNull(r.name_result),\n        img_result:    emptyToNull(r.img_result),\n        id_type:       toNumOrNull(r.id_type),\n        sort_result:   toNumOrNull(r.sort_result),\n        visibility:    toNumOrNull(r.visibility),\n        load_timestamp: r.load_timestamp ?? null\n      }))\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -9664,
+        -144
+      ],
+      "id": "7448b892-a9e5-490e-aae3-49f62e4fb994",
+      "name": "Code8"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH src AS (\n  SELECT *\n  FROM json_to_recordset($1::json) AS x(\n    id_result     TEXT,\n    name_result   TEXT,\n    img_result    TEXT,\n    id_type       TEXT,\n    sort_result   TEXT,\n    visibility    TEXT,\n    load_timestamp TEXT\n  )\n)\nINSERT INTO raw.itcrm_new_result_name AS t (\n  id_result,\n  name_result,\n  img_result,\n  id_type,\n  sort_result,\n  visibility,\n  load_timestamp\n)\nSELECT\n  NULLIF(id_result,'')::int,\n  name_result,\n  img_result,\n  CASE WHEN NULLIF(id_type,'')     IS NULL THEN NULL ELSE id_type::int     END,\n  CASE WHEN NULLIF(sort_result,'') IS NULL THEN NULL ELSE sort_result::int END,\n  CASE WHEN NULLIF(visibility,'')  IS NULL THEN NULL ELSE visibility::int  END,\n  COALESCE(NULLIF(load_timestamp,'')::timestamptz, NOW())\nFROM src\nON CONFLICT (id_result) DO UPDATE\nSET\n  name_result   = EXCLUDED.name_result,\n  img_result    = EXCLUDED.img_result,\n  id_type       = EXCLUDED.id_type,\n  sort_result   = EXCLUDED.sort_result,\n  visibility    = EXCLUDED.visibility,\n  load_timestamp= EXCLUDED.load_timestamp;",
+        "options": {
+          "queryReplacement": "=$1 = {{$json.rows}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -9392,
+        -144
+      ],
+      "id": "0fe6aaf9-a80c-404d-ba3b-0345f323f233",
+      "name": "raw.itcrm_new_result_name",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Name: Prepare Bulk JSON (new_payment)\n\nfunction toNumOrNull(v, toInt = true) {\n  if (v === undefined || v === null || v === '') return null;\n  \n  // Безопасное преобразование\n  try {\n    const n = toInt ? parseInt(v, 10) : Number(v);\n    \n    // Проверка на валидность\n    if (!Number.isFinite(n)) {\n      console.warn(`Invalid number conversion: \"${v}\" -> ${n}`);\n      return null;\n    }\n    \n    return n;\n  } catch (error) {\n    console.error(`Number conversion error for value \"${v}\": ${error.message}`);\n    return null;\n  }\n}\n\nreturn [\n  {\n    json: {\n      rows: items.map(({ json: r }) => ({\n        payment_id:      toNumOrNull(r.payment_id),\n        id_source:       toNumOrNull(r.id_source),\n        payment:         toNumOrNull(r.payment),\n        reissuance:      toNumOrNull(r.reissuance),\n        // даты передаём строкой — парсим в SQL (учтём '0000-00-00')\n        date_payment:    r.date_payment ?? null,\n        date_fail:       r.date_fail ?? null,\n        date_prepayment: r.date_prepayment ?? null,\n        load_timestamp:  r.load_timestamp ?? null\n      }))\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -9664,
+        64
+      ],
+      "id": "4a5a31ce-8840-493d-a0ef-d91e3f0344f7",
+      "name": "Code9"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH src AS (\n  SELECT *\n  FROM json_to_recordset($1::json) AS x(\n    payment_id      TEXT,\n    id_source       TEXT,\n    payment         TEXT,\n    reissuance      TEXT,\n    date_payment    TEXT,\n    date_fail       TEXT,\n    date_prepayment TEXT,\n    load_timestamp  TEXT\n  )\n)\nINSERT INTO raw.itcrm_new_payment AS t (\n  payment_id,\n  id_source,\n  payment,\n  reissuance,\n  date_payment,\n  date_fail,\n  date_prepayment,\n  load_timestamp\n)\nSELECT\n  NULLIF(payment_id,'')::bigint,\n  NULLIF(id_source,'')::bigint,\n  CASE WHEN NULLIF(payment,'')    IS NULL THEN NULL ELSE payment::int    END,\n  CASE WHEN NULLIF(reissuance,'') IS NULL THEN NULL ELSE reissuance::int END,\n\n  CASE\n    WHEN date_payment IS NULL OR date_payment IN ('', '0000-00-00', '0000-00-00 00:00:00') THEN NULL\n    WHEN date_payment ~ '^\\d{4}-\\d{2}-\\d{2}$'              THEN date_payment::date\n    WHEN date_payment ~ '^\\d{2}\\.\\d{2}\\.\\d{4}$'            THEN to_date(date_payment,'DD.MM.YYYY')\n    ELSE NULL\n  END AS date_payment,\n\n  CASE\n    WHEN date_fail IS NULL OR date_fail IN ('', '0000-00-00', '0000-00-00 00:00:00') THEN NULL\n    WHEN date_fail ~ '^\\d{4}-\\d{2}-\\d{2}$'                  THEN date_fail::date\n    WHEN date_fail ~ '^\\d{2}\\.\\d{2}\\.\\d{4}$'                THEN to_date(date_fail,'DD.MM.YYYY')\n    ELSE NULL\n  END AS date_fail,\n\n  CASE\n    WHEN date_prepayment IS NULL OR date_prepayment IN ('', '0000-00-00', '0000-00-00 00:00:00') THEN NULL\n    WHEN date_prepayment ~ '^\\d{4}-\\d{2}-\\d{2}$'            THEN date_prepayment::date\n    WHEN date_prepayment ~ '^\\d{2}\\.\\d{2}\\.\\d{4}$'          THEN to_date(date_prepayment,'DD.MM.YYYY')\n    ELSE NULL\n  END AS date_prepayment,\n\n  COALESCE(NULLIF(load_timestamp,'')::timestamptz, NOW())\nFROM src\nON CONFLICT (payment_id) DO UPDATE\nSET\n  id_source      = EXCLUDED.id_source,\n  payment        = EXCLUDED.payment,\n  reissuance     = EXCLUDED.reissuance,\n  date_payment   = EXCLUDED.date_payment,\n  date_fail      = EXCLUDED.date_fail,\n  date_prepayment= EXCLUDED.date_prepayment,\n  load_timestamp = EXCLUDED.load_timestamp;",
+        "options": {
+          "queryReplacement": "=$1 = {{$json.rows}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -9392,
+        64
+      ],
+      "id": "ef1747b8-bad2-42a3-9ed2-32a0380db2e7",
+      "name": "raw.itcrm_new_payment",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH src AS (\n  SELECT *\n  FROM json_to_recordset($1::json) AS x(\n    id                   int,\n    analytic_id          smallint,\n    internet_request_id  int,\n    code_json            jsonb,\n    request_created_at   timestamp,\n    phone                text,\n    email                text,\n    load_timestamp       timestamptz\n  )\n)\nINSERT INTO raw.itcrm_analytics AS t (\n  id,\n  analytic_id,\n  internet_request_id,\n  code,\n  request_created_at,\n  phone,\n  email,\n  load_timestamp\n)\nSELECT\n  id,\n  analytic_id,\n  internet_request_id,\n  code_json,                         -- уже нормализованный jsonb\n  request_created_at,\n  NULLIF(phone, ''),\n  NULLIF(email, ''),\n  COALESCE(load_timestamp, now())\nFROM src\nON CONFLICT (id) DO UPDATE\nSET\n  analytic_id          = EXCLUDED.analytic_id,\n  internet_request_id  = EXCLUDED.internet_request_id,\n  code                 = EXCLUDED.code,\n  request_created_at   = EXCLUDED.request_created_at,\n  phone                = EXCLUDED.phone,\n  email                = EXCLUDED.email,\n  load_timestamp       = EXCLUDED.load_timestamp;",
+        "options": {
+          "queryReplacement": "=\t$1 = {{$json.rows}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -9392,
+        -1824
+      ],
+      "id": "bd99bf68-ec97-4626-b7e4-422ba51d3252",
+      "name": "raw.itcrm_analytics",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Name: Prepare Users with Enhanced Validation\n\nconst toInt = v => {\n  if (v === '' || v == null) return null;\n  const n = parseInt(v, 10);\n  return Number.isFinite(n) ? n : null;\n};\n\nconst toBool = v => {\n  if (v === '' || v == null) return null;\n  const s = String(v).toLowerCase().trim();\n  if (['1', 't', 'true', 'yes', 'y'].includes(s)) return true;\n  if (['0', 'f', 'false', 'no', 'n'].includes(s)) return false;\n  return null;\n};\n\nconst normPhone = v => {\n  if (!v) return null;\n  \n  try {\n    let s = String(v).replace(/[^\\d]/g, ''); // только цифры\n    if (!s || s.length < 9) return null; // минимум 9 цифр\n    \n    // привести к формату 380XXXXXXXXX по возможности\n    if (s.startsWith('0') && s.length === 10) {\n      s = '38' + s; // 0XXXXXXXXX -> 380XXXXXXXXX\n    } else if (!s.startsWith('380') && s.length === 9) {\n      s = '380' + s; // XXXXXXXXX -> 380XXXXXXXXX\n    }\n    \n    // Проверка на корректную длину украинского номера\n    if (s.startsWith('380') && s.length !== 12) {\n      console.warn(`Invalid UA phone length: ${s}`);\n      return s; // возвращаем как есть, но с предупреждением\n    }\n    \n    return s;\n  } catch (error) {\n    console.error(`Phone normalization error: ${error.message}`);\n    return null;\n  }\n};\n\nconst validateEmail = email => {\n  if (!email) return null;\n  \n  const trimmed = String(email).toLowerCase().trim();\n  \n  // Базовая проверка формата email\n  const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\n  if (!emailRegex.test(trimmed)) {\n    console.warn(`Invalid email format: ${trimmed}`);\n    return null;\n  }\n  \n  // Проверка на подозрительные домены (опционально)\n  const suspiciousDomains = ['test.com', 'example.com', 'temp.com'];\n  const domain = trimmed.split('@')[1];\n  if (suspiciousDomains.includes(domain)) {\n    console.warn(`Suspicious email domain: ${domain}`);\n  }\n  \n  return trimmed;\n};\n\nconst processedItems = items.map((item, index) => {\n  try {\n    const { json } = item;\n    \n    const userId = toInt(json.id_user);\n    if (!userId) {\n      console.warn(`Skipping row ${index}: missing id_user`);\n      return null;\n    }\n\n    return {\n      json: {\n        id_user: userId,\n        name_user: json.fio_user ?? json.name_user ?? null,\n        email_user: validateEmail(json.email_user),\n        login_user: json.username ?? json.login_user ?? null,\n        phone_user: normPhone(json.tel_user ?? json.phone_user),\n        arc_user: toBool(json.arc_user),\n        flag_enter: toBool(json.flag_enter),\n        external_user_id: toInt(json.external_user_id),\n        external_profile_id: toInt(json.external_profile_id),\n        position_id: toInt(json.position_id),\n        load_timestamp: json.load_timestamp || null,\n      }\n    };\n  } catch (error) {\n    console.error(`Error processing user row ${index}: ${error.message}`);\n    return null;\n  }\n}).filter(item => item !== null);\n\nreturn processedItems;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -9664,
+        288
+      ],
+      "id": "cebe946d-884f-4685-8866-d92e92edfb74",
+      "name": "Code33"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH uids AS (\n  SELECT DISTINCT rws.user_id\n  FROM itcrm_new_kiev.request_work_states rws\n  WHERE rws.created_at >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)\n  UNION\n  SELECT DISTINCT dc.created_by\n  FROM itcrm_new_kiev.docs_clients dc\n  WHERE dc.created_at >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)\n  UNION\n  SELECT DISTINCT dc.updated_by\n  FROM itcrm_new_kiev.docs_clients dc\n  WHERE dc.updated_at >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)\n)\nSELECT\n  u.*,\n  CURRENT_TIMESTAMP AS load_timestamp\nFROM itcrm_public.`user` u\nJOIN uids ON u.id_user = uids.user_id;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -9872,
+        288
+      ],
+      "id": "2a743354-509c-4e90-a60a-d506773dcb2d",
+      "name": "stg_users1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const yes = (v) => {\n  const s = String(v).toLowerCase();\n  return s === '1' || s === 'true' || s === 't' || s === 'yes' || s === 'y';\n};\n\nconst guessCurrencyCode = (country, alias) => {\n  if (['ua', 'ukraine'].includes(country) || /kyiv|kiev/.test(alias)) return 'UAH';\n  if (['kz', 'kazakhstan'].includes(country)) return 'KZT';\n  if (['pl', 'poland'].includes(country)) return 'PLN';\n  if (['cz', 'czech', 'czechia'].includes(country)) return 'CZK';\n  if (['ro', 'romania'].includes(country)) return 'RON';\n  if (['bg', 'bulgaria'].includes(country)) return 'BGN';\n  if (['hu', 'hungary'].includes(country)) return 'HUF';\n  if (['gb', 'uk', 'united kingdom', 'great britain'].includes(country)) return 'GBP';\n  if (['de', 'fr', 'es', 'it', 'pt', 'nl', 'be', 'at', 'fi', 'gr', 'ie', 'lu', 'mt', 'si', 'sk', 'lv', 'lt', 'ee', 'cy'].includes(country)) return 'EUR';\n  if (['us', 'usa', 'united states'].includes(country)) return 'USD';\n  return 'USD';\n};\n\nreturn items.map(({ json }) => {\n  const country = (json.country || '').toLowerCase();\n  const alias = (json.alias || '').toLowerCase();\n  const idCity = json.id_city != null ? parseInt(json.id_city, 10) : null;\n\n  const currencyCode = (json.currency_code || '').toUpperCase() || guessCurrencyCode(country, alias);\n\n  return {\n    json: {\n      branch_key: `${country}:${alias}`,\n      country,\n      alias,\n      id_city: idCity,\n      company_id: json.company_id != null ? parseInt(json.company_id, 10) : null,\n      name: json.name || null,\n      timezone: null,\n      currency_id: json.currency_id != null ? parseInt(json.currency_id, 10) : null,\n      currency_code: currencyCode,\n      is_active: json.status != null ? yes(json.status) : null,\n      is_test: yes(json.is_test),\n      is_internal: yes(json.is_internal),\n      source: 'itcrm_admin.admin_company',\n      src_load_timestamp: json.src_load_timestamp || null\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -9696,
+        752
+      ],
+      "id": "c074cf31-0893-4b7e-b519-8d111b90e169",
+      "name": "Code34"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH payload AS (\n  SELECT\n    (row->>'id_user')::bigint                      AS id_user,\n    NULLIF(btrim(row->>'name_user'), '')          AS name_user,\n    NULLIF(lower(row->>'email_user'), '')         AS email_user,\n    NULLIF(btrim(row->>'login_user'), '')         AS login_user,\n    NULLIF(btrim(row->>'phone_user'), '')         AS phone_user,\n    CASE\n      WHEN (row->>'arc_user') IN ('true','t','1')  THEN TRUE\n      WHEN (row->>'arc_user') IN ('false','f','0') THEN FALSE\n      ELSE NULL\n    END                                            AS arc_user,\n    CASE\n      WHEN (row->>'flag_enter') IN ('true','t','1')  THEN TRUE\n      WHEN (row->>'flag_enter') IN ('false','f','0') THEN FALSE\n      ELSE NULL\n    END                                            AS flag_enter,\n    NULLIF(row->>'external_user_id','')::bigint    AS external_user_id,\n    NULLIF(row->>'external_profile_id','')::bigint AS external_profile_id,\n    NULLIF(row->>'position_id','')::int            AS position_id,\n    COALESCE((row->>'load_timestamp')::timestamptz, now()) AS load_timestamp\n  FROM (SELECT $1::jsonb AS row) s\n)\nINSERT INTO raw.itcrm_users_ua (\n  id_user, name_user, email_user, login_user, phone_user,\n  arc_user, flag_enter, external_user_id, external_profile_id, position_id,\n  load_timestamp\n)\nSELECT\n  id_user, name_user, email_user, login_user, phone_user,\n  arc_user, flag_enter, external_user_id, external_profile_id, position_id,\n  load_timestamp\nFROM payload\nON CONFLICT (id_user) DO UPDATE SET\n  name_user            = EXCLUDED.name_user,\n  email_user           = EXCLUDED.email_user,\n  login_user           = EXCLUDED.login_user,\n  phone_user           = EXCLUDED.phone_user,\n  arc_user             = EXCLUDED.arc_user,\n  flag_enter           = EXCLUDED.flag_enter,\n  external_user_id     = EXCLUDED.external_user_id,\n  external_profile_id  = EXCLUDED.external_profile_id,\n  position_id          = EXCLUDED.position_id,\n  load_timestamp       = EXCLUDED.load_timestamp;",
+        "options": {
+          "queryReplacement": "=={{$json}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -9392,
+        288
+      ],
+      "id": "0feefe14-020f-4fa6-844a-3b42bdbfd407",
+      "name": "raw.itcrm_users_ua",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  {{$json.company_id}}          AS company_id,\n  LOWER('{{$json.safe_alias}}') AS alias,\n  '{{$json.name}}'              AS name,\n  LOWER('{{$json.country}}')    AS country,\n  {{$json.status}}              AS status,\n  {{$json.is_test}}             AS is_test,\n  {{$json.is_internal}}         AS is_internal,\n  '{{$json.src_load_timestamp}}' AS src_load_timestamp,\n  t.id_city,\n  t.cnt\nFROM (\n  SELECT id_city, COUNT(*) AS cnt\n  FROM itcrm_new_{{$json.safe_alias}}.reg_zatrat\n  GROUP BY id_city\n  ORDER BY cnt DESC\n  LIMIT 1\n) t;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -9856,
+        752
+      ],
+      "id": "8fa6147f-496f-42db-ae89-04f6a139eebc",
+      "name": "id_city",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  id                           AS company_id,\n  LOWER(TRIM(alias))           AS alias,\n  name,\n  LOWER(TRIM(country))         AS country,\n  CAST(status AS SIGNED)       AS status,\n  CAST(is_test AS SIGNED)      AS is_test,\n  CAST(is_internal AS SIGNED)  AS is_internal,\n  NOW()                        AS src_load_timestamp\nFROM itcrm_admin.admin_company\nWHERE country = 'UA'\n  AND COALESCE(alias,'') <> ''\n  AND status = 1;   -- активные",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -9872,
+        528
+      ],
+      "id": "68e3b995-fe54-4272-a9b7-8f852ce3b5cf",
+      "name": "id_city1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH j AS (\n  -- текущее item → JSON\n  SELECT '{{ JSON.stringify($json).replace(/'/g, \"''\") }}'::jsonb AS row\n),\np AS (\n  SELECT\n    lower(trim(coalesce(row->>'country','')))  AS country,\n    lower(trim(coalesce(row->>'alias','')))    AS alias,\n    NULLIF(row->>'id_city','')::int            AS id_city,\n    NULLIF(row->>'company_id','')::int         AS company_id,\n    NULLIF(btrim(row->>'name'),'')             AS name,\n    NULLIF(btrim(row->>'timezone'),'')         AS timezone,\n\n    -- вход (опционально)\n    NULLIF(row->>'currency_code','')           AS in_currency_code,\n    NULLIF(row->>'currency_id','')::int        AS in_currency_id,\n\n    CASE WHEN (row->>'is_active')   IN ('true','t','1')  THEN TRUE\n         WHEN (row->>'is_active')   IN ('false','f','0') THEN FALSE ELSE NULL END AS is_active,\n    CASE WHEN (row->>'is_test')     IN ('true','t','1')  THEN TRUE\n         WHEN (row->>'is_test')     IN ('false','f','0') THEN FALSE ELSE NULL END AS is_test,\n    CASE WHEN (row->>'is_internal') IN ('true','t','1')  THEN TRUE\n         WHEN (row->>'is_internal') IN ('false','f','0') THEN FALSE ELSE NULL END AS is_internal,\n    NULLIF(btrim(row->>'source'),'')           AS source,\n    coalesce((row->>'src_load_timestamp')::timestamptz, now()) AS src_load_timestamp\n  FROM j\n),\nautocode AS (\n  SELECT\n    p.*,\n    upper(\n      coalesce(\n        p.in_currency_code,\n        CASE\n          WHEN p.country IN ('ua','ukraine') OR p.alias ~ '(kyiv|kiev)' THEN 'UAH'\n          WHEN p.country IN ('kz','kazakhstan')                         THEN 'KZT'\n          WHEN p.country IN ('pl','poland')                             THEN 'PLN'\n          WHEN p.country IN ('cz','czech','czechia')                    THEN 'CZK'\n          WHEN p.country IN ('ro','romania')                            THEN 'RON'\n          WHEN p.country IN ('bg','bulgaria')                           THEN 'BGN'\n          WHEN p.country IN ('hu','hungary')                            THEN 'HUF'\n          WHEN p.country IN ('gb','uk','united kingdom','great britain') THEN 'GBP'\n          WHEN p.country IN ('de','fr','es','it','pt','nl','be','at','fi','gr','ie','lu','mt','si','sk','lv','lt','ee','cy') THEN 'EUR'\n          WHEN p.country IN ('us','usa','united states')                THEN 'USD'\n          ELSE 'USD'\n        END\n      )\n    ) AS currency_code\n  FROM p\n),\ncur AS (\n  -- мини-справочник (ISO numeric). Замените на свой, если нужно.\n  SELECT * FROM (VALUES\n    ('UAH', 980), ('USD', 840), ('EUR', 978), ('GBP', 826),\n    ('PLN', 985), ('CZK', 203), ('RON', 946), ('BGN', 975),\n    ('HUF', 348), ('KZT', 398)\n  ) AS t(iso_code, currency_id)\n),\nresolved_currency AS (\n  SELECT\n    a.*,\n    coalesce(a.in_currency_id, c.currency_id) AS currency_id\n  FROM autocode a\n  LEFT JOIN cur c\n    ON c.iso_code = a.currency_code\n)\nINSERT INTO raw.dim_branch_src (\n  -- ВАЖНО: без branch_key (он GENERATED)\n  country,\n  alias,\n  id_city,\n  company_id,\n  name,\n  timezone,\n  currency_id,\n  is_active,\n  is_test,\n  is_internal,\n  source,\n  src_load_timestamp,\n  ingested_at\n)\nSELECT\n  country,\n  alias,\n  id_city,\n  company_id,\n  name,\n  timezone,\n  currency_id,\n  is_active,\n  is_test,\n  is_internal,\n  source,\n  src_load_timestamp,\n  now()\nFROM resolved_currency\nWHERE country <> '' AND alias <> ''\nON CONFLICT (branch_key) DO UPDATE SET\n  id_city            = EXCLUDED.id_city,\n  company_id         = EXCLUDED.company_id,\n  name               = EXCLUDED.name,\n  timezone           = EXCLUDED.timezone,\n  currency_id        = EXCLUDED.currency_id,\n  is_active          = EXCLUDED.is_active,\n  is_test            = EXCLUDED.is_test,\n  is_internal        = EXCLUDED.is_internal,\n  source             = EXCLUDED.source,\n  src_load_timestamp = EXCLUDED.src_load_timestamp,\n  ingested_at        = now();",
+        "options": {
+          "queryReplacement": "=={{$json}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -9552,
+        752
+      ],
+      "id": "c9289223-2323-49af-8cfe-fc2e58b4a56e",
+      "name": "raw.dim_branch_src",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  o.id,\n  o.id_source,\n  o.id_city,\n  o.code1c,\n  o.one_1c,\n  o.date        AS date,\n  o.listener,\n  o.customer,\n  o.datebirth,\n  o.mobphone,\n  o.homephone,\n  o.workphone,\n  o.cpasport,\n  o.cpassissued,\n  o.lpasport,\n  o.lpassissued,\n  o.cindnumber,\n  o.email,\n  o.address,\n  o.education,\n  o.work,\n  o.okpo,\n  o.no_active,\n  o.id_course,\n  o.descr_bookkeeping,\n  o.discount_sum,\n  o.discount_description,\n  o.payment_form,\n  o.payment_status,\n  o.short_contract,\n  o.first_sum,\n  o.sent1s,\n  o.id_form,\n  o.id_product,\n  o.product,\n  o.name_form,\n  o.name_sub_form,\n  o.contract_url,\n  o.extension_status,\n  o.date_pay_onec,\n  o.sum_pay_onec,\n  o.entrance_fee,\n  o.total_cost,\n  o.quantity_of_pairs,\n  o.payment_schedule,\n  o.contracts_url,\n  o.discounts_url,\n  o.customer_type,\n  o.customer_iban\nFROM clients_for_bookkeeping o\nWHERE o.date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)\n  AND o.date <  CURDATE();",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -9856,
+        960
+      ],
+      "id": "242fcb80-56d4-4b73-bac7-db4895d27d0d",
+      "name": "clients_for_bookkeeping",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Name: Prepare CRM Orders with Error Handling\n\nfunction n(v) {\n  return (v === '' || v === undefined || v === null) ? null : v;\n}\n\nfunction toInt(v) {\n  if (v === null || v === undefined || v === '') return null;\n  const x = Number.parseInt(v, 10);\n  return Number.isFinite(x) ? x : null;\n}\n\nfunction toNum(v) {\n  if (v === null || v === undefined || v === '') return null;\n  const x = Number(v);\n  return Number.isFinite(x) ? x : null;\n}\n\nfunction toBool(v) {\n  if (v === true || v === false) return v;\n  if (v === 1 || v === '1' || (typeof v === 'string' && v.toLowerCase() === 'true')) return true;\n  if (v === 0 || v === '0' || (typeof v === 'string' && v.toLowerCase() === 'false')) return false;\n  return null;\n}\n\nfunction j(v) {\n  if (v === null || v === undefined) return null;\n  if (typeof v === 'object') return v;\n  if (typeof v === 'string') {\n    try {\n      return JSON.parse(v);\n    } catch (e) {\n      console.warn(`JSON parse failed: ${e.message}`);\n      return null;\n    }\n  }\n  return null;\n}\n\nfunction normalize(r, index) {\n  try {\n    return {\n      id: toNum(r.id),\n      id_source: toNum(r.id_source),\n      id_city: toInt(r.id_city),\n      code1c: n(r.code1c),\n      one_1c: toBool(r.one_1c),\n      date: n(r.date),\n      listener: n(r.listener),\n      customer: n(r.customer),\n      datebirth: n(r.datebirth),\n      mobphone: n(r.mobphone),\n      homephone: n(r.homephone),\n      workphone: n(r.workphone),\n      cpasport: n(r.cpasport),\n      cpassissued: n(r.cpassissued),\n      lpasport: n(r.lpasport),\n      lpassissued: n(r.lpassissued),\n      cindnumber: n(r.cindnumber),\n      email: n(r.email),\n      address: n(r.address),\n      education: n(r.education),\n      work: n(r.work),\n      okpo: n(r.okpo),\n      no_active: toBool(r.no_active),\n      id_course: toInt(r.id_course),\n      descr_bookkeeping: n(r.descr_bookkeeping),\n      discount_sum: toNum(r.discount_sum),\n      discount_description: n(r.discount_description),\n      payment_form: n(r.payment_form),\n      payment_status: toInt(r.payment_status),\n      short_contract: toBool(r.short_contract),\n      first_sum: toNum(r.first_sum),\n      sent1s: toInt(r.sent1s),\n      id_form: toInt(r.id_form),\n      id_product: toNum(r.id_product),\n      product: n(r.product),\n      name_form: n(r.name_form),\n      name_sub_form: n(r.name_sub_form),\n      contract_url: n(r.contract_url),\n      extension_status: toInt(r.extension_status),\n      date_pay_onec: n(r.date_pay_onec),\n      sum_pay_onec: toNum(r.sum_pay_onec),\n      entrance_fee: toNum(r.entrance_fee),\n      total_cost: toNum(r.total_cost),\n      quantity_of_pairs: toInt(r.quantity_of_pairs),\n      payment_schedule: j(r.payment_schedule),\n      contracts_url: j(r.contracts_url),\n      discounts_url: j(r.discounts_url),\n      customer_type: toInt(r.customer_type),\n      customer_iban: n(r.customer_iban),\n    };\n  } catch (error) {\n    console.error(`Error normalizing row ${index}: ${error.message}`);\n    // Возвращаем минимальную валидную структуру\n    return {\n      id: toNum(r.id),\n      id_source: toNum(r.id_source),\n      id_city: toInt(r.id_city),\n      code1c: null,\n      one_1c: null,\n      date: n(r.date),\n      listener: null,\n      customer: n(r.customer),\n      // ... остальные поля как null\n    };\n  }\n}\n\ntry {\n  const rows = items.map((i, index) => normalize(i.json, index))\n    .filter(row => row.id !== null); // Фильтруем записи без ID\n\n  console.log(`Successfully processed ${rows.length} orders`);\n\n  return [{\n    json: {\n      payload: rows\n    }\n  }];\n} catch (error) {\n  console.error(`Critical error in Code10: ${error.message}`);\n  throw error;\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -9616,
+        960
+      ],
+      "id": "6ec33610-1eaf-497a-9eec-abffd2b37088",
+      "name": "Code10"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH data AS (\n  SELECT\n    CASE\n      WHEN jsonb_typeof($1::jsonb) = 'array' THEN $1::jsonb\n      WHEN jsonb_typeof($1::jsonb) = 'object' THEN\n        COALESCE(\n          ($1::jsonb)->'rows',\n          ($1::jsonb)->'payload',\n          ($1::jsonb)->'data',\n          ($1::jsonb)->'items',\n          CASE\n            WHEN ($1::jsonb ? 'sample_first_row') AND jsonb_typeof(($1::jsonb)->'sample_first_row') = 'object'\n              THEN jsonb_build_array(($1::jsonb)->'sample_first_row')\n            ELSE jsonb_build_array($1::jsonb)\n          END\n        )\n      ELSE '[]'::jsonb\n    END AS arr\n),\nsrc AS (\n  SELECT *\n  FROM jsonb_to_recordset((SELECT arr FROM data)) AS x(\n    id                 BIGINT,\n    id_source          BIGINT,\n    id_city            INT,\n    code1c             TEXT,\n    one_1c             BOOLEAN,\n    \"date\"             TIMESTAMP,\n    listener           TEXT,\n    customer           TEXT,\n    datebirth          DATE,\n    mobphone           TEXT,\n    homephone          TEXT,\n    workphone          TEXT,\n    cpasport           TEXT,\n    cpassissued        TEXT,\n    lpasport           TEXT,\n    lpassissued        TEXT,\n    cindnumber         TEXT,\n    email              TEXT,\n    address            TEXT,\n    education          TEXT,\n    work               TEXT,\n    okpo               TEXT,\n    no_active          BOOLEAN,\n    id_course          INT,\n    descr_bookkeeping  TEXT,\n    discount_sum       NUMERIC(14,2),\n    discount_description TEXT,\n    payment_form       TEXT,\n    payment_status     SMALLINT,\n    short_contract     BOOLEAN,\n    first_sum          NUMERIC(14,2),\n    sent1s             SMALLINT,\n    id_form            INT,\n    id_product         BIGINT,\n    product            TEXT,\n    name_form          TEXT,\n    name_sub_form      TEXT,\n    contract_url       TEXT,\n    extension_status   SMALLINT,\n    date_pay_onec      TIMESTAMP,\n    sum_pay_onec       NUMERIC(14,2),\n    entrance_fee       NUMERIC(14,2),\n    total_cost         NUMERIC(14,2),\n    quantity_of_pairs  INT,\n    payment_schedule   JSONB,\n    contracts_url      JSONB,\n    discounts_url      JSONB,\n    customer_type      SMALLINT,\n    customer_iban      TEXT\n  )\n),\nsrc_clean AS (\n  -- защищаемся от мусора: пропускаем записи без ключевого PK\n  SELECT * FROM src WHERE id IS NOT NULL\n)\nINSERT INTO raw.crm_orders AS t (\n  id, id_source, id_city, code1c, one_1c, \"date\", listener, customer, datebirth,\n  mobphone, homephone, workphone, cpasport, cpassissued, lpasport, lpassissued,\n  cindnumber, email, address, education, work, okpo, no_active, id_course,\n  descr_bookkeeping, discount_sum, discount_description, payment_form,\n  payment_status, short_contract, first_sum, sent1s, id_form, id_product,\n  product, name_form, name_sub_form, contract_url, extension_status,\n  date_pay_onec, sum_pay_onec, entrance_fee, total_cost, quantity_of_pairs,\n  payment_schedule, contracts_url, discounts_url, customer_type, customer_iban\n)\nSELECT\n  id, id_source, id_city, code1c, one_1c, \"date\", listener, customer, datebirth,\n  mobphone, homephone, workphone, cpasport, cpassissued, lpasport, lpassissued,\n  cindnumber, email, address, education, work, okpo, no_active, id_course,\n  descr_bookkeeping, discount_sum, discount_description, payment_form,\n  payment_status, short_contract, first_sum, sent1s, id_form, id_product,\n  product, name_form, name_sub_form, contract_url, extension_status,\n  date_pay_onec, sum_pay_onec, entrance_fee, total_cost, quantity_of_pairs,\n  payment_schedule, contracts_url, discounts_url, customer_type, customer_iban\nFROM src_clean\nON CONFLICT (id) DO UPDATE SET\n  id_source = EXCLUDED.id_source,\n  id_city = EXCLUDED.id_city,\n  code1c = EXCLUDED.code1c,\n  one_1c = EXCLUDED.one_1c,\n  \"date\" = EXCLUDED.\"date\",\n  listener = EXCLUDED.listener,\n  customer = EXCLUDED.customer,\n  datebirth = EXCLUDED.datebirth,\n  mobphone = EXCLUDED.mobphone,\n  homephone = EXCLUDED.homephone,\n  workphone = EXCLUDED.workphone,\n  cpasport = EXCLUDED.cpasport,\n  cpassissued = EXCLUDED.cpassissued,\n  lpasport = EXCLUDED.lpasport,\n  lpassissued = EXCLUDED.lpassissued,\n  cindnumber = EXCLUDED.cindnumber,\n  email = EXCLUDED.email,\n  address = EXCLUDED.address,\n  education = EXCLUDED.education,\n  work = EXCLUDED.work,\n  okpo = EXCLUDED.okpo,\n  no_active = EXCLUDED.no_active,\n  id_course = EXCLUDED.id_course,\n  descr_bookkeeping = EXCLUDED.descr_bookkeeping,\n  discount_sum = EXCLUDED.discount_sum,\n  discount_description = EXCLUDED.discount_description,\n  payment_form = EXCLUDED.payment_form,\n  payment_status = EXCLUDED.payment_status,\n  short_contract = EXCLUDED.short_contract,\n  first_sum = EXCLUDED.first_sum,\n  sent1s = EXCLUDED.sent1s,\n  id_form = EXCLUDED.id_form,\n  id_product = EXCLUDED.id_product,\n  product = EXCLUDED.product,\n  name_form = EXCLUDED.name_form,\n  name_sub_form = EXCLUDED.name_sub_form,\n  contract_url = EXCLUDED.contract_url,\n  extension_status = EXCLUDED.extension_status,\n  date_pay_onec = EXCLUDED.date_pay_onec,\n  sum_pay_onec = EXCLUDED.sum_pay_onec,\n  entrance_fee = EXCLUDED.entrance_fee,\n  total_cost = EXCLUDED.total_cost,\n  quantity_of_pairs = EXCLUDED.quantity_of_pairs,\n  payment_schedule = EXCLUDED.payment_schedule,\n  contracts_url = EXCLUDED.contracts_url,\n  discounts_url = EXCLUDED.discounts_url,\n  customer_type = EXCLUDED.customer_type,\n  customer_iban = EXCLUDED.customer_iban\nRETURNING id, customer, \"date\", id_product;",
+        "options": {
+          "queryReplacement": "=={{ $json }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -9376,
+        960
+      ],
+      "id": "c7ae1bff-6121-4d89-a257-98405033c61e",
+      "name": "raw.crm_orders",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ✅ VALIDATE ALIAS - Полный whitelist из БД\n\nconst ALLOWED_ALIASES = [\n  'autoqa', 'basic_sem', 'berd', 'bila', 'boryspil', 'brovary',\n  'cher', 'cherk', 'cherniv', 'coll_od', 'defenders', 'dp',\n  'drohobych', 'foun', 'globus', 'hm', 'hson', 'irpen',\n  'itstepblck', 'ivf', 'kalush', 'kh', 'kiev', 'kmn',\n  'kolomyia', 'kovel', 'kram', 'kremen', 'krog', 'krp',\n  'kyiv', 'lt', 'lv', 'med_coll', 'mk', 'mukachevo',\n  'multimed', 'od', 'ol', 'pl', 'rv', 'stanislav',\n  'stsm_kiev', 'stt_ukr', 'sum', 'test', 'testqa', 'trn',\n  'unicorn', 'uzh', 'virt', 'virt_west', 'vn', 'zhitomir', 'zp'\n];\n\nreturn items.map(({ json }) => {\n  const alias = String(json.alias || '').toLowerCase().trim();\n\n  // Проверка 1: Непустой\n  if (!alias) {\n    throw new Error(`🚫 SECURITY: Empty alias not allowed.`);\n  }\n\n  // Проверка 2: Whitelist\n  if (!ALLOWED_ALIASES.includes(alias)) {\n    throw new Error(`🚫 SECURITY: Unauthorized alias \"${alias}\". Contact administrator.`);\n  }\n\n  // Проверка 3: Безопасные символы\n  if (!/^[a-z0-9_]+$/.test(alias)) {\n    throw new Error(`🚫 SECURITY: Alias \"${alias}\" contains invalid characters.`);\n  }\n\n  // Проверка 4: Длина\n  if (alias.length > 50) {\n    throw new Error(`🚫 SECURITY: Alias too long.`);\n  }\n\n  // ✅ Все проверки пройдены\n  console.log(`✅ Validated alias: ${alias}`);\n\n  return {\n    json: {\n      ...json,\n      safe_alias: alias\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -9648,
+        528
+      ],
+      "id": "f6bcc73b-6ef8-4e5d-9476-fe1c6be91d27",
+      "name": "Code11"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  ns.id_source,\n  ns.id_uniq,\n  ns.id_user,\n  u.fio_user                 AS user_name,\n  ns.type,\n  nt.types_descr             AS type_name,\n  ns.date_time,\n  ns.dogovor,\n  ns.at_event,\n  ns.no_active,\n  ns.hidden,\n  ns.updated_at,\n  CURRENT_TIMESTAMP          AS load_timestamp,\n  DATE(ns.date_time)         AS date_key\nFROM itcrm_new_kiev.new_source AS ns\nLEFT JOIN itcrm_new_kiev.new_types AS nt\n       ON nt.id_type = ns.type\nLEFT JOIN itcrm_public.`user` AS u\n       ON u.id_user = ns.id_user\nWHERE\n      (ns.date_time  >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND ns.date_time  < CURDATE())\n   OR (ns.updated_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND ns.updated_at < CURDATE());",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -10688,
+        800
+      ],
+      "id": "bf466691-5f7c-4d8e-956a-e11745398cdb",
+      "name": "itcrm_new_kiev.new_source",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  e.id_event,\n  e.name_event,\n  e.full_name_event,\n  e.date_event,\n  e.parent_id,\n  e.status_event,\n  e.type_event,\n  e.format_event,\n  e.target,\n  e.auditory,\n  e.remind,\n  e.autocall,\n  e.link_youtube,\n  e.link_presentation,\n  e.link_youtube_work,\n  e.translate_name,\n  e.advertising_costs,\n  CURRENT_TIMESTAMP AS load_timestamp,\n  DATE(e.date_event) AS date_key\nFROM itcrm_new_kiev.events e\nWHERE e.date_event >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)\n  AND e.date_event <= DATE_ADD(CURDATE(), INTERVAL 30 DAY);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -10688,
+        608
+      ],
+      "id": "1a06c437-ade8-44d8-9cd3-b18cb0de1f1a",
+      "name": "stg_events1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  p.id   AS promo_id,\n  p.name AS promo_name,\n  p.parent_id,\n  p.status,\n  CURRENT_TIMESTAMP AS load_timestamp\nFROM itcrm_new_kiev.promo_sourse p;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -10672,
+        80
+      ],
+      "id": "31e7184d-5dce-4b28-a281-6f0dc2d14afa",
+      "name": "stg_promo_sources1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  psr.id         AS promo_relation_id,     -- PK связи\n  psr.id_source,\n  psr.id_promo   AS id_promo,              -- FK на promo_sourse.id\n  psr.old_promo,\n  CURRENT_TIMESTAMP AS load_timestamp,\n  DATE(ns.date_time) AS date_key\nFROM itcrm_new_kiev.promo_sourse_relations psr\nJOIN itcrm_new_kiev.new_source ns\n  ON ns.id_source = psr.id_source\nWHERE ns.date_time >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)\n  AND ns.date_time <  CURDATE();",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -10672,
+        -112
+      ],
+      "id": "5a2e6c04-c73d-4748-b2a1-301ccbb92e63",
+      "name": "stg_promo_source_relations1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  fct.id,                 -- это id форм‐типа (совпадает с dp.id_form_cost_type)\n  fct.id_form_cost,\n  fct.`type`,             -- экранируем в MySQL\n  fct.amount,\n  fct.status_edit,\n  CURRENT_TIMESTAMP AS load_timestamp\nFROM itcrm_public.form_cost_type fct\nWHERE fct.id IN (\n  SELECT DISTINCT dp.id_form_cost_type\n  FROM itcrm_new_kiev.docs_products dp\n  JOIN itcrm_new_kiev.docs_clients dc\n        ON dc.id = dp.id_docs_clients\n  WHERE (dc.created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND dc.created_at < CURDATE())\n     OR (dc.updated_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND dc.updated_at < CURDATE())\n);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -10688,
+        -1504
+      ],
+      "id": "f0377fd2-2188-475b-b0fc-c692e549fc29",
+      "name": "stg_form_cost_type1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  c.id_course,\n  c.name_course,\n  CURRENT_TIMESTAMP AS load_timestamp\nFROM itcrm_new_kiev.course c;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -10688,
+        -720
+      ],
+      "id": "48f97219-cab2-4a70-83d4-3d652091ad34",
+      "name": "stg_courses1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  cr.id AS course_relation_id,\n  cr.id_source,\n  cr.id_course,\n  CURRENT_TIMESTAMP AS load_timestamp,\n  DATE(ns.date_time) AS date_key\nFROM itcrm_new_kiev.course_relations cr\nJOIN itcrm_new_kiev.new_source ns\n  ON ns.id_source = cr.id_source\nWHERE ns.date_time >= DATE_SUB(CURDATE(), INTERVAL 365 DAY)\n  AND ns.date_time <  CURDATE();",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -10688,
+        -912
+      ],
+      "id": "040c5ca8-52b2-4989-b2b4-820e0544d205",
+      "name": "stg_course_relations1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  nt.id_type,\n  nt.types_descr,\n  CURRENT_TIMESTAMP AS load_timestamp\nFROM itcrm_new_kiev.new_types nt;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -10704,
+        992
+      ],
+      "id": "e57926c5-e1af-462e-bb05-cecc78bd6853",
+      "name": "itcrm_new_kiev.new_types",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  pfr.id,\n  pfr.id_form,\n  pfr.id_product,\n  pfr.id_source,\n  pfr.is_old_source,\n  CURRENT_TIMESTAMP AS load_timestamp,\n  DATE(ns.date_time) AS date_key\nFROM itcrm_new_kiev.product_form_relations pfr\nJOIN itcrm_new_kiev.new_source ns\n  ON ns.id_source = pfr.id_source\nWHERE ns.date_time >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)\n  AND ns.date_time <  CURDATE();",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -10688,
+        -528
+      ],
+      "id": "edb9559b-80b4-4002-8d99-03d5af0e8c7d",
+      "name": "itcrm_new_kiev.product_form_relations",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH recent_req AS (\n  SELECT id, date\n  FROM itcrm_new_kiev.internet_request\n  WHERE date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)\n    AND date <  CURDATE()\n),\nbest_irr AS (\n  SELECT id_request, id_source\n  FROM (\n    SELECT\n      irr.*,\n      ROW_NUMBER() OVER (\n        PARTITION BY irr.id_request\n        ORDER BY irr.request DESC, irr.date DESC, irr.id DESC\n      ) AS rn\n    FROM itcrm_new_kiev.internet_request_relation irr\n    WHERE irr.id_request IN (SELECT id FROM recent_req)\n  ) x\n  WHERE rn = 1\n),\nunion_src AS (\n  -- 1) internet_request_analytics\n  SELECT\n    ira.id_request,\n    COALESCE(bi.id_source, ira.id_source) AS id_source,\n    ira.analytic_info\n  FROM itcrm_new_kiev.internet_request_analytics ira\n  JOIN recent_req rr ON rr.id = ira.id_request\n  LEFT JOIN best_irr bi ON bi.id_request = ira.id_request\n\n  UNION ALL\n\n  -- 2) fallback: analytics\n  SELECT\n    a.internet_request_id AS id_request,\n    bi.id_source,\n    a.code                AS analytic_info\n  FROM itcrm_new_kiev.analytics a\n  JOIN recent_req rr ON rr.id = a.internet_request_id\n  LEFT JOIN best_irr bi ON bi.id_request = a.internet_request_id\n)\nSELECT\n  u.id_request,\n  u.id_source,\n  u.analytic_info,\n  CURRENT_TIMESTAMP AS load_timestamp,\n  DATE(ir.date)     AS date_key\nFROM union_src u\nJOIN itcrm_new_kiev.internet_request ir\n  ON ir.id = u.id_request\nWHERE u.id_source IS NOT NULL\n  AND COALESCE(u.analytic_info, '') <> ''\nGROUP BY u.id_request, u.id_source, u.analytic_info, ir.date\nORDER BY u.id_request DESC;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -10688,
+        -320
+      ],
+      "id": "18cbaac4-b8c8-454a-9555-f2faf7da2ad3",
+      "name": "internet_request_analytics",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  er.id,\n  er.id_source,\n  er.id_event,\n  CURRENT_TIMESTAMP AS load_timestamp,\n  DATE(COALESCE(e.date_event, ns.date_time)) AS date_key\nFROM itcrm_new_kiev.events_relations er\nLEFT JOIN itcrm_new_kiev.events e      ON e.id_event   = er.id_event\nLEFT JOIN itcrm_new_kiev.new_source ns ON ns.id_source = er.id_source\nWHERE (ns.date_time >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND ns.date_time < CURDATE())\n   OR (e.date_event >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND e.date_event < CURDATE());",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -10672,
+        256
+      ],
+      "id": "f9571c2e-8bf2-4919-adac-4a1d943082f4",
+      "name": "itcrm_new_kiev.events_relations",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  sf.id,\n  sf.name_form,\n  sf.base_study_form__id,\n  sf.short_form,\n  sf.sort_form,\n  sf.id_from_cron_get_cost,\n  CURRENT_TIMESTAMP AS load_timestamp\nFROM itcrm_public.study_form sf;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -10688,
+        -1104
+      ],
+      "id": "57bf64b4-4c97-463f-a9d2-2af28a15e54c",
+      "name": "itcrm_public.study_form",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  sfr.id,\n  sfr.id_form,\n  sfr.base_study_form__id,\n  CURRENT_TIMESTAMP AS load_timestamp\nFROM itcrm_public.study_form_relation sfr;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -10688,
+        -1696
+      ],
+      "id": "cfe0adbc-616a-4c19-828a-2a6bcc984dd7",
+      "name": "stg_study_form_relation",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  fc.id_form_cost,\n  fc.id_form_public,\n  fc.product,\n  fc.months,\n  fc.id_city,\n  fc.status_active,\n  fc.id_form_cost_etalon,\n  fc.etalon_form_id,\n  fc.etalon_index,\n  fc.sum_first_pay,\n  fc.months_fact,\n  fc.short_name,\n  fc.cost_diploma_design,\n  fc.currency_id,\n  fc.validity_start,\n  fc.validity_end,\n  fc.comment,\n  fc.created_at,\n  fc.entrance_fee_type,\n  fc.translate_key,\n  fc.created_by,\n  fc.currency_code,\n  fc.is_trial_lesson,\n  CURRENT_TIMESTAMP AS load_timestamp,\n  DATE(COALESCE(fc.created_at, fc.validity_start)) AS date_key\nFROM itcrm_public.form_cost fc\nWHERE (fc.created_at    >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND fc.created_at    < CURDATE())\n   OR (fc.validity_start>= DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND fc.validity_start< CURDATE())\n   OR (fc.validity_end  >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND fc.validity_end  < CURDATE());",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -10688,
+        -1904
+      ],
+      "id": "fd949909-cb31-4127-8836-bc267960cad5",
+      "name": "itcrm_public.form_cost",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  fcc.id,\n  fcc.form_cost_etalon_id,\n  fcc.city_id,\n  CURRENT_TIMESTAMP AS load_timestamp\nFROM itcrm_public.form_cost_city fcc\nWHERE fcc.form_cost_etalon_id IN (\n  SELECT DISTINCT COALESCE(fc.id_form_cost_etalon, fc.etalon_form_id)\n  FROM itcrm_public.form_cost fc\n  WHERE (fc.created_at    >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND fc.created_at    < CURDATE())\n     OR (fc.validity_start>= DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND fc.validity_start< CURDATE())\n     OR (fc.validity_end  >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND fc.validity_end  < CURDATE())\n);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -10688,
+        -1312
+      ],
+      "id": "9351ca7e-6529-4311-8b36-af53a25d6252",
+      "name": "itcrm_public.form_cost city",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO raw.itcrm_new_types (id_type, types_descr, load_timestamp)\nVALUES (\n  {{$json.id_type}},\n  '{{$json.types_descr}}',\n  NOW()\n)\nON CONFLICT (id_type) DO UPDATE\nSET types_descr    = EXCLUDED.types_descr,\n    load_timestamp = EXCLUDED.load_timestamp;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -10448,
+        992
+      ],
+      "id": "a7e3b2a7-3a39-4868-be9b-67e6f793258b",
+      "name": "raw.itcrm_new_types",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO raw.itcrm_new_source_w_names (\n  id_source, id_uniq, id_user, user_name, type, type_name,\n  date_time, dogovor, at_event, no_active, hidden,\n  updated_at, load_timestamp, date_key\n)\nVALUES (\n  $1, $2, $3, $4, $5, $6,\n  $7::timestamp, $8::smallint, $9::smallint, $10::smallint, $11::smallint,\n  $12::timestamp, $13::timestamptz, $14::date\n)\nON CONFLICT (id_source) DO UPDATE SET\n  id_uniq        = EXCLUDED.id_uniq,\n  id_user        = EXCLUDED.id_user,\n  user_name      = EXCLUDED.user_name,\n  type           = EXCLUDED.type,\n  type_name      = EXCLUDED.type_name,\n  date_time      = EXCLUDED.date_time,\n  dogovor        = EXCLUDED.dogovor,\n  at_event       = EXCLUDED.at_event,\n  no_active      = EXCLUDED.no_active,\n  hidden         = EXCLUDED.hidden,\n  updated_at     = EXCLUDED.updated_at,\n  load_timestamp = EXCLUDED.load_timestamp,\n  date_key       = EXCLUDED.date_key;",
+        "options": {
+          "queryReplacement": "=1: {{$json.id_source}} 2: {{$json.id_uniq}} 3: {{$json.id_user}} 4: {{$json.user_name || null}} 5: {{$json.type}} 6: {{$json.type_name || null}} 7: {{$json.date_time || null}} 8: {{$json.dogovor}} 9: {{$json.at_event}} 10: {{$json.no_active}} 11: {{$json.hidden}} 12: {{$json.updated_at || null}} 13: {{$json.load_timestamp || null}} 14: {{$json.date_key || null}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -10448,
+        800
+      ],
+      "id": "7cf75f0a-3ddf-4dd7-9980-6f4a1f2b2eb7",
+      "name": "raw.itcrm_new_source_w_names",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO raw.itcrm_events (\n  id_event, name_event, full_name_event, date_event, parent_id,\n  status_event, type_event, format_event, target, auditory,\n  remind, autocall, link_youtube, link_presentation, link_youtube_work,\n  translate_name, advertising_costs, load_timestamp, date_key\n)\nVALUES (\n  $1,                                           -- id_event (bigint)\n  $2,                                           -- name_event\n  $3,                                           -- full_name_event\n  $4::timestamp,                                -- date_event\n  NULLIF(NULLIF($5::text, 'null'), '')::bigint, -- parent_id (safe)\n  $6::smallint,                                 -- status_event\n  $7::smallint,                                 -- type_event\n  $8::smallint,                                 -- format_event\n  $9::smallint,                                 -- target\n  $10::smallint,                                -- auditory\n  $11::smallint,                                -- remind\n  $12::smallint,                                -- autocall\n  $13,                                          -- link_youtube\n  $14,                                          -- link_presentation\n  $15,                                          -- link_youtube_work\n  $16,                                          -- translate_name\n  NULLIF(NULLIF($17::text, 'null'), '')::numeric, -- advertising_costs (safe)\n  $18::timestamptz,                             -- load_timestamp\n  $19::date                                     -- date_key\n)\nON CONFLICT (id_event) DO UPDATE SET\n  name_event         = EXCLUDED.name_event,\n  full_name_event    = EXCLUDED.full_name_event,\n  date_event         = EXCLUDED.date_event,\n  parent_id          = EXCLUDED.parent_id,\n  status_event       = EXCLUDED.status_event,\n  type_event         = EXCLUDED.type_event,\n  format_event       = EXCLUDED.format_event,\n  target             = EXCLUDED.target,\n  auditory           = EXCLUDED.auditory,\n  remind             = EXCLUDED.remind,\n  autocall           = EXCLUDED.autocall,\n  link_youtube       = EXCLUDED.link_youtube,\n  link_presentation  = EXCLUDED.link_presentation,\n  link_youtube_work  = EXCLUDED.link_youtube_work,\n  translate_name     = EXCLUDED.translate_name,\n  advertising_costs  = EXCLUDED.advertising_costs,\n  load_timestamp     = EXCLUDED.load_timestamp,\n  date_key           = EXCLUDED.date_key;",
+        "options": {
+          "queryReplacement": "=1:  {{$json.id_event}}\n2:  {{$json.name_event || null}}\n3:  {{$json.full_name_event || null}}\n4:  {{$json.date_event || null}}\n5:  {{$json.parent_id || null}}\n6:  {{$json.status_event}}\n7:  {{$json.type_event}}\n8:  {{$json.format_event}}\n9:  {{$json.target}}\n10: {{$json.auditory}}\n11: {{$json.remind}}\n12: {{$json.autocall}}\n13: {{$json.link_youtube || null}}\n14: {{$json.link_presentation || null}}\n15: {{$json.link_youtube_work || null}}\n16: {{$json.translate_name || null}}\n17: {{$json.advertising_costs ?? ''}}\n18: {{$json.load_timestamp || null}}\n19: {{$json.date_key || null}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -10448,
+        608
+      ],
+      "id": "6ec37428-bd28-4dc3-868f-afbfe2f12408",
+      "name": "raw.itcrm_events",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  se.id                   AS participant_id,\n  se.id_event,\n  se.id_source,\n  se.id_uniq,\n  se.status,\n  se.count_children,\n  se.age_children,\n  CURRENT_TIMESTAMP       AS load_timestamp,\n  DATE(COALESCE(e.date_event, ns.date_time)) AS date_key\nFROM itcrm_new_kiev.source_events se\nLEFT JOIN itcrm_new_kiev.events e\n       ON e.id_event = se.id_event\nLEFT JOIN itcrm_new_kiev.new_source ns\n       ON ns.id_source = se.id_source\nWHERE se.id_source IN (\n  SELECT ns2.id_source\n  FROM itcrm_new_kiev.new_source ns2\n  WHERE ns2.date_time >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)\n    AND ns2.date_time <  CURDATE()\n);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        -10672,
+        432
+      ],
+      "id": "c14d87f1-5936-4501-b645-defb955c8dcd",
+      "name": "itcrm_new_kiev.source_events",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mySql": {
+          "id": "C5GYW6qNSkDJ0GnM",
+          "name": "MySQL account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO raw.itcrm_source_events (\n  participant_id, id_event, id_source, id_uniq,\n  status, count_children, age_children,\n  date_key, load_timestamp\n)\nVALUES (\n  $1::bigint,                                         -- participant_id\n  NULLIF(NULLIF($2::text,'null'),'')::bigint,         -- id_event\n  NULLIF(NULLIF($3::text,'null'),'')::bigint,         -- id_source\n  NULLIF(NULLIF($4::text,'null'),'')::bigint,         -- id_uniq\n  NULLIF(NULLIF($5::text,'null'),'')::smallint,       -- status\n  NULLIF(NULLIF($6::text,'null'),'')::smallint,       -- count_children\n  CASE WHEN $7 IS NULL OR $7::text IN ('','null') THEN NULL ELSE $7::text END, -- age_children\n  COALESCE(                                           -- date_key\n    (SELECT DATE(e.date_event)\n       FROM raw.itcrm_events e\n      WHERE e.id_event = NULLIF(NULLIF($2::text,'null'),'')::bigint),\n    CURRENT_DATE\n  ),\n  NOW()                                               -- load_timestamp\n)\nON CONFLICT (participant_id) DO UPDATE SET\n  id_event       = EXCLUDED.id_event,\n  id_source      = EXCLUDED.id_source,\n  id_uniq        = EXCLUDED.id_uniq,\n  status         = EXCLUDED.status,\n  count_children = EXCLUDED.count_children,\n  age_children   = EXCLUDED.age_children,\n  date_key       = EXCLUDED.date_key,\n  load_timestamp = NOW();",
+        "options": {
+          "queryReplacement": "=1: {{$json.participant_id}}\n2: {{$json.id_event}}\n3: {{$json.id_source}}\n4: {{$json.id_uniq}}\n5: {{$json.status}}\n6: {{$json.count_children}}\n7: {{$json.age_children}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -10464,
+        432
+      ],
+      "id": "307d28a3-cf97-4e26-abb5-2fa14d75258c",
+      "name": "raw.itcrm_source_events",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO raw.itcrm_events_relations AS t (\n  id, id_source, id_event, date_key, load_timestamp\n)\nVALUES (\n  $1::bigint,                                        -- id\n  NULLIF(NULLIF($2::text,'null'),'')::bigint,        -- id_source\n  NULLIF(NULLIF($3::text,'null'),'')::bigint,        -- id_event\n  COALESCE(                                          -- date_key\n    NULLIF(NULLIF($4::text,''),'null')::date,\n    (SELECT DATE(e.date_event)\n       FROM raw.itcrm_events e\n      WHERE e.id_event = NULLIF(NULLIF($3::text,'null'),'')::bigint),\n    CURRENT_DATE\n  ),\n  NOW()\n)\nON CONFLICT (id) DO UPDATE SET\n  id_source      = EXCLUDED.id_source,\n  id_event       = EXCLUDED.id_event,\n  date_key       = COALESCE(\n                     EXCLUDED.date_key,\n                     (SELECT DATE(e.date_event)\n                        FROM raw.itcrm_events e\n                       WHERE e.id_event = EXCLUDED.id_event),\n                     t.date_key               -- <== используем алиас t\n                   ),\n  load_timestamp = NOW();",
+        "options": {
+          "queryReplacement": "=1: {{$json.id}}\n2: {{$json.id_source}}\n3: {{$json.id_event}}\n4: {{$json.date_key}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -10464,
+        256
+      ],
+      "id": "89b8ac49-451e-4abe-a254-89fe9d4334ad",
+      "name": "raw.itcrm_events_relations",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO raw.itcrm_promo_sources AS t (\n  promo_id, promo_name, parent_id, status, load_timestamp\n)\nVALUES (\n  NULLIF(NULLIF($1::text,''),'null')::bigint,   -- promo_id\n  NULLIF(NULLIF($2::text,''),'null'),           -- promo_name (text)\n  NULLIF(NULLIF($3::text,''),'null')::bigint,   -- parent_id (оставляем 0, если он реально приходит как 0)\n  NULLIF(NULLIF($4::text,''),'null')::smallint, -- status\n  NOW()\n)\nON CONFLICT (promo_id) DO UPDATE SET\n  promo_name     = EXCLUDED.promo_name,\n  parent_id      = EXCLUDED.parent_id,\n  status         = EXCLUDED.status,\n  load_timestamp = NOW();",
+        "options": {
+          "queryReplacement": "=1: {{$json.promo_id}}\n2: {{$json.promo_name}}\n3: {{$json.parent_id}}\n4: {{$json.status}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -10464,
+        80
+      ],
+      "id": "e1327f2b-39df-4e80-a065-8c85aa668cf5",
+      "name": "raw.itcrm_promo_sources",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO raw.itcrm_promo_source_relations AS t (\n  promo_relation_id, id_source, id_promo, old_promo, load_timestamp, date_key\n)\nVALUES (\n  NULLIF(NULLIF('{{$json.promo_relation_id}}',''),'null')::bigint,\n  NULLIF(NULLIF('{{$json.id_source}}',''),'null')::bigint,\n  NULLIF(NULLIF('{{$json.id_promo}}',''),'null')::bigint,\n  NULLIF(NULLIF('{{$json.old_promo}}',''),'null'),\n  NOW(),\n  NULLIF(NULLIF('{{$json.date_key}}',''),'null')::date\n)\nON CONFLICT (promo_relation_id) DO UPDATE SET\n  id_source      = EXCLUDED.id_source,\n  id_promo       = EXCLUDED.id_promo,\n  old_promo      = EXCLUDED.old_promo,\n  load_timestamp = NOW(),\n  date_key       = EXCLUDED.date_key;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -10464,
+        -112
+      ],
+      "id": "4897dd4d-a9e6-4c34-853c-76cd9433bc6c",
+      "name": "raw.itcrm_promo_source_relations",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO raw.itcrm_internet_request_analytics AS t (\n  id_request, id_source, analytic_info_raw, analytic_info, load_timestamp, date_key\n)\nVALUES (\n  NULLIF(NULLIF('{{$json.id_request}}',''),'null')::bigint,\n  NULLIF(NULLIF('{{$json.id_source}}',''),'null')::bigint,\n  -- сохраняем сырец как есть (без потерь)\n  NULLIF(NULLIF('{{$json.analytic_info}}',''),'null'),\n  -- и сразу пытаемся распарсить в jsonb\n  NULLIF(NULLIF('{{$json.analytic_info}}',''),'null')::jsonb,\n  NOW(),\n  NULLIF(NULLIF('{{$json.date_key}}',''),'null')::date\n)\nON CONFLICT (id_request, id_source) DO UPDATE SET\n  analytic_info_raw = EXCLUDED.analytic_info_raw,\n  analytic_info     = EXCLUDED.analytic_info,\n  load_timestamp    = NOW(),\n  date_key          = EXCLUDED.date_key;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -10464,
+        -320
+      ],
+      "id": "356184e7-a6d5-476f-a589-0810138e3204",
+      "name": "raw.itcrm_internet_request_analytics",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO raw.itcrm_product_form_relations AS t (\n  id, id_form, id_product, id_source, is_old_source, load_timestamp, date_key\n)\nVALUES (\n  NULLIF(NULLIF('{{$json.id}}',''),'null')::bigint,\n  NULLIF(NULLIF('{{$json.id_form}}',''),'null')::bigint,\n  NULLIF(NULLIF('{{$json.id_product}}',''),'null')::bigint,\n  NULLIF(NULLIF('{{$json.id_source}}',''),'null')::bigint,\n  NULLIF(NULLIF('{{$json.is_old_source}}',''),'null')::smallint,\n  NOW(),\n  NULLIF(NULLIF('{{$json.date_key}}',''),'null')::date\n)\nON CONFLICT (id) DO UPDATE SET\n  id_form        = EXCLUDED.id_form,\n  id_product     = EXCLUDED.id_product,\n  id_source      = EXCLUDED.id_source,\n  is_old_source  = EXCLUDED.is_old_source,\n  load_timestamp = NOW(),\n  date_key       = EXCLUDED.date_key;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -10464,
+        -528
+      ],
+      "id": "3864b08b-1985-418f-a363-48872a767da1",
+      "name": "raw.itcrm_product_form_relations",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO raw.itcrm_courses AS t (\n  id_course, name_course, load_timestamp\n)\nVALUES (\n  NULLIF(NULLIF('{{$json.id_course}}',''),'null')::bigint,\n  NULLIF(NULLIF('{{$json.name_course}}',''),'null'),\n  NOW()\n)\nON CONFLICT (id_course) DO UPDATE SET\n  name_course    = EXCLUDED.name_course,\n  load_timestamp = NOW();",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -10464,
+        -720
+      ],
+      "id": "e58aa871-8053-4d0b-86cd-bcd84656a159",
+      "name": "raw.itcrm_courses",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO raw.itcrm_course_relations AS t (\n  course_relation_id, id_source, id_course, load_timestamp, date_key\n)\nVALUES (\n  NULLIF(NULLIF($1::text,''),'null')::bigint,   -- course_relation_id\n  NULLIF(NULLIF($2::text,''),'null')::bigint,   -- id_source\n  NULLIF(NULLIF($3::text,''),'null')::bigint,   -- id_course\n  NOW(),                                        -- load_timestamp (ставит БД)\n  NULLIF(NULLIF($4::text,''),'null')::date      -- date_key\n)\nON CONFLICT (course_relation_id) DO UPDATE SET\n  id_source      = EXCLUDED.id_source,\n  id_course      = EXCLUDED.id_course,\n  load_timestamp = NOW(),\n  date_key       = EXCLUDED.date_key;",
+        "options": {
+          "queryReplacement": "=\t1.\t{{$json.course_relation_id}} \t2.\t{{$json.id_source}} \t3.\t{{$json.id_course}} \t4.\t{{$json.date_key}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -10464,
+        -912
+      ],
+      "id": "a3996907-bff0-4b5f-a8f8-e5d093d9c0d6",
+      "name": "raw.itcrm_course_relations",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO raw.itcrm_study_form AS t (\n  id, name_form, base_study_form_id, short_form, sort_form, id_from_cron_get_cost, load_timestamp\n)\nVALUES (\n  NULLIF(NULLIF($1::text,''),'null')::bigint,    -- id\n  NULLIF(NULLIF($2::text,''),'null'),            -- name_form\n  NULLIF(NULLIF($3::text,''),'null')::smallint,  -- base_study_form_id (из base_study_form__id)\n  NULLIF(NULLIF($4::text,''),'null')::smallint,  -- short_form (0/1)\n  NULLIF(NULLIF($5::text,''),'null')::int,       -- sort_form\n  NULLIF(NULLIF($6::text,''),'null')::int,       -- id_from_cron_get_cost\n  NOW()                                          -- load_timestamp\n)\nON CONFLICT (id) DO UPDATE SET\n  name_form             = EXCLUDED.name_form,\n  base_study_form_id    = EXCLUDED.base_study_form_id,\n  short_form            = EXCLUDED.short_form,\n  sort_form             = EXCLUDED.sort_form,\n  id_from_cron_get_cost = EXCLUDED.id_from_cron_get_cost,\n  load_timestamp        = NOW();",
+        "options": {
+          "queryReplacement": "=\t1.\t{{$json.id}}\n\t2.\t{{$json.name_form}}\n\t3.\t{{$json.base_study_form__id}} \n\t4.\t{{$json.short_form}}\n\t5.\t{{$json.sort_form}}\n\t6.\t{{$json.id_from_cron_get_cost}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -10464,
+        -1104
+      ],
+      "id": "940e8ffa-81c4-42ea-bd49-12289a76958f",
+      "name": "raw.itcrm_study_form",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO raw.itcrm_form_cost_city AS t (\n  id, form_cost_etalon_id, city_id, load_timestamp\n)\nVALUES (\n  NULLIF(NULLIF($1::text,''),'null')::bigint,   -- id\n  NULLIF(NULLIF($2::text,''),'null')::bigint,   -- form_cost_etalon_id\n  NULLIF(NULLIF($3::text,''),'null')::bigint,   -- city_id\n  NOW()\n)\nON CONFLICT (id) DO UPDATE SET\n  form_cost_etalon_id = EXCLUDED.form_cost_etalon_id,\n  city_id             = EXCLUDED.city_id,\n  load_timestamp      = NOW();",
+        "options": {
+          "queryReplacement": "=\t•\t$1 → {{$json.id}}\n\t•\t$2 → {{$json.form_cost_etalon_id}}\n\t•\t$3 → {{$json.city_id}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -10464,
+        -1312
+      ],
+      "id": "5878df87-7aa9-4eef-97fd-32fb3f099d57",
+      "name": "raw.itcrm_form_cost_city",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO raw.itcrm_form_cost_type AS t (\n  id, id_form_cost, \"type\", amount, status_edit, load_timestamp\n)\nVALUES (\n  NULLIF(NULLIF($1::text,''),'null')::bigint,        -- id\n  NULLIF(NULLIF($2::text,''),'null')::bigint,        -- id_form_cost\n  NULLIF(NULLIF($3::text,''),'null'),                -- type (text)\n  NULLIF(NULLIF($4::text,''),'null')::numeric,       -- amount\n  NULLIF(NULLIF($5::text,''),'null')::smallint,      -- status_edit\n  NOW()\n)\nON CONFLICT (id) DO UPDATE SET\n  id_form_cost  = EXCLUDED.id_form_cost,\n  \"type\"        = EXCLUDED.\"type\",\n  amount        = EXCLUDED.amount,\n  status_edit   = EXCLUDED.status_edit,\n  load_timestamp= NOW();",
+        "options": {
+          "queryReplacement": "=\t•\t$1 → {{$json.id}}\n\t•\t$2 → {{$json.id_form_cost}}\n\t•\t$3 → {{$json.type}}\n\t•\t$4 → {{$json.amount}}\n\t•\t$5 → {{$json.status_edit}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -10464,
+        -1504
+      ],
+      "id": "90d1c667-360c-4132-9291-2c3cff1b3da1",
+      "name": "raw.itcrm_form_cost_type",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO raw.itcrm_study_form_relation AS t (\n  id, id_form, base_study_form_id, load_timestamp\n)\nVALUES (\n  NULLIF(NULLIF($1::text,''),'null')::bigint,     -- id\n  NULLIF(NULLIF($2::text,''),'null')::bigint,     -- id_form\n  NULLIF(NULLIF($3::text,''),'null')::int,        -- base_study_form_id\n  NOW()\n)\nON CONFLICT (id) DO UPDATE SET\n  id_form            = EXCLUDED.id_form,\n  base_study_form_id = EXCLUDED.base_study_form_id,\n  load_timestamp     = NOW();",
+        "options": {
+          "queryReplacement": "=\t•\t$1 → {{$json.id}}\n\t•\t$2 → {{$json.id_form}}\n\t•\t$3 → {{$json.base_study_form__id}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -10464,
+        -1696
+      ],
+      "id": "29a1bd8e-b88e-4877-a034-84ce719f97b8",
+      "name": "raw.itcrm_form_cost_type1",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO raw.itcrm_form_cost AS t (\n  id_form_cost, id_form_public, product, months, id_city, status_active,\n  id_form_cost_etalon, etalon_form_id, etalon_index, sum_first_pay, months_fact,\n  short_name, cost_diploma_design, currency_id, validity_start, validity_end,\n  comment, created_at, entrance_fee_type, translate_key, created_by,\n  currency_code, is_trial_lesson, load_timestamp, date_key\n)\nVALUES (\n  NULLIF(NULLIF($1::text,''),'null')::bigint,        -- id_form_cost\n  NULLIF(NULLIF($2::text,''),'null')::int,           -- id_form_public\n  NULLIF(NULLIF($3::text,''),'null'),                -- product\n  NULLIF(NULLIF($4::text,''),'null')::int,           -- months\n  NULLIF(NULLIF($5::text,''),'null')::int,           -- id_city\n  NULLIF(NULLIF($6::text,''),'null')::smallint,      -- status_active\n  NULLIF(NULLIF($7::text,''),'null')::bigint,        -- id_form_cost_etalon\n  NULLIF(NULLIF($8::text,''),'null')::int,           -- etalon_form_id\n  NULLIF(NULLIF($9::text,''),'null'),                -- etalon_index (TEXT)\n  NULLIF(NULLIF($10::text,''),'null')::numeric,      -- sum_first_pay\n  NULLIF(NULLIF($11::text,''),'null')::int,          -- months_fact\n  NULLIF(NULLIF($12::text,''),'null'),               -- short_name\n  NULLIF(NULLIF($13::text,''),'null')::numeric,      -- cost_diploma_design\n  NULLIF(NULLIF($14::text,''),'null')::int,          -- currency_id\n  NULLIF(NULLIF($15::text,''),'null')::timestamp,    -- validity_start\n  NULLIF(NULLIF($16::text,''),'null')::timestamp,    -- validity_end\n  NULLIF(NULLIF($17::text,''),'null'),               -- comment\n  NULLIF(NULLIF($18::text,''),'null')::timestamp,    -- created_at\n  NULLIF(NULLIF($19::text,''),'null')::smallint,     -- entrance_fee_type\n  NULLIF(NULLIF($20::text,''),'null'),               -- translate_key\n  NULLIF(NULLIF($21::text,''),'null')::bigint,       -- created_by\n  NULLIF(NULLIF($22::text,''),'null'),               -- currency_code\n  NULLIF(NULLIF($23::text,''),'null')::smallint,     -- is_trial_lesson\n  NOW(),                                             -- load_timestamp (ставим текущее)\n  NULLIF(NULLIF($24::text,''),'null')::date          -- date_key\n)\nON CONFLICT (id_form_cost) DO UPDATE SET\n  id_form_public       = EXCLUDED.id_form_public,\n  product              = EXCLUDED.product,\n  months               = EXCLUDED.months,\n  id_city              = EXCLUDED.id_city,\n  status_active        = EXCLUDED.status_active,\n  id_form_cost_etalon  = EXCLUDED.id_form_cost_etalon,\n  etalon_form_id       = EXCLUDED.etalon_form_id,\n  etalon_index         = EXCLUDED.etalon_index,\n  sum_first_pay        = EXCLUDED.sum_first_pay,\n  months_fact          = EXCLUDED.months_fact,\n  short_name           = EXCLUDED.short_name,\n  cost_diploma_design  = EXCLUDED.cost_diploma_design,\n  currency_id          = EXCLUDED.currency_id,\n  validity_start       = EXCLUDED.validity_start,\n  validity_end         = EXCLUDED.validity_end,\n  comment              = EXCLUDED.comment,\n  created_at           = EXCLUDED.created_at,\n  entrance_fee_type    = EXCLUDED.entrance_fee_type,\n  translate_key        = EXCLUDED.translate_key,\n  created_by           = EXCLUDED.created_by,\n  currency_code        = EXCLUDED.currency_code,\n  is_trial_lesson      = EXCLUDED.is_trial_lesson,\n  load_timestamp       = NOW(),\n  date_key             = EXCLUDED.date_key;",
+        "options": {
+          "queryReplacement": "=1.\t{{$json.id_form_cost}}\n\t2.\t{{$json.id_form_public}}\n\t3.\t{{$json.product}}\n\t4.\t{{$json.months}}\n\t5.\t{{$json.id_city}}\n\t6.\t{{$json.status_active}}\n\t7.\t{{$json.id_form_cost_etalon}}\n\t8.\t{{$json.etalon_form_id}}\n\t9.\t{{$json.etalon_index}}\n\t10.\t{{$json.sum_first_pay}}\n\t11.\t{{$json.months_fact}}\n\t12.\t{{$json.short_name}}\n\t13.\t{{$json.cost_diploma_design}}\n\t14.\t{{$json.currency_id}}\n\t15.\t{{$json.validity_start}}\n\t16.\t{{$json.validity_end}}\n\t17.\t{{$json.comment}}\n\t18.\t{{$json.created_at}}\n\t19.\t{{$json.entrance_fee_type}}\n\t20.\t{{$json.translate_key}}\n\t21.\t{{$json.created_by}}\n\t22.\t{{$json.currency_code}}\n\t23.\t{{$json.is_trial_lesson}}\n\t24.\t{{$json.date_key}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -10464,
+        -1904
+      ],
+      "id": "19d6b0c1-c6cd-48a5-96ad-0c796ae7bfdc",
+      "name": "raw.itcrm_form_cost",
+      "credentials": {
+        "postgres": {
+          "id": "vltYUx2Z4Q74JwSy",
+          "name": "Final ITstep"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "stg_new_sources1": {
+      "main": [
+        [
+          {
+            "node": "Code2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "stg_internet_requests1": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "stg_internet_request_relation1": {
+      "main": [
+        [
+          {
+            "node": "Code3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "stg_docs_clients1": {
+      "main": [
+        [
+          {
+            "node": "Code4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "stg_new_payments": {
+      "main": [
+        [
+          {
+            "node": "Code9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "stg_new_result_names1": {
+      "main": [
+        [
+          {
+            "node": "Code8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "stg_new_results1": {
+      "main": [
+        [
+          {
+            "node": "Code6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "stg_new_form_names1": {
+      "main": [
+        [
+          {
+            "node": "Code7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "new_form": {
+      "main": [
+        [
+          {
+            "node": "Code5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "itcrm_public.form_cost",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.internet_request": {
+      "main": [
+        [
+          {
+            "node": "stg_new_sources1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "stg_analytics1": {
+      "main": [
+        [
+          {
+            "node": "Code1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code1": {
+      "main": [
+        [
+          {
+            "node": "raw.itcrm_analytics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "raw.internet_request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code2": {
+      "main": [
+        [
+          {
+            "node": "raw.itcrm_new_source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.itcrm_new_source": {
+      "main": [
+        [
+          {
+            "node": "stg_internet_request_relation1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code3": {
+      "main": [
+        [
+          {
+            "node": "raw.itcrm_internet_request_relation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.itcrm_internet_request_relation": {
+      "main": [
+        [
+          {
+            "node": "stg_docs_clients1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code4": {
+      "main": [
+        [
+          {
+            "node": "raw.itcrm_docs_clients",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.itcrm_docs_clients": {
+      "main": [
+        [
+          {
+            "node": "new_form",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code5": {
+      "main": [
+        [
+          {
+            "node": "raw.itcrm_new_form",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.itcrm_new_form": {
+      "main": [
+        [
+          {
+            "node": "stg_new_form_names1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code7": {
+      "main": [
+        [
+          {
+            "node": "raw.itcrm_new_form1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.itcrm_new_form1": {
+      "main": [
+        [
+          {
+            "node": "stg_new_results1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code6": {
+      "main": [
+        [
+          {
+            "node": "raw.itcrm_new_result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.itcrm_new_result": {
+      "main": [
+        [
+          {
+            "node": "stg_new_result_names1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code8": {
+      "main": [
+        [
+          {
+            "node": "raw.itcrm_new_result_name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.itcrm_new_result_name": {
+      "main": [
+        [
+          {
+            "node": "stg_new_payments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code9": {
+      "main": [
+        [
+          {
+            "node": "raw.itcrm_new_payment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.itcrm_analytics": {
+      "main": [
+        [
+          {
+            "node": "stg_internet_requests1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "stg_users1": {
+      "main": [
+        [
+          {
+            "node": "Code33",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code33": {
+      "main": [
+        [
+          {
+            "node": "raw.itcrm_users_ua",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.itcrm_new_payment": {
+      "main": [
+        [
+          {
+            "node": "stg_users1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code34": {
+      "main": [
+        [
+          {
+            "node": "raw.dim_branch_src",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "id_city": {
+      "main": [
+        [
+          {
+            "node": "Code34",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "id_city1": {
+      "main": [
+        [
+          {
+            "node": "Code11",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.itcrm_users_ua": {
+      "main": [
+        [
+          {
+            "node": "id_city1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "clients_for_bookkeeping": {
+      "main": [
+        [
+          {
+            "node": "Code10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code10": {
+      "main": [
+        [
+          {
+            "node": "raw.crm_orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.crm_orders": {
+      "main": [
+        []
+      ]
+    },
+    "Code11": {
+      "main": [
+        [
+          {
+            "node": "id_city",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.dim_branch_src": {
+      "main": [
+        [
+          {
+            "node": "clients_for_bookkeeping",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "itcrm_new_kiev.new_types": {
+      "main": [
+        [
+          {
+            "node": "raw.itcrm_new_types",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "itcrm_new_kiev.new_source": {
+      "main": [
+        [
+          {
+            "node": "raw.itcrm_new_source_w_names",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "stg_events1": {
+      "main": [
+        [
+          {
+            "node": "raw.itcrm_events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "itcrm_new_kiev.source_events": {
+      "main": [
+        [
+          {
+            "node": "raw.itcrm_source_events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "itcrm_new_kiev.events_relations": {
+      "main": [
+        [
+          {
+            "node": "raw.itcrm_events_relations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "stg_promo_sources1": {
+      "main": [
+        [
+          {
+            "node": "raw.itcrm_promo_sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "stg_promo_source_relations1": {
+      "main": [
+        [
+          {
+            "node": "raw.itcrm_promo_source_relations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "internet_request_analytics": {
+      "main": [
+        [
+          {
+            "node": "raw.itcrm_internet_request_analytics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "itcrm_new_kiev.product_form_relations": {
+      "main": [
+        [
+          {
+            "node": "raw.itcrm_product_form_relations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "stg_courses1": {
+      "main": [
+        [
+          {
+            "node": "raw.itcrm_courses",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "stg_course_relations1": {
+      "main": [
+        [
+          {
+            "node": "raw.itcrm_course_relations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "itcrm_public.study_form": {
+      "main": [
+        [
+          {
+            "node": "raw.itcrm_study_form",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "itcrm_public.form_cost city": {
+      "main": [
+        [
+          {
+            "node": "raw.itcrm_form_cost_city",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "stg_form_cost_type1": {
+      "main": [
+        [
+          {
+            "node": "raw.itcrm_form_cost_type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "stg_study_form_relation": {
+      "main": [
+        [
+          {
+            "node": "raw.itcrm_form_cost_type1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "itcrm_public.form_cost": {
+      "main": [
+        [
+          {
+            "node": "raw.itcrm_form_cost",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.itcrm_form_cost": {
+      "main": [
+        [
+          {
+            "node": "stg_study_form_relation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.itcrm_form_cost_type1": {
+      "main": [
+        [
+          {
+            "node": "stg_form_cost_type1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.itcrm_form_cost_type": {
+      "main": [
+        [
+          {
+            "node": "itcrm_public.form_cost city",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.itcrm_form_cost_city": {
+      "main": [
+        [
+          {
+            "node": "itcrm_public.study_form",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.itcrm_study_form": {
+      "main": [
+        [
+          {
+            "node": "stg_course_relations1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.itcrm_course_relations": {
+      "main": [
+        [
+          {
+            "node": "stg_courses1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.itcrm_courses": {
+      "main": [
+        [
+          {
+            "node": "itcrm_new_kiev.product_form_relations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.itcrm_product_form_relations": {
+      "main": [
+        [
+          {
+            "node": "internet_request_analytics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.itcrm_internet_request_analytics": {
+      "main": [
+        [
+          {
+            "node": "stg_promo_source_relations1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.itcrm_promo_source_relations": {
+      "main": [
+        [
+          {
+            "node": "stg_promo_sources1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.itcrm_promo_sources": {
+      "main": [
+        [
+          {
+            "node": "itcrm_new_kiev.events_relations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.itcrm_events_relations": {
+      "main": [
+        [
+          {
+            "node": "itcrm_new_kiev.source_events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.itcrm_source_events": {
+      "main": [
+        [
+          {
+            "node": "stg_events1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.itcrm_events": {
+      "main": [
+        [
+          {
+            "node": "itcrm_new_kiev.new_source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.itcrm_new_source_w_names": {
+      "main": [
+        [
+          {
+            "node": "itcrm_new_kiev.new_types",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "raw.itcrm_new_types": {
+      "main": [
+        [
+          {
+            "node": "stg_analytics1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "8ab793c6-d64f-410c-816c-68542fbde4d2",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "540ab69109515f10dd49f8acf74edf7f1313658ee3ec59f626a0c42af55aceaf"
+  },
+  "id": "GGD4mKmYslbj0EBa",
+  "tags": []
+}
