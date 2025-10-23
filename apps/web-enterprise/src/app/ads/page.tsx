@@ -40,8 +40,8 @@ export default function AdsPage() {
 
 function AdsPageContent() {
   // Filters (UPDATED: wider range to capture all data)
-  const [dateFrom, setDateFrom] = useState("2025-09-01")
-  const [dateTo, setDateTo] = useState("2025-10-23")
+  const [dateFrom, setDateFrom] = useState("2024-01-01")
+  const [dateTo, setDateTo] = useState("2025-12-31")
   const [platformFilter, setPlatformFilter] = useState<string>("") // "" = all
 
   // Data states
