@@ -848,7 +848,7 @@ async def get_contracts_enriched(
             query_text += " AND c.dominant_platform = :platform"
             params["platform"] = platform
 
-        query_text += " ORDER BY c.contract_date DESC, c.contract_amount DESC"
+        query_text += " ORDER BY c.contract_source_id, c.contract_date DESC, c.contract_amount DESC"
 
         result = await session.execute(text(query_text), params)
         rows = result.fetchall()
