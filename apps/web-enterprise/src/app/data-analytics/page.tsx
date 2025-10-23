@@ -267,7 +267,6 @@ function DataAnalyticsPageContent() {
             <FacebookAdsPerformance
               data={v9FacebookWeekly}
               title="Facebook Ads Weekly Performance (V9)"
-              showTop={10}
               loading={loading}
             />
           )}
@@ -277,7 +276,6 @@ function DataAnalyticsPageContent() {
             <GoogleAdsPerformance
               data={v9GoogleWeekly}
               title="Google Ads Weekly Performance (V9)"
-              showTop={10}
               loading={loading}
             />
           )}
