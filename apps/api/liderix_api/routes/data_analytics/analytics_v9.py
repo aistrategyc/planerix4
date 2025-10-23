@@ -872,39 +872,39 @@ async def get_contracts_enriched(
                        thumbnail_url, link_url, cta_type,
                        -- Priority scoring for best match
                        CASE
-                           WHEN ad_id = c.meta_ad_id THEN 1  -- Exact ad match (best)
-                           WHEN adset_id = c.meta_adset_id THEN 2  -- Adset fallback
-                           WHEN campaign_id = c.meta_campaign_id THEN 3  -- Campaign fallback
-                           WHEN campaign_name = c.unified_campaign_name THEN 4  -- Name match
+                           WHEN ad_id = ac.ad_id THEN 1  -- Exact ad match (best)
+                           WHEN adset_id = ac.adset_id THEN 2  -- Adset fallback
+                           WHEN campaign_id = ac.campaign_id THEN 3  -- Campaign fallback
+                           WHEN campaign_name = ac.campaign_name THEN 4  -- Name match
                            ELSE 5
                        END as match_priority
                 FROM stg.v9_facebook_ad_creatives_full
-                WHERE ad_id = c.meta_ad_id
-                   OR adset_id = c.meta_adset_id
-                   OR campaign_id = c.meta_campaign_id
-                   OR campaign_name = c.unified_campaign_name
+                WHERE ad_id = ac.ad_id
+                   OR adset_id = ac.adset_id
+                   OR campaign_id = ac.campaign_id
+                   OR campaign_name = ac.campaign_name
                 ORDER BY
                     CASE
-                        WHEN ad_id = c.meta_ad_id THEN 1
-                        WHEN adset_id = c.meta_adset_id THEN 2
-                        WHEN campaign_id = c.meta_campaign_id THEN 3
-                        WHEN campaign_name = c.unified_campaign_name THEN 4
+                        WHEN ad_id = ac.ad_id THEN 1
+                        WHEN adset_id = ac.adset_id THEN 2
+                        WHEN campaign_id = ac.campaign_id THEN 3
+                        WHEN campaign_name = ac.campaign_name THEN 4
                         ELSE 5
                     END,
                     media_image_src IS NOT NULL DESC,
                     ad_creative_id
                 LIMIT 1
             ) cr ON true
-            WHERE c.contract_date >= :start_date AND c.contract_date <= :end_date
+            WHERE ac.contract_date >= :start_date AND ac.contract_date <= :end_date
         """
 
         params = {"start_date": start_date, "end_date": end_date}
 
         if platform:
-            query_text += " AND c.dominant_platform = :platform"
+            query_text += " AND ac.platform = :platform"
             params["platform"] = platform
 
-        query_text += " ORDER BY c.contract_source_id, c.contract_date DESC, c.contract_amount DESC"
+        query_text += " ORDER BY ac.contract_source_id, ac.contract_date DESC, ac.revenue DESC"
 
         result = await session.execute(text(query_text), params)
         rows = result.fetchall()
