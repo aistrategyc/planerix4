@@ -715,6 +715,355 @@ async def get_marketing_funnel(
 
 
 # ============================================================================
+# CONTRACTS ENRICHED (FOR FRONTEND PAGES)
+# ============================================================================
+
+@router.get("/contracts/enriched")
+async def get_contracts_enriched(
+    start_date: Optional[date] = Query(default=None),
+    end_date: Optional[date] = Query(default=None),
+    platform: Optional[str] = Query(default=None),
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_itstep_session),
+) -> List[Dict[str, Any]]:
+    """
+    Get enriched contract data with full campaign and creative details
+
+    View: stg.v9_contracts_with_sk_enriched
+    """
+    try:
+        query_text = """
+            SELECT
+                sk_contract,
+                sk_lead,
+                contract_date,
+                platform,
+                campaign_id,
+                campaign_name,
+                ad_id,
+                ad_name,
+                ad_creative_id,
+                creative_title,
+                creative_body,
+                creative_name,
+                media_image_src,
+                event_name,
+                traffic_source,
+                revenue,
+                product_name
+            FROM stg.v9_contracts_with_sk_enriched
+            WHERE 1=1
+        """
+
+        params = {}
+        if start_date:
+            query_text += " AND contract_date >= :start_date"
+            params["start_date"] = start_date
+        if end_date:
+            query_text += " AND contract_date <= :end_date"
+            params["end_date"] = end_date
+        if platform:
+            query_text += " AND LOWER(platform) = LOWER(:platform)"
+            params["platform"] = platform
+
+        query_text += " ORDER BY contract_date DESC"
+
+        result = await session.execute(text(query_text), params)
+        rows = result.fetchall()
+
+        return [
+            {
+                "sk_contract": row.sk_contract,
+                "sk_lead": row.sk_lead,
+                "contract_date": str(row.contract_date) if row.contract_date else None,
+                "platform": row.platform,
+                "campaign_id": row.campaign_id,
+                "campaign_name": row.campaign_name,
+                "ad_id": row.ad_id,
+                "ad_name": row.ad_name,
+                "ad_creative_id": row.ad_creative_id,
+                "creative_title": row.creative_title,
+                "creative_body": row.creative_body,
+                "creative_name": row.creative_name,
+                "media_image_src": row.media_image_src,
+                "event_name": row.event_name,
+                "traffic_source": row.traffic_source,
+                "revenue": float(row.revenue) if row.revenue else 0,
+                "product_name": row.product_name,
+            }
+            for row in rows
+        ]
+
+    except Exception as e:
+        logger.error(f"Error fetching enriched contracts: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# PLATFORM COMPARISON (WEEKLY AGGREGATES)
+# ============================================================================
+
+@router.get("/platforms/comparison")
+async def get_platform_comparison(
+    start_date: Optional[date] = Query(default=None),
+    end_date: Optional[date] = Query(default=None),
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_itstep_session),
+) -> List[Dict[str, Any]]:
+    """
+    Get platform performance comparison by week
+
+    View: stg.v9_platform_weekly_trends
+    """
+    try:
+        query_text = """
+            SELECT
+                report_week,
+                platform,
+                leads,
+                contracts,
+                revenue,
+                conversion_rate,
+                avg_contract_value
+            FROM stg.v9_platform_weekly_trends
+            WHERE 1=1
+        """
+
+        params = {}
+        if start_date:
+            query_text += " AND report_week >= :start_date"
+            params["start_date"] = start_date
+        if end_date:
+            query_text += " AND report_week <= :end_date"
+            params["end_date"] = end_date
+
+        query_text += " ORDER BY report_week DESC, platform"
+
+        result = await session.execute(text(query_text), params)
+        rows = result.fetchall()
+
+        return [
+            {
+                "report_week": str(row.report_week) if row.report_week else None,
+                "platform": row.platform,
+                "leads": int(row.leads) if row.leads else 0,
+                "contracts": int(row.contracts) if row.contracts else 0,
+                "revenue": float(row.revenue) if row.revenue else 0,
+                "conversion_rate": float(row.conversion_rate) if row.conversion_rate else 0,
+                "avg_contract_value": float(row.avg_contract_value) if row.avg_contract_value else 0,
+            }
+            for row in rows
+        ]
+
+    except Exception as e:
+        logger.error(f"Error fetching platform comparison: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# FACEBOOK & GOOGLE WEEKLY PERFORMANCE
+# ============================================================================
+
+@router.get("/facebook/weekly")
+async def get_facebook_weekly(
+    start_date: Optional[date] = Query(default=None),
+    end_date: Optional[date] = Query(default=None),
+    campaign_id: Optional[str] = Query(default=None),
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_itstep_session),
+) -> List[Dict[str, Any]]:
+    """
+    Get Facebook weekly performance metrics
+
+    View: stg.v9_facebook_performance_daily (aggregated by week)
+    """
+    try:
+        query_text = """
+            SELECT
+                DATE_TRUNC('week', report_date)::date as week_start,
+                campaign_id,
+                campaign_name,
+                SUM(impressions) as impressions,
+                SUM(clicks) as clicks,
+                SUM(spend) as spend,
+                SUM(conversions) as conversions,
+                AVG(ctr) as ctr,
+                AVG(cpc) as cpc,
+                AVG(cpm) as cpm,
+                AVG(conversion_rate) as conversion_rate
+            FROM stg.v9_facebook_performance_daily
+            WHERE 1=1
+        """
+
+        params = {}
+        if start_date:
+            query_text += " AND report_date >= :start_date"
+            params["start_date"] = start_date
+        if end_date:
+            query_text += " AND report_date <= :end_date"
+            params["end_date"] = end_date
+        if campaign_id:
+            query_text += " AND campaign_id = :campaign_id"
+            params["campaign_id"] = campaign_id
+
+        query_text += """
+            GROUP BY DATE_TRUNC('week', report_date), campaign_id, campaign_name
+            ORDER BY week_start DESC
+        """
+
+        result = await session.execute(text(query_text), params)
+        rows = result.fetchall()
+
+        return [
+            {
+                "week_start": str(row.week_start) if row.week_start else None,
+                "campaign_id": row.campaign_id,
+                "campaign_name": row.campaign_name,
+                "impressions": int(row.impressions) if row.impressions else 0,
+                "clicks": int(row.clicks) if row.clicks else 0,
+                "spend": float(row.spend) if row.spend else 0,
+                "conversions": int(row.conversions) if row.conversions else 0,
+                "ctr": float(row.ctr) if row.ctr else 0,
+                "cpc": float(row.cpc) if row.cpc else 0,
+                "cpm": float(row.cpm) if row.cpm else 0,
+                "conversion_rate": float(row.conversion_rate) if row.conversion_rate else 0,
+            }
+            for row in rows
+        ]
+
+    except Exception as e:
+        logger.error(f"Error fetching Facebook weekly performance: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/google/weekly")
+async def get_google_weekly(
+    start_date: Optional[date] = Query(default=None),
+    end_date: Optional[date] = Query(default=None),
+    campaign_id: Optional[str] = Query(default=None),
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_itstep_session),
+) -> List[Dict[str, Any]]:
+    """
+    Get Google Ads weekly performance metrics
+
+    View: stg.v9_google_performance_daily (aggregated by week)
+    """
+    try:
+        query_text = """
+            SELECT
+                DATE_TRUNC('week', report_date)::date as week_start,
+                campaign_id,
+                campaign_name,
+                SUM(impressions) as impressions,
+                SUM(clicks) as clicks,
+                SUM(cost) as spend,
+                SUM(conversions) as conversions,
+                AVG(ctr) as ctr,
+                AVG(avg_cpc) as cpc,
+                AVG(avg_cpm) as cpm,
+                AVG(conversion_rate) as conversion_rate
+            FROM stg.v9_google_performance_daily
+            WHERE 1=1
+        """
+
+        params = {}
+        if start_date:
+            query_text += " AND report_date >= :start_date"
+            params["start_date"] = start_date
+        if end_date:
+            query_text += " AND report_date <= :end_date"
+            params["end_date"] = end_date
+        if campaign_id:
+            query_text += " AND campaign_id = :campaign_id"
+            params["campaign_id"] = campaign_id
+
+        query_text += """
+            GROUP BY DATE_TRUNC('week', report_date), campaign_id, campaign_name
+            ORDER BY week_start DESC
+        """
+
+        result = await session.execute(text(query_text), params)
+        rows = result.fetchall()
+
+        return [
+            {
+                "week_start": str(row.week_start) if row.week_start else None,
+                "campaign_id": row.campaign_id,
+                "campaign_name": row.campaign_name,
+                "impressions": int(row.impressions) if row.impressions else 0,
+                "clicks": int(row.clicks) if row.clicks else 0,
+                "spend": float(row.spend) if row.spend else 0,
+                "conversions": int(row.conversions) if row.conversions else 0,
+                "ctr": float(row.ctr) if row.ctr else 0,
+                "cpc": float(row.cpc) if row.cpc else 0,
+                "cpm": float(row.cpm) if row.cpm else 0,
+                "conversion_rate": float(row.conversion_rate) if row.conversion_rate else 0,
+            }
+            for row in rows
+        ]
+
+    except Exception as e:
+        logger.error(f"Error fetching Google weekly performance: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# ATTRIBUTION QUALITY
+# ============================================================================
+
+@router.get("/attribution/quality")
+async def get_attribution_quality(
+    platform: Optional[str] = Query(default=None),
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_itstep_session),
+) -> List[Dict[str, Any]]:
+    """
+    Get attribution quality scores by platform
+
+    View: stg.v9_attribution_quality_score
+    """
+    try:
+        query_text = """
+            SELECT
+                platform,
+                total_contracts,
+                contracts_with_campaign,
+                campaign_match_rate,
+                utm_coverage,
+                attribution_quality_score
+            FROM stg.v9_attribution_quality_score
+            WHERE 1=1
+        """
+
+        params = {}
+        if platform:
+            query_text += " AND LOWER(platform) = LOWER(:platform)"
+            params["platform"] = platform
+
+        query_text += " ORDER BY attribution_quality_score DESC"
+
+        result = await session.execute(text(query_text), params)
+        rows = result.fetchall()
+
+        return [
+            {
+                "platform": row.platform,
+                "total_contracts": int(row.total_contracts) if row.total_contracts else 0,
+                "contracts_with_campaign": int(row.contracts_with_campaign) if row.contracts_with_campaign else 0,
+                "campaign_match_rate": float(row.campaign_match_rate) if row.campaign_match_rate else 0,
+                "utm_coverage": float(row.utm_coverage) if row.utm_coverage else 0,
+                "attribution_quality_score": float(row.attribution_quality_score) if row.attribution_quality_score else 0,
+            }
+            for row in rows
+        ]
+
+    except Exception as e:
+        logger.error(f"Error fetching attribution quality: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
 # HEALTH CHECK
 # ============================================================================
 

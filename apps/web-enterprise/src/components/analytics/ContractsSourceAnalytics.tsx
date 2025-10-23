@@ -150,8 +150,13 @@ export function ContractsSourceAnalytics({
     )
   }
 
-  // Aggregate by source
+  // Aggregate by source (with null safety)
   const sourceData = data.reduce((acc, item) => {
+    // Skip if source is missing
+    if (!item.source) {
+      return acc
+    }
+
     const source = item.source.toLowerCase()
     if (!acc[source]) {
       acc[source] = {
