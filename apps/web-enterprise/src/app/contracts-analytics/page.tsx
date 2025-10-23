@@ -13,6 +13,7 @@ import { FacebookCreativeAnalytics } from "@/components/analytics/FacebookCreati
 import { PlatformKPICards } from "@/components/analytics/PlatformKPICards"
 import { AttributionBreakdown } from "@/components/analytics/AttributionBreakdown"
 import { WeekOverWeekComparison } from "@/components/analytics/WeekOverWeekComparison"
+import { ContractsDetailTable } from "@/components/analytics/ContractsDetailTable"
 
 function ContractsAnalyticsPageContent() {
   // Filters - V9 ONLY VERSION
@@ -222,6 +223,56 @@ function ContractsAnalyticsPageContent() {
             <ContractsSourceAnalytics
               data={v9ContractsEnriched}
               title="Contracts by Source - Откуда пришли клиенты (V9)"
+              loading={loading}
+            />
+          )}
+
+          {/* V9: ДЕТАЛИЗАЦИЯ КОНТРАКТОВ - ПО ТРЕБОВАНИЮ ПОЛЬЗОВАТЕЛЯ! */}
+          <div className="pt-8 border-t-4 border-indigo-300">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              📋 Детализация Контрактов по Платформам
+            </h2>
+            <p className="text-gray-600 mb-6">
+              Полная информация по каждому контракту: кампании, объявления, креативы, мероприятия
+            </p>
+          </div>
+
+          {/* Facebook Contracts Detail - 10 контрактов, 8 клиентов, 245K грн */}
+          {v9ContractsEnriched.length > 0 && (
+            <ContractsDetailTable
+              data={v9ContractsEnriched}
+              title="📘 Facebook Контракты (Детально)"
+              platform="facebook"
+              loading={loading}
+            />
+          )}
+
+          {/* Instagram Contracts Detail - 9 контрактов, 4 клиента, 232K грн */}
+          {v9ContractsEnriched.length > 0 && (
+            <ContractsDetailTable
+              data={v9ContractsEnriched}
+              title="📸 Instagram Контракты (Детально)"
+              platform="instagram"
+              loading={loading}
+            />
+          )}
+
+          {/* Google Contracts Detail - 21 контракт, 13 клиентов, 972K грн */}
+          {v9ContractsEnriched.length > 0 && (
+            <ContractsDetailTable
+              data={v9ContractsEnriched}
+              title="🔴 Google Контракты (Детально)"
+              platform="google"
+              loading={loading}
+            />
+          )}
+
+          {/* Event Contracts Detail - 5 контрактов, 5 клиентов, 99K грн */}
+          {v9ContractsEnriched.length > 0 && (
+            <ContractsDetailTable
+              data={v9ContractsEnriched}
+              title="🎪 Event Контракты (Детально)"
+              platform="event"
               loading={loading}
             />
           )}
