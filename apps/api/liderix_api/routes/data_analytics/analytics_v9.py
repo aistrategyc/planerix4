@@ -990,47 +990,42 @@ async def get_facebook_weekly_performance(
         if not end_date:
             end_date = date.today()
 
-        # Use v9_platform_weekly_trends (has real contracts!) filtered by platform
+        # Use v9_facebook_ads_performance_sk (REAL data from ad accounts!)
         query_text = """
             SELECT
                 week_start,
-                '' as campaign_id,
-                platform as campaign_name,
-                '' as adset_name,
-                '' as ad_name,
-                0.0 as total_spend,
-                0 as total_impressions,
-                0 as total_clicks,
-                0.0 as avg_ctr,
-                0.0 as avg_cpc,
-                0 as total_fb_leads,
-                0 as total_crm_leads_same_day,
-                leads as total_crm_leads_7d,
-                contracts as total_contracts,
-                revenue as total_revenue,
-                CASE WHEN leads > 0 THEN revenue / leads ELSE 0 END as avg_cpl,
-                0.0 as avg_roas,
-                LAG(revenue) OVER (PARTITION BY platform ORDER BY week_start) as prev_week_revenue,
-                LAG(contracts) OVER (PARTITION BY platform ORDER BY week_start) as prev_week_contracts,
-                0.0 as prev_week_spend,
-                0.0 as spend_wow_growth_pct,
-                CASE
-                    WHEN LAG(contracts) OVER (PARTITION BY platform ORDER BY week_start) > 0
-                    THEN ((contracts - LAG(contracts) OVER (PARTITION BY platform ORDER BY week_start)) * 100.0 / LAG(contracts) OVER (PARTITION BY platform ORDER BY week_start))
-                    ELSE 0
-                END as contracts_wow_growth_pct,
-                CASE
-                    WHEN LAG(revenue) OVER (PARTITION BY platform ORDER BY week_start) > 0
-                    THEN ((revenue - LAG(revenue) OVER (PARTITION BY platform ORDER BY week_start)) * 100.0 / LAG(revenue) OVER (PARTITION BY platform ORDER BY week_start))
-                    ELSE 0
-                END as revenue_wow_growth_pct
-            FROM stg.v9_platform_weekly_trends
+                campaign_id,
+                campaign_name,
+                adset_name,
+                ad_name,
+                total_spend,
+                total_impressions,
+                total_clicks,
+                avg_ctr,
+                avg_cpc,
+                total_fb_leads,
+                total_crm_leads_same_day,
+                total_crm_leads_7d,
+                total_contracts,
+                total_revenue,
+                avg_cpl,
+                avg_roas,
+                prev_week_spend,
+                prev_week_contracts,
+                prev_week_revenue,
+                spend_wow_growth_pct,
+                contracts_wow_growth_pct,
+                revenue_wow_growth_pct
+            FROM stg.v9_facebook_ads_performance_sk
             WHERE week_start >= :start_date
               AND week_start <= :end_date
-              AND LOWER(platform) IN ('facebook', 'instagram', 'meta')
         """
 
         params = {"start_date": start_date, "end_date": end_date}
+
+        if campaign_id:
+            query_text += " AND campaign_id = :campaign_id"
+            params["campaign_id"] = campaign_id
 
         query_text += " ORDER BY week_start DESC, total_revenue DESC NULLS LAST"
 
@@ -1097,44 +1092,39 @@ async def get_google_weekly_performance(
         if not end_date:
             end_date = date.today()
 
-        # Use v9_platform_weekly_trends (has real contracts!) filtered by platform
+        # Use v9_google_ads_performance_sk (REAL data from Google Ads!)
         query_text = """
             SELECT
                 week_start,
-                '' as campaign_id,
-                platform as campaign_name,
-                0.0 as total_spend,
-                0 as total_impressions,
-                0 as total_clicks,
-                0.0 as avg_cpc,
-                0.0 as avg_ctr,
-                0 as total_crm_leads_same_day,
-                leads as total_crm_leads_7d,
-                contracts as total_contracts,
-                revenue as total_revenue,
-                CASE WHEN leads > 0 THEN revenue / leads ELSE 0 END as avg_cpl,
-                0.0 as avg_roas,
-                0.0 as prev_week_spend,
-                LAG(contracts) OVER (PARTITION BY platform ORDER BY week_start) as prev_week_contracts,
-                LAG(revenue) OVER (PARTITION BY platform ORDER BY week_start) as prev_week_revenue,
-                0.0 as spend_wow_growth_pct,
-                CASE
-                    WHEN LAG(contracts) OVER (PARTITION BY platform ORDER BY week_start) > 0
-                    THEN ((contracts - LAG(contracts) OVER (PARTITION BY platform ORDER BY week_start)) * 100.0 / LAG(contracts) OVER (PARTITION BY platform ORDER BY week_start))
-                    ELSE 0
-                END as contracts_wow_growth_pct,
-                CASE
-                    WHEN LAG(revenue) OVER (PARTITION BY platform ORDER BY week_start) > 0
-                    THEN ((revenue - LAG(revenue) OVER (PARTITION BY platform ORDER BY week_start)) * 100.0 / LAG(revenue) OVER (PARTITION BY platform ORDER BY week_start))
-                    ELSE 0
-                END as revenue_wow_growth_pct
-            FROM stg.v9_platform_weekly_trends
+                campaign_id,
+                campaign_name,
+                total_spend,
+                total_impressions,
+                total_clicks,
+                avg_cpc,
+                avg_ctr,
+                total_crm_leads_same_day,
+                total_crm_leads_7d,
+                total_contracts,
+                total_revenue,
+                avg_cpl,
+                avg_roas,
+                prev_week_spend,
+                prev_week_contracts,
+                prev_week_revenue,
+                spend_wow_growth_pct,
+                contracts_wow_growth_pct,
+                revenue_wow_growth_pct
+            FROM stg.v9_google_ads_performance_sk
             WHERE week_start >= :start_date
               AND week_start <= :end_date
-              AND LOWER(platform) = 'google'
         """
 
         params = {"start_date": start_date, "end_date": end_date}
+
+        if campaign_id:
+            query_text += " AND campaign_id = :campaign_id"
+            params["campaign_id"] = campaign_id
 
         query_text += " ORDER BY week_start DESC, total_revenue DESC NULLS LAST"
 
