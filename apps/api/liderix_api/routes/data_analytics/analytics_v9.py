@@ -804,24 +804,60 @@ async def get_contracts_enriched(
             end_date = date.today()
 
         query_text = """
-            SELECT DISTINCT ON (c.contract_source_id)
-                c.sk_lead,
-                c.contract_source_id,
-                c.client_id,
-                c.contract_date,
-                c.contract_amount as revenue,
-                c.dominant_platform as platform,
-                c.unified_campaign_name as campaign_name,
-                c.meta_campaign_id as campaign_id,
-                c.meta_adset_id as adset_id,
-                c.meta_adset_name as adset_name,
-                c.meta_ad_id as ad_id,
-                c.meta_ad_name as ad_name,
-                c.utm_source,
-                c.utm_campaign,
-                c.utm_medium,
-                c.utm_term,
-                c.attribution_level,
+            WITH main_contracts AS (
+                SELECT DISTINCT ON (c.contract_source_id)
+                    c.sk_lead,
+                    c.contract_source_id,
+                    c.client_id,
+                    c.contract_date,
+                    c.contract_amount as revenue,
+                    c.dominant_platform as platform,
+                    c.unified_campaign_name as campaign_name,
+                    c.meta_campaign_id as campaign_id,
+                    c.meta_adset_id as adset_id,
+                    c.meta_adset_name as adset_name,
+                    c.meta_ad_id as ad_id,
+                    c.meta_ad_name as ad_name,
+                    c.utm_source,
+                    c.utm_campaign,
+                    c.utm_medium,
+                    c.utm_term,
+                    c.attribution_level
+                FROM stg.v9_contracts_with_sk_enriched c
+                WHERE c.contract_date >= :start_date AND c.contract_date <= :end_date
+                ORDER BY c.contract_source_id, c.contract_date DESC, c.contract_amount DESC
+            ),
+            event_contracts AS (
+                SELECT
+                    NULL::bigint as sk_lead,
+                    fc.contract_source_id::text as contract_source_id,
+                    fc.client_id,
+                    fc.contract_date::date as contract_date,
+                    fc.contract_amount as revenue,
+                    fc.matched_platform as platform,
+                    COALESCE(fc.campaign_name, 'Event') as campaign_name,
+                    NULL as campaign_id,
+                    NULL as adset_id,
+                    NULL as adset_name,
+                    NULL as ad_id,
+                    NULL as ad_name,
+                    fc.utm_source,
+                    fc.utm_campaign,
+                    fc.utm_medium,
+                    NULL as utm_term,
+                    'event_direct' as attribution_level
+                FROM stg.fact_contracts fc
+                WHERE fc.matched_platform = 'event'
+                  AND fc.contract_date >= :start_date
+                  AND fc.contract_date <= :end_date
+            ),
+            all_contracts AS (
+                SELECT * FROM main_contracts
+                UNION ALL
+                SELECT * FROM event_contracts
+            )
+            SELECT
+                ac.*,
                 cr.ad_creative_id,
                 cr.creative_name,
                 cr.title as creative_title,
@@ -830,13 +866,33 @@ async def get_contracts_enriched(
                 cr.thumbnail_url,
                 cr.link_url,
                 cr.cta_type
-            FROM stg.v9_contracts_with_sk_enriched c
+            FROM all_contracts ac
             LEFT JOIN LATERAL (
                 SELECT ad_creative_id, creative_name, title, body, media_image_src,
-                       thumbnail_url, link_url, cta_type
+                       thumbnail_url, link_url, cta_type,
+                       -- Priority scoring for best match
+                       CASE
+                           WHEN ad_id = c.meta_ad_id THEN 1  -- Exact ad match (best)
+                           WHEN adset_id = c.meta_adset_id THEN 2  -- Adset fallback
+                           WHEN campaign_id = c.meta_campaign_id THEN 3  -- Campaign fallback
+                           WHEN campaign_name = c.unified_campaign_name THEN 4  -- Name match
+                           ELSE 5
+                       END as match_priority
                 FROM stg.v9_facebook_ad_creatives_full
-                WHERE ad_id = c.meta_ad_id OR campaign_name = c.unified_campaign_name
-                ORDER BY media_image_src IS NOT NULL DESC, ad_creative_id
+                WHERE ad_id = c.meta_ad_id
+                   OR adset_id = c.meta_adset_id
+                   OR campaign_id = c.meta_campaign_id
+                   OR campaign_name = c.unified_campaign_name
+                ORDER BY
+                    CASE
+                        WHEN ad_id = c.meta_ad_id THEN 1
+                        WHEN adset_id = c.meta_adset_id THEN 2
+                        WHEN campaign_id = c.meta_campaign_id THEN 3
+                        WHEN campaign_name = c.unified_campaign_name THEN 4
+                        ELSE 5
+                    END,
+                    media_image_src IS NOT NULL DESC,
+                    ad_creative_id
                 LIMIT 1
             ) cr ON true
             WHERE c.contract_date >= :start_date AND c.contract_date <= :end_date
