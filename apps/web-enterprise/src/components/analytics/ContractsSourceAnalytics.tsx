@@ -74,7 +74,7 @@ const SOURCE_ICONS: Record<string, any> = {
   telegram: MessageCircle,
 }
 
-const formatCurrency = (value: number) => `$${(value / 1000).toFixed(1)}K`
+const formatCurrency = (value: number) => `₴${(value / 1000).toFixed(1)}K`
 const formatNumber = (value: number) => value.toFixed(0)
 const formatPercent = (value: number) => `${value.toFixed(1)}%`
 

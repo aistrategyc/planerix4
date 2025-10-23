@@ -47,7 +47,7 @@ interface FacebookCreativeAnalyticsProps {
   loading?: boolean
 }
 
-const formatCurrency = (value: number) => `$${value.toFixed(2)}`
+const formatCurrency = (value: number) => `₴${value.toFixed(2)}`
 const formatNumber = (value: number) => value.toFixed(0)
 const formatPercent = (value: number) => `${value.toFixed(1)}%`
 

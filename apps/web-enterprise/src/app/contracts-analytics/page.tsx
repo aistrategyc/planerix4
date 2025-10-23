@@ -301,7 +301,7 @@ function ContractsAnalyticsPageContent() {
                   <XAxis dataKey="name" />
                   <YAxis />
                   <Tooltip
-                    formatter={(value: any) => `$${value.toLocaleString()}`}
+                    formatter={(value: any) => `₴${value.toLocaleString()}`}
                     labelFormatter={(label) => `Platform: ${label}`}
                   />
                   <Bar dataKey="revenue" fill="#10b981" />
