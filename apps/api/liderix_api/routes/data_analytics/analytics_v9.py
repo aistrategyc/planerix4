@@ -1039,6 +1039,7 @@ async def get_facebook_weekly_performance(
                 "campaign_name": row.campaign_name,
                 "adset_name": row.adset_name,
                 "ad_name": row.ad_name,
+                # Detailed metrics (for full display)
                 "total_spend": float(row.total_spend) if row.total_spend else 0.0,
                 "total_impressions": int(row.total_impressions) if row.total_impressions else 0,
                 "total_clicks": int(row.total_clicks) if row.total_clicks else 0,
@@ -1051,12 +1052,22 @@ async def get_facebook_weekly_performance(
                 "total_revenue": float(row.total_revenue) if row.total_revenue else 0.0,
                 "avg_cpl": float(row.avg_cpl) if row.avg_cpl else 0.0,
                 "avg_roas": float(row.avg_roas) if row.avg_roas else 0.0,
+                # Previous week metrics
                 "prev_week_spend": float(row.prev_week_spend) if row.prev_week_spend else 0.0,
                 "prev_week_contracts": int(row.prev_week_contracts) if row.prev_week_contracts else 0,
                 "prev_week_revenue": float(row.prev_week_revenue) if row.prev_week_revenue else 0.0,
+                # Growth metrics
                 "spend_wow_growth_pct": float(row.spend_wow_growth_pct) if row.spend_wow_growth_pct else 0.0,
                 "contracts_wow_growth_pct": float(row.contracts_wow_growth_pct) if row.contracts_wow_growth_pct else 0.0,
                 "revenue_wow_growth_pct": float(row.revenue_wow_growth_pct) if row.revenue_wow_growth_pct else 0.0,
+                # Frontend compatibility aliases (for V9FacebookWeekly interface)
+                "leads": int(row.total_crm_leads_7d) if row.total_crm_leads_7d else 0,
+                "contracts": int(row.total_contracts) if row.total_contracts else 0,
+                "revenue": float(row.total_revenue) if row.total_revenue else 0.0,
+                "conversion_rate": float(row.total_contracts / row.total_crm_leads_7d * 100) if (row.total_crm_leads_7d and row.total_crm_leads_7d > 0) else 0.0,
+                "prev_week_leads": int(row.total_crm_leads_7d - (row.total_crm_leads_7d * row.contracts_wow_growth_pct / 100)) if row.contracts_wow_growth_pct else None,
+                "leads_wow_growth": float(row.contracts_wow_growth_pct) if row.contracts_wow_growth_pct else None,
+                "contracts_wow_growth": float(row.contracts_wow_growth_pct) if row.contracts_wow_growth_pct else None,
             }
             for row in rows
         ]
@@ -1136,6 +1147,7 @@ async def get_google_weekly_performance(
                 "week_start": str(row.week_start),
                 "campaign_id": row.campaign_id,
                 "campaign_name": row.campaign_name,
+                # Detailed metrics
                 "total_spend": float(row.total_spend) if row.total_spend else 0.0,
                 "total_impressions": int(row.total_impressions) if row.total_impressions else 0,
                 "total_clicks": int(row.total_clicks) if row.total_clicks else 0,
@@ -1147,12 +1159,22 @@ async def get_google_weekly_performance(
                 "total_revenue": float(row.total_revenue) if row.total_revenue else 0.0,
                 "avg_cpl": float(row.avg_cpl) if row.avg_cpl else 0.0,
                 "avg_roas": float(row.avg_roas) if row.avg_roas else 0.0,
+                # Previous week metrics
                 "prev_week_spend": float(row.prev_week_spend) if row.prev_week_spend else 0.0,
                 "prev_week_contracts": int(row.prev_week_contracts) if row.prev_week_contracts else 0,
                 "prev_week_revenue": float(row.prev_week_revenue) if row.prev_week_revenue else 0.0,
+                # Growth metrics
                 "spend_wow_growth_pct": float(row.spend_wow_growth_pct) if row.spend_wow_growth_pct else 0.0,
                 "contracts_wow_growth_pct": float(row.contracts_wow_growth_pct) if row.contracts_wow_growth_pct else 0.0,
                 "revenue_wow_growth_pct": float(row.revenue_wow_growth_pct) if row.revenue_wow_growth_pct else 0.0,
+                # Frontend compatibility aliases (for V9GoogleWeekly interface)
+                "leads": int(row.total_crm_leads_7d) if row.total_crm_leads_7d else 0,
+                "contracts": int(row.total_contracts) if row.total_contracts else 0,
+                "revenue": float(row.total_revenue) if row.total_revenue else 0.0,
+                "conversion_rate": float(row.total_contracts / row.total_crm_leads_7d * 100) if (row.total_crm_leads_7d and row.total_crm_leads_7d > 0) else 0.0,
+                "prev_week_leads": int(row.total_crm_leads_7d - (row.total_crm_leads_7d * row.contracts_wow_growth_pct / 100)) if row.contracts_wow_growth_pct else None,
+                "leads_wow_growth": float(row.contracts_wow_growth_pct) if row.contracts_wow_growth_pct else None,
+                "contracts_wow_growth": float(row.contracts_wow_growth_pct) if row.contracts_wow_growth_pct else None,
             }
             for row in rows
         ]
