@@ -990,35 +990,75 @@ async def get_facebook_weekly_performance(
         if not end_date:
             end_date = date.today()
 
-        # Use v9_facebook_ads_performance_sk (REAL data from ad accounts!)
+        # Combined query: ad performance (spend/impressions) + contracts/revenue from weekly trends
+        # v9_facebook_ads_performance_sk has spend/clicks but NO contracts
+        # v9_platform_weekly_trends has contracts/revenue but NO spend/clicks
+        # We aggregate ad performance by week and combine with platform weekly contracts
         query_text = """
+            WITH ad_performance AS (
+                SELECT
+                    week_start,
+                    SUM(total_spend) as total_spend,
+                    SUM(total_impressions) as total_impressions,
+                    SUM(total_clicks) as total_clicks,
+                    AVG(avg_ctr) as avg_ctr,
+                    AVG(avg_cpc) as avg_cpc
+                FROM stg.v9_facebook_ads_performance_sk
+                WHERE week_start >= :start_date AND week_start <= :end_date
+                GROUP BY week_start
+            ),
+            platform_contracts AS (
+                SELECT
+                    week_start,
+                    platform,
+                    leads,
+                    contracts,
+                    revenue,
+                    LAG(contracts) OVER (PARTITION BY platform ORDER BY week_start) as prev_week_contracts,
+                    LAG(revenue) OVER (PARTITION BY platform ORDER BY week_start) as prev_week_revenue
+                FROM stg.v9_platform_weekly_trends
+                WHERE week_start >= :start_date
+                  AND week_start <= :end_date
+                  AND LOWER(platform) IN ('facebook', 'instagram', 'meta')
+            )
             SELECT
-                week_start,
-                campaign_id,
-                campaign_name,
-                adset_name,
-                ad_name,
-                total_spend,
-                total_impressions,
-                total_clicks,
-                avg_ctr,
-                avg_cpc,
-                total_fb_leads,
-                total_crm_leads_same_day,
-                total_crm_leads_7d,
-                total_contracts,
-                total_revenue,
-                avg_cpl,
-                avg_roas,
-                prev_week_spend,
-                prev_week_contracts,
-                prev_week_revenue,
-                spend_wow_growth_pct,
-                contracts_wow_growth_pct,
-                revenue_wow_growth_pct
-            FROM stg.v9_facebook_ads_performance_sk
-            WHERE week_start >= :start_date
-              AND week_start <= :end_date
+                pc.week_start,
+                '' as campaign_id,
+                pc.platform as campaign_name,
+                '' as adset_name,
+                '' as ad_name,
+                COALESCE(ap.total_spend, 0) as total_spend,
+                COALESCE(ap.total_impressions, 0) as total_impressions,
+                COALESCE(ap.total_clicks, 0) as total_clicks,
+                COALESCE(ap.avg_ctr, 0) as avg_ctr,
+                COALESCE(ap.avg_cpc, 0) as avg_cpc,
+                0 as total_fb_leads,
+                0 as total_crm_leads_same_day,
+                pc.leads as total_crm_leads_7d,
+                pc.contracts as total_contracts,
+                pc.revenue as total_revenue,
+                CASE WHEN pc.leads > 0 THEN pc.revenue / pc.leads ELSE 0 END as avg_cpl,
+                CASE WHEN ap.total_spend > 0 THEN pc.revenue / ap.total_spend ELSE 0 END as avg_roas,
+                LAG(COALESCE(ap.total_spend, 0)) OVER (PARTITION BY pc.platform ORDER BY pc.week_start) as prev_week_spend,
+                pc.prev_week_contracts,
+                pc.prev_week_revenue,
+                CASE
+                    WHEN LAG(COALESCE(ap.total_spend, 0)) OVER (PARTITION BY pc.platform ORDER BY pc.week_start) > 0
+                    THEN ((COALESCE(ap.total_spend, 0) - LAG(COALESCE(ap.total_spend, 0)) OVER (PARTITION BY pc.platform ORDER BY pc.week_start)) * 100.0 / LAG(COALESCE(ap.total_spend, 0)) OVER (PARTITION BY pc.platform ORDER BY pc.week_start))
+                    ELSE 0
+                END as spend_wow_growth_pct,
+                CASE
+                    WHEN pc.prev_week_contracts > 0
+                    THEN ((pc.contracts - pc.prev_week_contracts) * 100.0 / pc.prev_week_contracts)
+                    ELSE 0
+                END as contracts_wow_growth_pct,
+                CASE
+                    WHEN pc.prev_week_revenue > 0
+                    THEN ((pc.revenue - pc.prev_week_revenue) * 100.0 / pc.prev_week_revenue)
+                    ELSE 0
+                END as revenue_wow_growth_pct
+            FROM platform_contracts pc
+            LEFT JOIN ad_performance ap ON pc.week_start = ap.week_start
         """
 
         params = {"start_date": start_date, "end_date": end_date}
@@ -1103,32 +1143,69 @@ async def get_google_weekly_performance(
         if not end_date:
             end_date = date.today()
 
-        # Use v9_google_ads_performance_sk (REAL data from Google Ads!)
+        # Combined query: ad performance (spend/impressions) + contracts/revenue from weekly trends
         query_text = """
+            WITH ad_performance AS (
+                SELECT
+                    week_start,
+                    SUM(total_spend) as total_spend,
+                    SUM(total_impressions) as total_impressions,
+                    SUM(total_clicks) as total_clicks,
+                    AVG(avg_ctr) as avg_ctr,
+                    AVG(avg_cpc) as avg_cpc
+                FROM stg.v9_google_ads_performance_sk
+                WHERE week_start >= :start_date AND week_start <= :end_date
+                GROUP BY week_start
+            ),
+            platform_contracts AS (
+                SELECT
+                    week_start,
+                    platform,
+                    leads,
+                    contracts,
+                    revenue,
+                    LAG(contracts) OVER (PARTITION BY platform ORDER BY week_start) as prev_week_contracts,
+                    LAG(revenue) OVER (PARTITION BY platform ORDER BY week_start) as prev_week_revenue
+                FROM stg.v9_platform_weekly_trends
+                WHERE week_start >= :start_date
+                  AND week_start <= :end_date
+                  AND LOWER(platform) = 'google'
+            )
             SELECT
-                week_start,
-                campaign_id,
-                campaign_name,
-                total_spend,
-                total_impressions,
-                total_clicks,
-                avg_cpc,
-                avg_ctr,
-                total_crm_leads_same_day,
-                total_crm_leads_7d,
-                total_contracts,
-                total_revenue,
-                avg_cpl,
-                avg_roas,
-                prev_week_spend,
-                prev_week_contracts,
-                prev_week_revenue,
-                spend_wow_growth_pct,
-                contracts_wow_growth_pct,
-                revenue_wow_growth_pct
-            FROM stg.v9_google_ads_performance_sk
-            WHERE week_start >= :start_date
-              AND week_start <= :end_date
+                pc.week_start,
+                '' as campaign_id,
+                pc.platform as campaign_name,
+                COALESCE(ap.total_spend, 0) as total_spend,
+                COALESCE(ap.total_impressions, 0) as total_impressions,
+                COALESCE(ap.total_clicks, 0) as total_clicks,
+                COALESCE(ap.avg_cpc, 0) as avg_cpc,
+                COALESCE(ap.avg_ctr, 0) as avg_ctr,
+                0 as total_crm_leads_same_day,
+                pc.leads as total_crm_leads_7d,
+                pc.contracts as total_contracts,
+                pc.revenue as total_revenue,
+                CASE WHEN pc.leads > 0 THEN pc.revenue / pc.leads ELSE 0 END as avg_cpl,
+                CASE WHEN ap.total_spend > 0 THEN pc.revenue / ap.total_spend ELSE 0 END as avg_roas,
+                LAG(COALESCE(ap.total_spend, 0)) OVER (ORDER BY pc.week_start) as prev_week_spend,
+                pc.prev_week_contracts,
+                pc.prev_week_revenue,
+                CASE
+                    WHEN LAG(COALESCE(ap.total_spend, 0)) OVER (ORDER BY pc.week_start) > 0
+                    THEN ((COALESCE(ap.total_spend, 0) - LAG(COALESCE(ap.total_spend, 0)) OVER (ORDER BY pc.week_start)) * 100.0 / LAG(COALESCE(ap.total_spend, 0)) OVER (ORDER BY pc.week_start))
+                    ELSE 0
+                END as spend_wow_growth_pct,
+                CASE
+                    WHEN pc.prev_week_contracts > 0
+                    THEN ((pc.contracts - pc.prev_week_contracts) * 100.0 / pc.prev_week_contracts)
+                    ELSE 0
+                END as contracts_wow_growth_pct,
+                CASE
+                    WHEN pc.prev_week_revenue > 0
+                    THEN ((pc.revenue - pc.prev_week_revenue) * 100.0 / pc.prev_week_revenue)
+                    ELSE 0
+                END as revenue_wow_growth_pct
+            FROM platform_contracts pc
+            LEFT JOIN ad_performance ap ON pc.week_start = ap.week_start
         """
 
         params = {"start_date": start_date, "end_date": end_date}
