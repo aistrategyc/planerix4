@@ -727,65 +727,67 @@ async def get_contracts_enriched(
     session: AsyncSession = Depends(get_itstep_session),
 ) -> List[Dict[str, Any]]:
     """
-    Get enriched contract data with campaign details
+    Get enriched contract data with FULL campaign and creative details
 
-    Uses existing v9_contracts_with_sk_enriched view fields and maps them to frontend format
+    Uses fact_contracts (has most fields) + JOIN with Facebook creatives for images
     """
     try:
         query_text = """
             SELECT
-                c.contract_source_id as sk_contract,
-                c.sk_lead,
-                c.contract_date,
-                COALESCE(c.dominant_platform, c.unified_platform, 'unknown') as platform,
-                COALESCE(c.meta_campaign_id, c.google_campaign_id, '') as campaign_id,
-                COALESCE(c.meta_campaign_name, c.google_campaign_name, c.unified_campaign_name, '—') as campaign_name,
-                COALESCE(c.meta_ad_id, '') as ad_id,
-                COALESCE(c.meta_ad_name, '') as ad_name,
-                CAST(NULL AS TEXT) as ad_creative_id,
-                CAST(NULL AS TEXT) as creative_title,
-                CAST(NULL AS TEXT) as creative_body,
-                CAST(NULL AS TEXT) as creative_name,
-                CAST(NULL AS TEXT) as media_image_src,
+                fc.contract_source_id as sk_contract,
+                fc.lead_source_id as sk_lead,
+                fc.contract_date,
+                COALESCE(fc.dominant_platform, fc.matched_platform, 'unknown') as platform,
+                fc.campaign_id,
+                COALESCE(fc.campaign_name, '—') as campaign_name,
+                fc.ad_id,
+                COALESCE(fc.ad_name, '') as ad_name,
+                fb_cr.ad_creative_id,
+                fb_cr.title as creative_title,
+                fb_cr.body as creative_body,
+                fb_cr.creative_name,
+                COALESCE(fb_cr.media_image_src, fb_cr.thumbnail_url) as media_image_src,
                 CAST(NULL AS TEXT) as event_name,
-                COALESCE(c.utm_source, '') as traffic_source,
-                c.contract_amount as revenue,
+                COALESCE(fc.utm_source, '') as traffic_source,
+                fc.contract_amount as revenue,
                 CAST(NULL AS TEXT) as product_name
-            FROM stg.v9_contracts_with_sk_enriched c
-            WHERE 1=1
+            FROM stg.fact_contracts fc
+            LEFT JOIN stg.v9_facebook_ad_creatives_full fb_cr
+                ON fc.ad_id = fb_cr.ad_id
+            WHERE fc.contract_date >= '2025-09-01'
         """
 
         params = {}
         if start_date:
-            query_text += " AND c.contract_date >= :start_date"
+            query_text += " AND fc.contract_day >= :start_date"
             params["start_date"] = start_date
         if end_date:
-            query_text += " AND c.contract_date <= :end_date"
+            query_text += " AND fc.contract_day <= :end_date"
             params["end_date"] = end_date
         if platform:
-            query_text += " AND (LOWER(c.dominant_platform) = LOWER(:platform) OR LOWER(c.unified_platform) = LOWER(:platform))"
+            query_text += " AND (LOWER(fc.dominant_platform) = LOWER(:platform) OR LOWER(fc.matched_platform) = LOWER(:platform))"
             params["platform"] = platform
 
-        query_text += " ORDER BY c.contract_date DESC LIMIT 500"
+        query_text += " ORDER BY fc.contract_date DESC LIMIT 500"
 
         result = await session.execute(text(query_text), params)
         rows = result.fetchall()
 
         return [
             {
-                "sk_contract": row.sk_contract,
-                "sk_lead": int(row.sk_lead) if row.sk_lead else 0,
-                "contract_date": str(row.contract_date) if row.contract_date else None,
+                "sk_contract": str(row.sk_contract) if row.sk_contract else "",
+                "sk_lead": str(row.sk_lead) if row.sk_lead else "",
+                "contract_date": str(row.contract_date.date()) if row.contract_date else None,
                 "platform": row.platform,
-                "campaign_id": row.campaign_id,
+                "campaign_id": row.campaign_id if row.campaign_id else "",
                 "campaign_name": row.campaign_name,
-                "ad_id": row.ad_id,
+                "ad_id": row.ad_id if row.ad_id else "",
                 "ad_name": row.ad_name,
-                "ad_creative_id": row.ad_creative_id,
-                "creative_title": row.creative_title,
-                "creative_body": row.creative_body,
-                "creative_name": row.creative_name,
-                "media_image_src": row.media_image_src,
+                "ad_creative_id": row.ad_creative_id if row.ad_creative_id else None,
+                "creative_title": row.creative_title if row.creative_title else None,
+                "creative_body": row.creative_body if row.creative_body else None,
+                "creative_name": row.creative_name if row.creative_name else None,
+                "media_image_src": row.media_image_src if row.media_image_src else None,
                 "event_name": row.event_name,
                 "traffic_source": row.traffic_source,
                 "revenue": float(row.revenue) if row.revenue else 0,
