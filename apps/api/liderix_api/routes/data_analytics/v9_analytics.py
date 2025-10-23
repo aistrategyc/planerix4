@@ -820,33 +820,33 @@ async def get_platform_comparison(
     try:
         query_text = """
             SELECT
-                report_week,
+                week_start,
                 platform,
                 leads,
                 contracts,
                 revenue,
-                conversion_rate,
-                avg_contract_value
+                avg_conversion_rate as conversion_rate,
+                revenue / NULLIF(contracts, 0) as avg_contract_value
             FROM stg.v9_platform_weekly_trends
             WHERE 1=1
         """
 
         params = {}
         if start_date:
-            query_text += " AND report_week >= :start_date"
+            query_text += " AND week_start >= :start_date"
             params["start_date"] = start_date
         if end_date:
-            query_text += " AND report_week <= :end_date"
+            query_text += " AND week_start <= :end_date"
             params["end_date"] = end_date
 
-        query_text += " ORDER BY report_week DESC, platform"
+        query_text += " ORDER BY week_start DESC, platform"
 
         result = await session.execute(text(query_text), params)
         rows = result.fetchall()
 
         return [
             {
-                "report_week": str(row.report_week) if row.report_week else None,
+                "period_start": str(row.week_start) if row.week_start else None,
                 "platform": row.platform,
                 "leads": int(row.leads) if row.leads else 0,
                 "contracts": int(row.contracts) if row.contracts else 0,
@@ -882,34 +882,36 @@ async def get_facebook_weekly(
     try:
         query_text = """
             SELECT
-                DATE_TRUNC('week', report_date)::date as week_start,
+                DATE_TRUNC('week', dt)::date as week_start,
                 campaign_id,
                 campaign_name,
                 SUM(impressions) as impressions,
                 SUM(clicks) as clicks,
                 SUM(spend) as spend,
-                SUM(conversions) as conversions,
+                SUM(crm_leads_7d) as conversions,
+                SUM(contracts) as contracts,
+                SUM(revenue) as revenue,
                 AVG(ctr) as ctr,
                 AVG(cpc) as cpc,
-                AVG(cpm) as cpm,
-                AVG(conversion_rate) as conversion_rate
+                AVG(cpl) as cpl,
+                AVG(roas) as roas
             FROM stg.v9_facebook_performance_daily
             WHERE 1=1
         """
 
         params = {}
         if start_date:
-            query_text += " AND report_date >= :start_date"
+            query_text += " AND dt >= :start_date"
             params["start_date"] = start_date
         if end_date:
-            query_text += " AND report_date <= :end_date"
+            query_text += " AND dt <= :end_date"
             params["end_date"] = end_date
         if campaign_id:
             query_text += " AND campaign_id = :campaign_id"
             params["campaign_id"] = campaign_id
 
         query_text += """
-            GROUP BY DATE_TRUNC('week', report_date), campaign_id, campaign_name
+            GROUP BY DATE_TRUNC('week', dt), campaign_id, campaign_name
             ORDER BY week_start DESC
         """
 
@@ -925,10 +927,12 @@ async def get_facebook_weekly(
                 "clicks": int(row.clicks) if row.clicks else 0,
                 "spend": float(row.spend) if row.spend else 0,
                 "conversions": int(row.conversions) if row.conversions else 0,
+                "contracts": int(row.contracts) if row.contracts else 0,
+                "revenue": float(row.revenue) if row.revenue else 0,
                 "ctr": float(row.ctr) if row.ctr else 0,
                 "cpc": float(row.cpc) if row.cpc else 0,
-                "cpm": float(row.cpm) if row.cpm else 0,
-                "conversion_rate": float(row.conversion_rate) if row.conversion_rate else 0,
+                "cpl": float(row.cpl) if row.cpl else 0,
+                "roas": float(row.roas) if row.roas else 0,
             }
             for row in rows
         ]
@@ -954,34 +958,36 @@ async def get_google_weekly(
     try:
         query_text = """
             SELECT
-                DATE_TRUNC('week', report_date)::date as week_start,
+                DATE_TRUNC('week', dt)::date as week_start,
                 campaign_id,
                 campaign_name,
                 SUM(impressions) as impressions,
                 SUM(clicks) as clicks,
-                SUM(cost) as spend,
-                SUM(conversions) as conversions,
+                SUM(spend) as spend,
+                SUM(crm_leads_7d) as conversions,
+                SUM(contracts) as contracts,
+                SUM(revenue) as revenue,
                 AVG(ctr) as ctr,
-                AVG(avg_cpc) as cpc,
-                AVG(avg_cpm) as cpm,
-                AVG(conversion_rate) as conversion_rate
+                AVG(cpc) as cpc,
+                AVG(cpl) as cpl,
+                AVG(roas) as roas
             FROM stg.v9_google_performance_daily
             WHERE 1=1
         """
 
         params = {}
         if start_date:
-            query_text += " AND report_date >= :start_date"
+            query_text += " AND dt >= :start_date"
             params["start_date"] = start_date
         if end_date:
-            query_text += " AND report_date <= :end_date"
+            query_text += " AND dt <= :end_date"
             params["end_date"] = end_date
         if campaign_id:
             query_text += " AND campaign_id = :campaign_id"
             params["campaign_id"] = campaign_id
 
         query_text += """
-            GROUP BY DATE_TRUNC('week', report_date), campaign_id, campaign_name
+            GROUP BY DATE_TRUNC('week', dt), campaign_id, campaign_name
             ORDER BY week_start DESC
         """
 
@@ -997,10 +1003,12 @@ async def get_google_weekly(
                 "clicks": int(row.clicks) if row.clicks else 0,
                 "spend": float(row.spend) if row.spend else 0,
                 "conversions": int(row.conversions) if row.conversions else 0,
+                "contracts": int(row.contracts) if row.contracts else 0,
+                "revenue": float(row.revenue) if row.revenue else 0,
                 "ctr": float(row.ctr) if row.ctr else 0,
                 "cpc": float(row.cpc) if row.cpc else 0,
-                "cpm": float(row.cpm) if row.cpm else 0,
-                "conversion_rate": float(row.conversion_rate) if row.conversion_rate else 0,
+                "cpl": float(row.cpl) if row.cpl else 0,
+                "roas": float(row.roas) if row.roas else 0,
             }
             for row in rows
         ]
@@ -1029,11 +1037,14 @@ async def get_attribution_quality(
         query_text = """
             SELECT
                 platform,
-                total_contracts,
-                contracts_with_campaign,
-                campaign_match_rate,
-                utm_coverage,
-                attribution_quality_score
+                attribution_level,
+                contracts as total_contracts,
+                contracts as contracts_with_campaign,
+                campaign_name_coverage_pct as campaign_match_rate,
+                (utm_source_coverage_pct + utm_campaign_coverage_pct + utm_medium_coverage_pct) / 3 as utm_coverage,
+                overall_quality_score as attribution_quality_score,
+                revenue,
+                avg_days_to_close
             FROM stg.v9_attribution_quality_score
             WHERE 1=1
         """
@@ -1043,7 +1054,7 @@ async def get_attribution_quality(
             query_text += " AND LOWER(platform) = LOWER(:platform)"
             params["platform"] = platform
 
-        query_text += " ORDER BY attribution_quality_score DESC"
+        query_text += " ORDER BY overall_quality_score DESC"
 
         result = await session.execute(text(query_text), params)
         rows = result.fetchall()
@@ -1051,11 +1062,14 @@ async def get_attribution_quality(
         return [
             {
                 "platform": row.platform,
+                "attribution_level": row.attribution_level,
                 "total_contracts": int(row.total_contracts) if row.total_contracts else 0,
                 "contracts_with_campaign": int(row.contracts_with_campaign) if row.contracts_with_campaign else 0,
                 "campaign_match_rate": float(row.campaign_match_rate) if row.campaign_match_rate else 0,
                 "utm_coverage": float(row.utm_coverage) if row.utm_coverage else 0,
                 "attribution_quality_score": float(row.attribution_quality_score) if row.attribution_quality_score else 0,
+                "revenue": float(row.revenue) if row.revenue else 0,
+                "avg_days_to_close": float(row.avg_days_to_close) if row.avg_days_to_close else 0,
             }
             for row in rows
         ]
