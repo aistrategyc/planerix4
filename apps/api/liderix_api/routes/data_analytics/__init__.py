@@ -47,8 +47,8 @@ router.include_router(paid_split.router, prefix="/v6/leads/paid-split", tags=["D
 # Include v6 sales endpoints (Oct 14, 2025)
 router.include_router(sales_v6.router, prefix="/sales/v6", tags=["Data Analytics v6 - Sales"])
 
-# Include v6 contracts endpoints (Oct 14, 2025)
-router.include_router(contracts_v6.router, prefix="/contracts/v6", tags=["Data Analytics v6 - Contracts"])
+# Include v6 contracts endpoints (Oct 14, 2025) - FIXED PREFIX Oct 23, 2025
+router.include_router(contracts_v6.router, prefix="/v6/contracts", tags=["Data Analytics v6 - Contracts"])
 
 # Include contracts attribution endpoints (Oct 19, 2025) - detailed contract source analysis
 router.include_router(contracts_attribution.router, prefix="/v8/contracts", tags=["Data Analytics v8 - Contracts Attribution"])
