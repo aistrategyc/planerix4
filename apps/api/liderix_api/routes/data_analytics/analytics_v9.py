@@ -804,7 +804,7 @@ async def get_contracts_enriched(
             end_date = date.today()
 
         query_text = """
-            SELECT
+            SELECT DISTINCT ON (c.contract_source_id)
                 c.sk_lead,
                 c.contract_source_id,
                 c.client_id,
@@ -831,8 +831,14 @@ async def get_contracts_enriched(
                 cr.link_url,
                 cr.cta_type
             FROM stg.v9_contracts_with_sk_enriched c
-            LEFT JOIN stg.v9_facebook_ad_creatives_full cr
-                ON c.meta_ad_id = cr.ad_id
+            LEFT JOIN LATERAL (
+                SELECT ad_creative_id, creative_name, title, body, media_image_src,
+                       thumbnail_url, link_url, cta_type
+                FROM stg.v9_facebook_ad_creatives_full
+                WHERE ad_id = c.meta_ad_id OR campaign_name = c.unified_campaign_name
+                ORDER BY media_image_src IS NOT NULL DESC, ad_creative_id
+                LIMIT 1
+            ) cr ON true
             WHERE c.contract_date >= :start_date AND c.contract_date <= :end_date
         """
 
