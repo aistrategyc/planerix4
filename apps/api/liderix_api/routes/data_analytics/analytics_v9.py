@@ -805,49 +805,78 @@ async def get_contracts_enriched(
 
         query_text = """
             SELECT
-                sk_lead,
-                contract_source_id,
-                client_id,
-                contract_date,
-                contract_amount,
-                unified_platform,
-                unified_campaign_name,
-                utm_source,
-                utm_campaign,
-                utm_medium,
-                utm_term,
-                attribution_level,
-                row_created_at
-            FROM stg.v9_contracts_with_sk_enriched
-            WHERE contract_date >= :start_date AND contract_date <= :end_date
+                c.sk_lead,
+                c.contract_source_id,
+                c.client_id,
+                c.contract_date,
+                c.contract_amount as revenue,
+                c.dominant_platform as platform,
+                c.unified_campaign_name as campaign_name,
+                c.meta_campaign_id as campaign_id,
+                c.meta_adset_id as adset_id,
+                c.meta_adset_name as adset_name,
+                c.meta_ad_id as ad_id,
+                c.meta_ad_name as ad_name,
+                c.utm_source as traffic_source,
+                c.utm_campaign,
+                c.utm_medium,
+                c.utm_term,
+                c.attribution_level,
+                cr.ad_creative_id,
+                cr.creative_name,
+                cr.title as creative_title,
+                cr.body as creative_body,
+                cr.media_image_src,
+                cr.thumbnail_url,
+                cr.link_url,
+                cr.cta_type
+            FROM stg.v9_contracts_with_sk_enriched c
+            LEFT JOIN stg.v9_facebook_ad_creatives_full cr
+                ON c.meta_ad_id = cr.ad_id
+            WHERE c.contract_date >= :start_date AND c.contract_date <= :end_date
         """
 
         params = {"start_date": start_date, "end_date": end_date}
 
         if platform:
-            query_text += " AND unified_platform = :platform"
+            query_text += " AND c.dominant_platform = :platform"
             params["platform"] = platform
 
-        query_text += " ORDER BY contract_date DESC, contract_amount DESC"
+        query_text += " ORDER BY c.contract_date DESC, c.contract_amount DESC"
 
         result = await session.execute(text(query_text), params)
         rows = result.fetchall()
 
         return [
             {
-                "sk_lead": int(row.sk_lead),
+                "sk_lead": str(row.sk_lead),
+                "sk_contract": row.contract_source_id,
                 "contract_source_id": row.contract_source_id,
                 "client_id": int(row.client_id) if row.client_id else None,
                 "contract_date": str(row.contract_date),
-                "contract_amount": float(row.contract_amount) if row.contract_amount else 0.0,
-                "unified_platform": row.unified_platform,
-                "unified_campaign_name": row.unified_campaign_name,
+                "revenue": float(row.revenue) if row.revenue else 0.0,
+                "platform": row.platform or "other",
+                "source": row.platform or "other",  # Add source field for ContractsSourceAnalytics
+                "campaign_id": row.campaign_id,
+                "campaign_name": row.campaign_name,
+                "adset_id": row.adset_id,
+                "adset_name": row.adset_name,
+                "ad_id": row.ad_id,
+                "ad_name": row.ad_name,
+                "ad_creative_id": row.ad_creative_id,
+                "creative_name": row.creative_name,
+                "creative_title": row.creative_title,
+                "creative_body": row.creative_body,
+                "media_image_src": row.media_image_src,
+                "thumbnail_url": row.thumbnail_url,
+                "link_url": row.link_url,
+                "cta_type": row.cta_type,
+                "traffic_source": row.traffic_source,
                 "utm_source": row.utm_source,
                 "utm_campaign": row.utm_campaign,
                 "utm_medium": row.utm_medium,
                 "utm_term": row.utm_term,
                 "attribution_level": row.attribution_level,
-                "row_created_at": str(row.row_created_at),
             }
             for row in rows
         ]
