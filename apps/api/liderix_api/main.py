@@ -279,6 +279,7 @@ from liderix_api.routes import (
 # --- клиентские (ITstep БД) ---
 from liderix_api.routes import data_analytics as data_analytics_router
 from liderix_api.routes.data_analytics import v9_analytics as v9_analytics_router
+from liderix_api.routes.data_analytics import analytics_v9 as analytics_v9_router
 from liderix_api.routes import ads_manager as ads_manager_router
 from liderix_api.routes import marketing_campaigns as marketing_campaigns_router
 from liderix_api.routes import ads as ads_router
@@ -314,10 +315,17 @@ app.include_router(
     tags=["Data Analytics"],
 )
 
-# V9 Analytics router (Enhanced with creatives, contracts, full funnel)
+# V9 Analytics router (Original - deprecated, use analytics_v9 instead)
 app.include_router(
     v9_analytics_router.router,
-    prefix=f"{PREFIX}/data-analytics",
+    prefix=f"{PREFIX}/data-analytics/v9-old",
+    tags=["V9 Analytics (Legacy)"],
+)
+
+# V9 Analytics New router (with REAL column names and data - USE THIS!)
+app.include_router(
+    analytics_v9_router.router,
+    prefix=f"{PREFIX}/data-analytics/v9",
     tags=["V9 Analytics"],
 )
 
