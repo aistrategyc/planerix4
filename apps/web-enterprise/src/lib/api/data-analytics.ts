@@ -845,3 +845,15 @@ export const getV9AttributionQuality = async (
   })
   return response.data || []
 }
+
+// V9 Campaigns Performance
+export const getV9CampaignsPerformance = async (
+  start_date: string,
+  end_date: string,
+  platform?: string
+): Promise<any[]> => {
+  const response = await apiClient.get("/data-analytics/v9/campaigns/performance", {
+    params: { start_date, end_date, platform },
+  })
+  return response.data || []
+}
