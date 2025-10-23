@@ -18,9 +18,9 @@ import { FacebookAdsPerformance } from "@/components/analytics/FacebookAdsPerfor
 import { GoogleAdsPerformance } from "@/components/analytics/GoogleAdsPerformance"
 
 function DataAnalyticsPageContent() {
-  // Filters - Oct 23, 2025 - V9 ONLY VERSION
-  const [dateFrom, setDateFrom] = useState("2025-09-10")
-  const [dateTo, setDateTo] = useState("2025-10-19")
+  // Filters - Oct 23, 2025 - V9 ONLY VERSION (UPDATED: wider range to capture all data)
+  const [dateFrom, setDateFrom] = useState("2025-09-01")
+  const [dateTo, setDateTo] = useState("2025-10-23")
   const [selectedPlatform, setSelectedPlatform] = useState<string>("")
 
   // V9 ONLY Data States - ALL V9 COMPONENTS (1000% Verified with SK_LEAD Keys - Oct 23, 2025)
